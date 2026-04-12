@@ -1,0 +1,110 @@
+{D:/FPGA Project/Risc_V_Project/tb/open_risc_v_soc.v} {1 {vlog -work work -vopt -stats=none {D:/FPGA Project/Risc_V_Project/tb/open_risc_v_soc.v}
+Model Technology ModelSim SE-64 vlog 10.6d Compiler 2018.02 Feb 24 2018
+-- Compiling module open_risc_v_soc
+
+Top level modules:
+	open_risc_v_soc
+
+} {} {}} {D:/FPGA Project/Risc_V_Project/rtl/id_ex.v} {1 {vlog -work work -vopt -stats=none {D:/FPGA Project/Risc_V_Project/rtl/id_ex.v}
+Model Technology ModelSim SE-64 vlog 10.6d Compiler 2018.02 Feb 24 2018
+-- Compiling module id_ex
+
+Top level modules:
+	id_ex
+
+} {} {}} {D:/FPGA Project/Risc_V_Project/rtl/regs.v} {1 {vlog -work work -vopt -stats=none {D:/FPGA Project/Risc_V_Project/rtl/regs.v}
+Model Technology ModelSim SE-64 vlog 10.6d Compiler 2018.02 Feb 24 2018
+-- Compiling module regs
+
+Top level modules:
+	regs
+
+} {} {}} {D:/FPGA Project/Risc_V_Project/tb/tb.v} {1 {vlog -work work -vopt -stats=none {D:/FPGA Project/Risc_V_Project/tb/tb.v}
+Model Technology ModelSim SE-64 vlog 10.6d Compiler 2018.02 Feb 24 2018
+-- Compiling module tb
+
+Top level modules:
+	tb
+
+} {} {}} {D:/FPGA Project/Risc_V_Project/rtl/if_id.v} {1 {vlog -work work -vopt -stats=none {D:/FPGA Project/Risc_V_Project/rtl/if_id.v}
+Model Technology ModelSim SE-64 vlog 10.6d Compiler 2018.02 Feb 24 2018
+-- Compiling module if_id
+
+Top level modules:
+	if_id
+
+} {} {}} {D:/FPGA Project/Risc_V_Project/rtl/ifetch.v} {1 {vlog -work work -vopt -stats=none {D:/FPGA Project/Risc_V_Project/rtl/ifetch.v}
+Model Technology ModelSim SE-64 vlog 10.6d Compiler 2018.02 Feb 24 2018
+-- Compiling module ifetch
+
+Top level modules:
+	ifetch
+
+} {} {}} {D:/FPGA Project/Risc_V_Project/rtl/rom.v} {1 {vlog -work work -vopt -stats=none {D:/FPGA Project/Risc_V_Project/rtl/rom.v}
+Model Technology ModelSim SE-64 vlog 10.6d Compiler 2018.02 Feb 24 2018
+-- Compiling module rom
+
+Top level modules:
+	rom
+
+} {} {}} {D:/FPGA Project/Risc_V_Project/rtl/defines.v} {1 {vlog -work work -vopt -stats=none {D:/FPGA Project/Risc_V_Project/rtl/defines.v}
+Model Technology ModelSim SE-64 vlog 10.6d Compiler 2018.02 Feb 24 2018
+
+} {} {}} {D:/FPGA Project/Risc_V_Project/rtl/open_risc_v.v} {1 {vlog -work work -vopt -stats=none {D:/FPGA Project/Risc_V_Project/rtl/open_risc_v.v}
+Model Technology ModelSim SE-64 vlog 10.6d Compiler 2018.02 Feb 24 2018
+-- Compiling module open_risc_v
+
+Top level modules:
+	open_risc_v
+
+} {} {}} {D:/FPGA Project/Risc_V_Project/rtl/ram.v} {1 {vlog -work work -vopt -stats=none {D:/FPGA Project/Risc_V_Project/rtl/ram.v}
+Model Technology ModelSim SE-64 vlog 10.6d Compiler 2018.02 Feb 24 2018
+-- Compiling module ram
+
+Top level modules:
+	ram
+
+} {} {}} {D:/FPGA Project/Risc_V_Project/rtl/pc_reg.v} {1 {vlog -work work -vopt -stats=none {D:/FPGA Project/Risc_V_Project/rtl/pc_reg.v}
+Model Technology ModelSim SE-64 vlog 10.6d Compiler 2018.02 Feb 24 2018
+-- Compiling module pc_reg
+
+Top level modules:
+	pc_reg
+
+} {} {}} {D:/FPGA Project/Risc_V_Project/tb/ctrl.v} {1 {vlog -work work -vopt -stats=none {D:/FPGA Project/Risc_V_Project/tb/ctrl.v}
+Model Technology ModelSim SE-64 vlog 10.6d Compiler 2018.02 Feb 24 2018
+-- Compiling module ctrl
+
+Top level modules:
+	ctrl
+
+} {} {}} {D:/FPGA Project/Risc_V_Project/utils/dff_set.v} {1 {vlog -work work -vopt -stats=none {D:/FPGA Project/Risc_V_Project/utils/dff_set.v}
+Model Technology ModelSim SE-64 vlog 10.6d Compiler 2018.02 Feb 24 2018
+-- Compiling module dff_set
+
+Top level modules:
+	dff_set
+
+} {} {}} {D:/FPGA Project/Risc_V_Project/utils/dual_ram.v} {1 {vlog -work work -vopt -stats=none {D:/FPGA Project/Risc_V_Project/utils/dual_ram.v}
+Model Technology ModelSim SE-64 vlog 10.6d Compiler 2018.02 Feb 24 2018
+-- Compiling module dual_ram
+-- Compiling module dual_ram_templete
+
+Top level modules:
+	dual_ram
+
+} {} {}} {D:/FPGA Project/Risc_V_Project/rtl/ex.v} {1 {vlog -work work -vopt -stats=none {D:/FPGA Project/Risc_V_Project/rtl/ex.v}
+Model Technology ModelSim SE-64 vlog 10.6d Compiler 2018.02 Feb 24 2018
+-- Compiling module ex
+
+Top level modules:
+	ex
+
+} {} {}} {D:/FPGA Project/Risc_V_Project/rtl/id.v} {1 {vlog -work work -vopt -stats=none {D:/FPGA Project/Risc_V_Project/rtl/id.v}
+Model Technology ModelSim SE-64 vlog 10.6d Compiler 2018.02 Feb 24 2018
+-- Compiling module id
+
+Top level modules:
+	id
+
+} {} {}}
