@@ -2,7 +2,7 @@
 
 module if_id(
     input clk,
-    input rst_n,
+    input rst,
     input [31:0] pc_addr_i,              
     input [31:0] inst_i,   
 
@@ -12,8 +12,8 @@ module if_id(
     output reg [31:0] pc_addr_o,         // 传递指令地址
     output reg [31:0] inst_o        // 传递指令内容
 );
-    always @(posedge clk or negedge rst_n) begin
-        if(!rst_n) begin
+    always @(posedge clk or negedge rst) begin
+        if(rst) begin
             pc_addr_o <= 32'b0;
             inst_o <= `NOP;
         end

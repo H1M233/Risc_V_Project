@@ -2,7 +2,7 @@
 
 module mem_wb(
     input clk,
-    input rst_n,
+    input rst,
     input [31:0] rd_data_i,
     input [4:0] rd_addr_i,
     input regs_wen_i,
@@ -11,8 +11,8 @@ module mem_wb(
     output reg [4:0] rd_addr_o,
     output reg regs_wen_o
 );
-    always@(posedge clk or negedge rst_n) begin
-        if(!rst_n) begin
+    always@(posedge clk or negedge rst) begin
+        if(rst) begin
             rd_data_o <= 32'b0;
             rd_addr_o <= 5'b0;
             regs_wen_o <= 1'b0;

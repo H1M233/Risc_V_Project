@@ -2,7 +2,7 @@
 
 module ex_mem(
     input clk,
-    input rst_n,
+    input rst,
 
     input [31:0] inst_i,
     input mem_wen_i,
@@ -22,8 +22,8 @@ module ex_mem(
     output reg [4:0] rd_addr_o,
     output reg [31:0] rs2_data_o
 );
-    always@(posedge clk or negedge rst_n) begin
-        if(!rst_n) begin
+    always@(posedge clk or negedge rst) begin
+        if(rst) begin
             inst_o <= `NOP;
             mem_wen_o <= 1'b0;
             mem_req_o <= 1'b0;

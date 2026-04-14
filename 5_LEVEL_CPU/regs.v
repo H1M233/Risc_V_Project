@@ -2,7 +2,7 @@
 
 module regs(
     input clk,
-    input rst_n,
+    input rst,
     input regs_wen,       // 寄存器写使能信号
     input [4:0] rs1_addr_i,
     input [4:0] rs2_addr_i,
@@ -16,7 +16,7 @@ module regs(
 
     // 读寄存器
     always@(*) begin
-        if(!rst_n) begin
+        if(rst) begin
             rs1_data_o = 32'b0;
         end 
         else if((rs1_addr_i == rd_addr_i) && regs_wen && (rd_addr_i != 0)) begin
@@ -28,7 +28,7 @@ module regs(
     end
 
     always@(*) begin
-        if(!rst_n) begin
+        if(rst) begin
             rs2_data_o = 32'b0;
         end 
         else if((rs2_addr_i == rd_addr_i) && regs_wen && (rd_addr_i != 0)) begin
@@ -40,8 +40,8 @@ module regs(
     end
     integer i;
     // 写寄存器
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+    always @(posedge clk or negedge rst) begin
+        if (rst) begin
             // 复位时将所有寄存器清零
             for (i = 1; i < 32; i = i + 1) begin
                 regs[i] <= 32'b0;

@@ -1,7 +1,7 @@
 `include "rv32I.vh"
 module id_ex(
     input clk,
-    input rst_n,
+    input rst,
     input jump_en,              // 来自控制单元的跳转使能信号
     input hazard_en,             // 来自控制单元的冒险使能信号
     input regs_wen_i,                   // 来自控制单元的寄存器写使能信号
@@ -24,8 +24,8 @@ module id_ex(
     output reg [31:0] rs1_data_o,
     output reg [31:0] rs2_data_o
 );
-    always @(posedge clk or negedge rst_n) begin
-        if(!rst_n) begin
+    always @(posedge clk or negedge rst) begin
+        if(rst) begin
             regs_wen_o <= 1'b0;
             inst_o <= `NOP;
             value1_o <= 32'b0;

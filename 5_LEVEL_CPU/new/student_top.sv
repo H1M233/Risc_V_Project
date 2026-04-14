@@ -50,7 +50,7 @@ module student_top#(
     assign inst_addr = pc[13:2];
 
     top_riscv Core_cpu (
-        .cpu_rst            (!w_clk_rst),
+        .cpu_rst            (w_clk_rst),
         .cpu_clk            (w_cpu_clk),
 
         // Interface to IROM
