@@ -237,7 +237,7 @@ module top_riscv(
         .mem_req_i(ex_mem_req),
         .mem_addr_i(ex_mem_addr_o),
         .regs_wen_i(ex_regs_wen_o),
-        .rd_data_i(perip_rdata),
+        .rd_data_i(ex_rd_data_o),
         .rd_addr_i(ex_rd_addr_o),
         .rs2_data_i(ex_rs2_data_o),
 
