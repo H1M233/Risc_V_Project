@@ -54,7 +54,7 @@ def compile():
     # 获取上一级目录
     rtl_dir = os.path.abspath(os.path.join(os.getcwd(), ".."))
     # iverilog 程序
-    iverilog_cmd = ['iverilog']
+    iverilog_cmd = ['iverilog', '-g2012']
     # 编译生成文件
     iverilog_cmd += ['-o', r'out.vvp']
     # 头文件(defines.v)路径
@@ -63,9 +63,14 @@ def compile():
     iverilog_cmd.append(rtl_dir + r'/auto sim/tb.v')
 
     # 外设
-    iverilog_cmd.append(rtl_dir + r'/module from 3level/rom.v')
+    iverilog_cmd.append(rtl_dir + r'/module from 3level/IROM.v')
+    iverilog_cmd.append(rtl_dir + r'/module from 3level/DRAM.v')
+    iverilog_cmd.append(rtl_dir + r'/new/seg7.sv')
+    iverilog_cmd.append(rtl_dir + r'/new/display_seg.sv')
+    iverilog_cmd.append(rtl_dir + r'/new/counter.sv')
     iverilog_cmd.append(rtl_dir + r'/new/dram_driver.sv')
-    iverilog_cmd.append(rtl_dir + r'/new/dram_driver.sv')
+    iverilog_cmd.append(rtl_dir + r'/new/perip_bridge.sv')
+    iverilog_cmd.append(rtl_dir + r'/new/student_top.sv')
 
     # 内核core
     iverilog_cmd.append(rtl_dir + r'/ex.v')

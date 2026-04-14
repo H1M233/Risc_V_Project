@@ -61,7 +61,26 @@ module perip_bridge(
     end
 
     // read process: in one cycle
-    always_comb begin
+    // always_comb begin
+    //     if (~perip_wen) begin
+    //         case (perip_addr)
+    //             SW0_ADDR:  mmio_rdata = virtual_sw_input[31:0];
+    //             SW1_ADDR:  mmio_rdata = virtual_sw_input[63:32];
+    //             KEY_ADDR:  mmio_rdata = {24'd0, virtual_key_input};
+    //             SEG_ADDR:  mmio_rdata = seg_wdata;
+    //             default:   mmio_rdata = 32'hDEAD_BEEF;
+    //         endcase
+    //     end else begin
+    //         mmio_rdata = 32'h0;
+    //     end
+    // end
+
+
+    // iverilog不支持always_comb
+
+
+    // read process: in one cycle
+    always@(*) begin
         if (~perip_wen) begin
             case (perip_addr)
                 SW0_ADDR:  mmio_rdata = virtual_sw_input[31:0];
@@ -86,7 +105,7 @@ module perip_bridge(
         .seg4   (seg_output[36:30]),
         .ans    ({seg_output[39:38], seg_output[29:28], seg_output[19:18], seg_output[9:8]})
     ); 
-   
+
     assign seg_output[7]  = 0;
     assign seg_output[17] = 0;
     assign seg_output[27] = 0;
