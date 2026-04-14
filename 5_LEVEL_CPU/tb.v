@@ -76,7 +76,7 @@ end
 
 // rom初始值
 initial begin
-    $readmemh("./generated/rv32ui-p-sub.txt", tb.IROM.rom_mem);
+    $readmemh("./generated/inst_data.txt", tb.IROM.rom_mem);
     // $readmemh("./inst_txt/rv32ui-p-andi.txt", tb.open_risc_v_soc_inst.rom_inst.rom_mem);
 end
 
