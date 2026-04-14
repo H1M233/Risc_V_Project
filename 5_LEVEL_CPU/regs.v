@@ -16,26 +16,26 @@ module regs(
 
     // 读寄存器
     always@(*) begin
-        if(!rst_n || !rs1_addr_i) begin
+        if(!rst_n) begin
             rs1_data_o = 32'b0;
         end 
-        else if((rs1_addr_i == rd_addr_i) && regs_wen) begin
+        else if((rs1_addr_i == rd_addr_i) && regs_wen && (rd_addr_i != 0)) begin
             rs1_data_o = rd_data_i;   // 数据转发，解决数据冒险
         end
         else begin
-            rs1_data_o = regs[rs1_addr_i];
+            rs1_data_o = (rs1_addr_i != 0) ? regs[rs1_addr_i] : 32'b0;
         end
     end
 
     always@(*) begin
-        if(!rst_n || !rs2_addr_i) begin
+        if(!rst_n) begin
             rs2_data_o = 32'b0;
         end 
-        else if((rs2_addr_i == rd_addr_i) && regs_wen) begin
+        else if((rs2_addr_i == rd_addr_i) && regs_wen && (rd_addr_i != 0)) begin
             rs2_data_o = rd_data_i;   // 数据转发，解决数据冒险
         end
         else begin
-            rs2_data_o = regs[rs2_addr_i];
+            rs2_data_o = (rs2_addr_i != 0) ? regs[rs2_addr_i] : 32'b0;
         end
     end
     integer i;
@@ -43,11 +43,11 @@ module regs(
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             // 复位时将所有寄存器清零
-            for (i = 0; i < 32; i = i + 1) begin
+            for (i = 1; i < 32; i = i + 1) begin
                 regs[i] <= 32'b0;
             end
         end 
-        else if (regs_wen && rd_addr_i != 0) begin
+        else if (regs_wen && (rd_addr_i != 0))  begin
             regs[rd_addr_i] <= rd_data_i;   // 写入数据到指定寄存器，x0寄存器不可写
         end
     end

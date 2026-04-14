@@ -38,11 +38,11 @@ module mem(
                 perip_wdata = 32'b0;
                 case(funct3)
                     `LB: begin
-                        perip_mask = 2'b10;
+                        perip_mask = 2'b00;
                         rd_data_o = {{24{perip_rdata[7]}}, perip_rdata[7:0]};
                     end
                     `LH: begin
-                        perip_mask = 2'b10;
+                        perip_mask = 2'b01;
                         rd_data_o = {{16{perip_rdata[15]}}, perip_rdata[15:0]};
                     end
                     `LW: begin
@@ -50,11 +50,11 @@ module mem(
                         rd_data_o = perip_rdata;
                     end
                     `LBU: begin
-                        perip_mask = 2'b10;
+                        perip_mask = 2'b00;
                         rd_data_o = {24'b0, perip_rdata[7:0]};
                     end
                     `LHU: begin
-                        perip_mask = 2'b10;
+                        perip_mask = 2'b01;
                         rd_data_o = {16'b0, perip_rdata[15:0]};
                     end
                     default: begin
