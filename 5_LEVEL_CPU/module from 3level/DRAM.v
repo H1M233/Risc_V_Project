@@ -1,17 +1,11 @@
-module ram(
+module DRAM(
     input   wire            clk,
-    input   wire            rst,
+    input   wire[32 - 1:0]  addr_i,
     input   wire[3:0]       w_en_i,       // 分别设置4个写使能
-    input   wire[32 - 1:0]  w_addr_i,
-    input   wire[32 - 1:0]  w_data_i,
-    input   wire            r_en_i,
-    input   wire[32 - 1:0]  r_addr_i,
     output  wire[32 - 1:0]  r_data_o
 );
 
     wire[11:0]  w_addr = w_addr_i[13:2];
-    wire[11:0]  r_addr = r_addr_i[13:2];
-
 
     // 字节0
     dual_ram #(
