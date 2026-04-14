@@ -13,7 +13,7 @@ module if_id(
     output reg [31:0] inst_o        // 传递指令内容
 );
     always @(posedge clk or negedge rst) begin
-        if(rst) begin
+        if(!rst) begin
             pc_addr_o <= 32'b0;
             inst_o <= `NOP;
         end

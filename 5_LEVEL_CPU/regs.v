@@ -16,7 +16,7 @@ module regs(
 
     // 读寄存器
     always@(*) begin
-        if(rst) begin
+        if(!rst) begin
             rs1_data_o = 32'b0;
         end 
         else if((rs1_addr_i == rd_addr_i) && regs_wen && (rd_addr_i != 0)) begin
@@ -28,7 +28,7 @@ module regs(
     end
 
     always@(*) begin
-        if(rst) begin
+        if(!rst) begin
             rs2_data_o = 32'b0;
         end 
         else if((rs2_addr_i == rd_addr_i) && regs_wen && (rd_addr_i != 0)) begin
@@ -41,7 +41,7 @@ module regs(
     integer i;
     // 写寄存器
     always @(posedge clk or negedge rst) begin
-        if (rst) begin
+        if (!rst) begin
             // 复位时将所有寄存器清零
             for (i = 1; i < 32; i = i + 1) begin
                 regs[i] <= 32'b0;

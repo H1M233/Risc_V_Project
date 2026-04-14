@@ -10,7 +10,7 @@ module pc(
     output reg [31:0] pc_addr_o // 传递给if模块的pc地址输出
 );
     always @(posedge clk or negedge rst) begin
-        if(rst) begin
+        if(!rst) begin
             pc_addr_o <= 32'h8000_0000; // 复位时pc地址初始化为0
         end
         else if(jump_en) begin

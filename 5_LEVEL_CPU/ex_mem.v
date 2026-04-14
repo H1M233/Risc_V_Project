@@ -23,7 +23,7 @@ module ex_mem(
     output reg [31:0] rs2_data_o
 );
     always@(posedge clk or negedge rst) begin
-        if(rst) begin
+        if(!rst) begin
             inst_o <= `NOP;
             mem_wen_o <= 1'b0;
             mem_req_o <= 1'b0;

@@ -25,7 +25,7 @@ module id_ex(
     output reg [31:0] rs2_data_o
 );
     always @(posedge clk or negedge rst) begin
-        if(rst) begin
+        if(!rst) begin
             regs_wen_o <= 1'b0;
             inst_o <= `NOP;
             value1_o <= 32'b0;
