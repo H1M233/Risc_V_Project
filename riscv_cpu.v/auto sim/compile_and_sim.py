@@ -60,12 +60,12 @@ def compile():
     # 头文件(defines.v)路径
     iverilog_cmd += ['-I', rtl_dir]
     # testbench 文件
-    iverilog_cmd.append(rtl_dir + r'/tb.v')
+    iverilog_cmd.append(rtl_dir + r'/auto sim/tb.v')
 
     # 外设
-    iverilog_cmd.append(rtl_dir + r'/module from 3level/dual_ram.v')
-    iverilog_cmd.append(rtl_dir + r'/module from 3level/ram.v')
     iverilog_cmd.append(rtl_dir + r'/module from 3level/rom.v')
+    iverilog_cmd.append(rtl_dir + r'/new/dram_driver.sv')
+    iverilog_cmd.append(rtl_dir + r'/new/dram_driver.sv')
 
     # 内核core
     iverilog_cmd.append(rtl_dir + r'/ex.v')
