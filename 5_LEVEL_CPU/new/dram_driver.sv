@@ -46,8 +46,54 @@ module dram_driver(
     );
 
     // dram_rdata_raw process, lh lb
-    always_comb begin
-        dout = 0;
+    // always_comb begin
+    //     dout = 0;
+    //     case (perip_mask)
+    //         2'b00: // lb/lbu
+    //             case (offset)
+    //                 2'b00:  dout = {24'b0, dram_rdata_raw[7:0]};
+    //                 2'b01:  dout = {24'b0, dram_rdata_raw[15:8]};
+    //                 2'b10:  dout = {24'b0, dram_rdata_raw[23:16]};
+    //                 2'b11:  dout = {24'b0, dram_rdata_raw[31:24]};
+    //             endcase
+    //         2'b01: // lh/lhu
+    //             case (offset[1])
+    //                 1'b0:  dout = {24'b0, dram_rdata_raw[15:0]};
+    //                 1'b1:  dout = {24'b0, dram_rdata_raw[31:16]};
+    //             endcase
+    //         2'b10: dout = dram_rdata_raw;
+    //         default: dout = 0;
+    //     endcase
+    // end
+
+    // dram_data_raw process, sh, sb
+    // always_comb begin
+    //     case (perip_mask)
+    //         2'b10: dram_data = perip_wdata;  // sw
+    //         2'b01: begin           // sh
+    //             case (offset[1])
+    //                 1'b0: dram_data = {dram_rdata_raw[31:16], perip_wdata[15:0]};
+    //                 1'b1: dram_data = {perip_wdata[15:0], dram_rdata_raw[15:0]};
+    //             endcase
+    //         end
+    //         2'b00: begin           // sb
+    //             case (offset)
+    //                 2'b00: dram_data = {dram_rdata_raw[31:8], perip_wdata[7:0]};
+    //                 2'b01: dram_data = {dram_rdata_raw[31:16], perip_wdata[7:0], dram_rdata_raw[7:0]};
+    //                 2'b10: dram_data = {dram_rdata_raw[31:24], perip_wdata[7:0], dram_rdata_raw[15:0]};
+    //                 2'b11: dram_data = {perip_wdata[7:0], dram_rdata_raw[23:0]};
+    //             endcase
+    //         end
+    //         default: dram_data = perip_wdata;
+    //     endcase
+    // end
+    
+    
+    // iverilog不支持always_comb
+
+
+    // dram_rdata_raw process, lh lb
+    always@(*) begin
         case (perip_mask)
             2'b00: // lb/lbu
                 case (offset)
@@ -62,12 +108,12 @@ module dram_driver(
                     1'b1:  dout = {24'b0, dram_rdata_raw[31:16]};
                 endcase
             2'b10: dout = dram_rdata_raw;
-            default: dout = 0;
+            default: dout = 32'b0;
         endcase
     end
 
     // dram_data_raw process, sh, sb
-    always_comb begin
+    always@(*) begin
         case (perip_mask)
             2'b10: dram_data = perip_wdata;  // sw
             2'b01: begin           // sh

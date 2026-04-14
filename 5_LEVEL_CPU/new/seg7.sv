@@ -24,7 +24,7 @@ module seg7(
     input  logic [3:0]      din     ,
     output logic [6:0]      dout    
 );
- 
+
 always_comb begin
     case(din)
         4'h0:dout = 7'b011_1111;
