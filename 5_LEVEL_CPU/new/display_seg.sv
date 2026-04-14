@@ -39,7 +39,7 @@ module display_seg (
         else 
             count <= count + 1;
     end
-       
+    
     always @(*)
     case(count[4])
         0: begin

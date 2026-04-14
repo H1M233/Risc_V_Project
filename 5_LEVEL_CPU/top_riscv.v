@@ -9,7 +9,7 @@ module top_riscv(
     //to DROM
     output [31:0] perip_addr,
     output perip_wen,
-    output [1:0] perip_mask,
+    output [2:0] perip_mask,
     output [31:0] perip_wdata,
     input [31:0] perip_rdata
 );

@@ -40,7 +40,7 @@ Disassembly of section .text.init:
   68:	beef1eb7          	lui	t4,0xbeef1
   6c:	aa0e8e93          	addi	t4,t4,-1376 # beef0aa0 <_end+0xbeeefa18>
   70:	00400193          	li	gp,4
-  74:	41df1663          	bne	t5,t4,480 <fail>
+  74:	41df1663          	bne	t5,t4,480 <fail>    
 
 00000078 <test_5>:
   78:	00001097          	auipc	ra,0x1

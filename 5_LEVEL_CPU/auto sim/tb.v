@@ -43,7 +43,7 @@ always #10 clk_50Mhz = ~clk_50Mhz;
 
 
 initial begin
-    rst <= 1'b1;    #30;    rst <= 1'b0;
+    rst <= 1'b0;    #30;    rst <= 1'b1;
 end
 
 // rom初始值

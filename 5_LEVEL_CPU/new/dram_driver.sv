@@ -25,7 +25,7 @@ module dram_driver(
 
     input  logic [17:0]  perip_addr			,
     input  logic [31:0]  perip_wdata		,
-	input  logic [1:0]	 perip_mask			,
+	input  logic [2:0]	 perip_mask			,
     input  logic         dram_wen           ,
     output logic [31:0]  perip_rdata		
 );
@@ -94,27 +94,27 @@ module dram_driver(
 
     // dram_rdata_raw process, lh lb
     always@(*) begin
-        case (perip_mask)
-            2'b00: // lb/lbu
-                case (offset)
-                    2'b00:  dout = {24'b0, dram_rdata_raw[7:0]};
-                    2'b01:  dout = {24'b0, dram_rdata_raw[15:8]};
-                    2'b10:  dout = {24'b0, dram_rdata_raw[23:16]};
-                    2'b11:  dout = {24'b0, dram_rdata_raw[31:24]};
-                endcase
+        case (perip_mask[2:1])
+            2'b10: dout = dram_rdata_raw;
             2'b01: // lh/lhu
                 case (offset[1])
-                    1'b0:  dout = {24'b0, dram_rdata_raw[15:0]};
-                    1'b1:  dout = {24'b0, dram_rdata_raw[31:16]};
+                    1'b0:  dout = {(perip_mask[0]) ? 16'b0 : {16{dram_rdata_raw[15]}}, dram_rdata_raw[15:0]};
+                    1'b1:  dout = {(perip_mask[0]) ? 16'b0 : {16{dram_rdata_raw[31]}}, dram_rdata_raw[31:16]};
                 endcase
-            2'b10: dout = dram_rdata_raw;
+            2'b00: // lb/lbu
+                case (offset)
+                    2'b00:  dout = {(perip_mask[0]) ? 24'b0 : {24{dram_rdata_raw[7]}}, dram_rdata_raw[7:0]};
+                    2'b01:  dout = {(perip_mask[0]) ? 24'b0 : {24{dram_rdata_raw[15]}}, dram_rdata_raw[15:8]};
+                    2'b10:  dout = {(perip_mask[0]) ? 24'b0 : {24{dram_rdata_raw[23]}}, dram_rdata_raw[23:16]};
+                    2'b11:  dout = {(perip_mask[0]) ? 24'b0 : {24{dram_rdata_raw[31]}}, dram_rdata_raw[31:24]};
+                endcase
             default: dout = 32'b0;
         endcase
     end
 
     // dram_data_raw process, sh, sb
     always@(*) begin
-        case (perip_mask)
+        case (perip_mask[2:1])
             2'b10: dram_data = perip_wdata;  // sw
             2'b01: begin           // sh
                 case (offset[1])

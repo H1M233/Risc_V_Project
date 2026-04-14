@@ -22,8 +22,7 @@ module tb;
 
     // rom初始值
     initial begin
-        $readmemh("../sim/generated/rv32ui-p-add.txt", tb.open_risc_v_soc_inst.rom_inst.rom_mem);
-        // $readmemh("./inst_txt/rv32ui-p-andi.txt", tb.open_risc_v_soc_inst.rom_inst.rom_mem);
+        $readmemh("./generated/rv32ui-p-lw.txt", tb.open_risc_v_soc_inst.rom_inst.rom_mem);
     end
 
     initial begin
