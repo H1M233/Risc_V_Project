@@ -94,7 +94,7 @@ module top_riscv(
 
     pc PC(
         .clk(cpu_clk),
-        .rst_n(cpu_rst),
+        .rst(cpu_rst),
         .jump_en(jump_jump_en_o),
         .jump_addr_i(jump_jump_addr_o),
         .hazard_en(hazard_hazard_en),
@@ -125,7 +125,7 @@ module top_riscv(
 
     regs REGS(
         .clk(cpu_clk),
-        .rst_n(cpu_rst),
+        .rst(cpu_rst),
         .regs_wen(wb_regs_wen_o),
         .rs1_addr_i(id_rs1_addr_o),
         .rs2_addr_i(id_rs2_addr_o),
@@ -144,7 +144,7 @@ module top_riscv(
 
     if_id IF_ID(
         .clk(cpu_clk),
-        .rst_n(cpu_rst),
+        .rst(cpu_rst),
         .pc_addr_i(if_pc_addr_o),
         .inst_i(if_inst_o),
         .jump_en(jump_jump_en_o),
@@ -179,7 +179,7 @@ module top_riscv(
 
     id_ex ID_EX(
         .clk(cpu_clk),
-        .rst_n(cpu_rst),
+        .rst(cpu_rst),
         .jump_en(jump_jump_en_o),
         .hazard_en(hazard_hazard_en),
         .regs_wen_i(id_reg_wen),
@@ -231,7 +231,7 @@ module top_riscv(
 
     ex_mem EX_MEM(
         .clk(cpu_clk),
-        .rst_n(cpu_rst),
+        .rst(cpu_rst),
         .inst_i(ex_inst_o),
         .mem_wen_i(ex_mem_wen),
         .mem_req_i(ex_mem_req),
@@ -273,7 +273,7 @@ module top_riscv(
 
     mem_wb MEM_WB(
         .clk(cpu_clk),
-        .rst_n(cpu_rst),
+        .rst(cpu_rst),
         .rd_data_i(mem_rd_data_o),
         .rd_addr_i(mem_rd_addr_o),
         .regs_wen_i(mem_regs_wen_o),
