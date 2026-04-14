@@ -7,3 +7,7 @@ Quartus_Project/
 Vivado_Project/
 
 MODELSIM/
+
+5_LEVEL_CPU/auto sim/out.vvp
+
+5_LEVEL_CPU/auto sim/__pycache__/

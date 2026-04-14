@@ -16,26 +16,26 @@ module regs(
 
     // 读寄存器
     always@(*) begin
-        if(!rst_n) begin
+        if(!rst_n || !rs1_addr_i) begin
             rs1_data_o = 32'b0;
         end 
         else if((rs1_addr_i == rd_addr_i) && regs_wen) begin
             rs1_data_o = rd_data_i;   // 数据转发，解决数据冒险
         end
         else begin
-            rs1_data_o = (rs1_addr_i != 0) ? regs[rs1_addr_i] : 32'b0;
+            rs1_data_o = regs[rs1_addr_i];
         end
     end
 
     always@(*) begin
-        if(!rst_n) begin
+        if(!rst_n || !rs2_addr_i) begin
             rs2_data_o = 32'b0;
         end 
         else if((rs2_addr_i == rd_addr_i) && regs_wen) begin
             rs2_data_o = rd_data_i;   // 数据转发，解决数据冒险
         end
         else begin
-            rs2_data_o = (rs2_addr_i != 0) ? regs[rs2_addr_i] : 32'b0;
+            rs2_data_o = regs[rs2_addr_i];
         end
     end
     integer i;
