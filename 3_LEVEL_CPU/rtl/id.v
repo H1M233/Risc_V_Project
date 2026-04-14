@@ -306,6 +306,8 @@ module id(
                 rd_wen_o    = 1'b0;
                 base_addr_o     = 32'b0;
                 addr_offest_o   = 32'b0;
+                mem_r_addr_o   = 32'b0;
+                mem_r_req_o    = 1'b0;
             end
         endcase
     end

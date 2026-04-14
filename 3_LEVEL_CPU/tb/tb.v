@@ -2,14 +2,14 @@ module tb;
     reg         clk;
     reg         rst;
 
-    wire        x3  = tb.open_risc_v_soc_inst.open_risc_v_inst.regs_inst.regs[3];   // 进行的test序号
-    wire        x26 = tb.open_risc_v_soc_inst.open_risc_v_inst.regs_inst.regs[26];  // 测试结束
-    wire        x27 = tb.open_risc_v_soc_inst.open_risc_v_inst.regs_inst.regs[27];  // 0: fail, 1: pass
-    
     open_risc_v_soc open_risc_v_soc_inst(
         .clk    (clk),
         .rst    (rst)
     );
+
+    wire        x3  = tb.open_risc_v_soc_inst.open_risc_v_inst.regs_inst.regs[3];   // 进行的test序号
+    wire        x26 = tb.open_risc_v_soc_inst.open_risc_v_inst.regs_inst.regs[26];  // 测试结束
+    wire        x27 = tb.open_risc_v_soc_inst.open_risc_v_inst.regs_inst.regs[27];  // 0: fail, 1: pass
     
     // 初始化时钟信号
     initial clk <= 1'b1;

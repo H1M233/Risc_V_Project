@@ -27,8 +27,7 @@ module ex(
     // to mem - write
     output  reg[31:0]   mem_w_addr_o,
     output  reg[31:0]   mem_w_data_o,
-    output  reg[3:0]    mem_w_sel_o,
-    output  reg         mem_w_req_o
+    output  reg[3:0]    mem_w_sel_o
 );
 
     // 运算器
@@ -77,7 +76,6 @@ module ex(
                 mem_w_addr_o    = 32'b0;
                 mem_w_data_o    = 32'b0;
                 mem_w_sel_o     = 4'b0;
-                mem_w_req_o     = 1'b0;
 
                 case(func3)
 
@@ -169,7 +167,6 @@ module ex(
                 mem_w_addr_o    = 32'b0;
                 mem_w_data_o    = 32'b0;
                 mem_w_sel_o     = 4'b0;
-                mem_w_req_o     = 1'b0;
 
                 case(func3)
 
@@ -273,7 +270,6 @@ module ex(
                 mem_w_addr_o    = 32'b0;
                 mem_w_data_o    = 32'b0;
                 mem_w_sel_o     = 4'b0;
-                mem_w_req_o     = 1'b0;
 
                 case(func3)
 
@@ -384,7 +380,6 @@ module ex(
                             end
                         endcase
                         mem_w_addr_o    = base_addr_add_addr_offset;
-                        mem_w_req_o     = 1'b1;
                     end
 
                     // StoreHalf: M[rs1 + imm][15:0] = rs2[15:0]
@@ -404,7 +399,6 @@ module ex(
                             end
                         endcase
                         mem_w_addr_o    = base_addr_add_addr_offset;
-                        mem_w_req_o     = 1'b1;
                     end
                     
                     // StoreWord: M[rs1 + imm] = rs2
@@ -412,7 +406,6 @@ module ex(
                         mem_w_addr_o    = base_addr_add_addr_offset;
                         mem_w_data_o    = op2_i;
                         mem_w_sel_o     = 4'b1111;
-                        mem_w_req_o     = 1'b1;
                     end
                     
                     // 默认状态下全给0
@@ -420,7 +413,6 @@ module ex(
                         mem_w_addr_o    = 32'b0;
                         mem_w_data_o    = 32'b0;
                         mem_w_sel_o     = 4'b0;
-                        mem_w_req_o     = 1'b0;
                     end
                 endcase
             end
@@ -436,7 +428,6 @@ module ex(
                 mem_w_addr_o    = 32'b0;
                 mem_w_data_o    = 32'b0;
                 mem_w_sel_o     = 4'b0;
-                mem_w_req_o     = 1'b0;
 
                 case(func3)
 
@@ -504,7 +495,6 @@ module ex(
                 mem_w_addr_o    = 32'b0;
                 mem_w_data_o    = 32'b0;
                 mem_w_sel_o     = 4'b0;
-                mem_w_req_o     = 1'b0;
             end
 
             // LUI: rd = imm << 12
@@ -520,7 +510,6 @@ module ex(
                 mem_w_addr_o    = 32'b0;
                 mem_w_data_o    = 32'b0;
                 mem_w_sel_o     = 4'b0;
-                mem_w_req_o     = 1'b0;
             end
 
             // AUIPC: rd = pc + (imm << 12) 
@@ -536,7 +525,6 @@ module ex(
                 mem_w_addr_o    = 32'b0;
                 mem_w_data_o    = 32'b0;
                 mem_w_sel_o     = 4'b0;
-                mem_w_req_o     = 1'b0;
             end
 
             default:begin
@@ -553,7 +541,6 @@ module ex(
                 mem_w_addr_o    = 32'b0;
                 mem_w_data_o    = 32'b0;
                 mem_w_sel_o     = 4'b0;
-                mem_w_req_o     = 1'b0;
             end
         endcase
     end

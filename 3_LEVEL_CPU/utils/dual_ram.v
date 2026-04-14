@@ -79,15 +79,21 @@
         input   wire            r_en_i
     );
         reg[DW - 1:0] memory[0:MEM_NUM - 1];
+        integer i;
 
         always@(posedge clk) begin
-            if(rst && r_en_i)
-                r_data_o <= memory[r_addr_i];
-        end
+            if(rst) begin
+                if(r_en_i)
+                    r_data_o <= memory[r_addr_i];
+                if(w_en_i)
+                    memory[w_addr_i] <= w_data_i;
+            end
+            else begin
+                r_data_o <= 32'b0;
 
-        always@(posedge clk) begin
-            if(rst && w_en_i)
-                memory[w_addr_i] <= w_data_i;
+                for(i = 0; i <= MEM_NUM - 1; i = i + 1)
+                    memory[i] <= {DW - 1{1'b0}};
+            end
         end
 
     endmodule
