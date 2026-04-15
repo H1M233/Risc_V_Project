@@ -68,8 +68,8 @@ def compile():
     iverilog_cmd.append(rtl_dir + r'/new/seg7.sv')
     iverilog_cmd.append(rtl_dir + r'/new/display_seg.sv')
     iverilog_cmd.append(rtl_dir + r'/new/counter.sv')
-    iverilog_cmd.append(rtl_dir + r'/new/dram_driver.sv')
-    iverilog_cmd.append(rtl_dir + r'/new/perip_bridge.sv')
+    iverilog_cmd.append(rtl_dir + r'/new/dram_driver copy.sv')
+    iverilog_cmd.append(rtl_dir + r'/new/perip_bridge copy.sv')
     iverilog_cmd.append(rtl_dir + r'/new/student_top.sv')
 
     # 内核core

@@ -9,13 +9,13 @@ module top_riscv(
     //to DROM
     output [31:0] perip_addr,
     output perip_wen,
-    output [2:0] perip_mask,
+    output [1:0] perip_mask,
     output [31:0] perip_wdata,
     input [31:0] perip_rdata
 );
-    assign irom_addr = pc_pc_addr_o; // 将pc模块输出的地址连接到irom_addr，供指令存储器使用
     //pc
     wire [31:0] pc_pc_addr_o;
+    assign irom_addr = pc_pc_addr_o; // 将pc模块输出的地址连接到irom_addr，供指令存储器使用
     //jump
     wire jump_jump_en_o;
     wire [31:0] jump_jump_addr_o;

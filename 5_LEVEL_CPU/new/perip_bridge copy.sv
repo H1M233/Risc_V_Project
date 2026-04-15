@@ -36,8 +36,8 @@ module perip_bridge(
 	output logic [39:0]  virtual_seg_output	,
     output logic [31:0]  virtual_led_output
 );
-    localparam DRAM_ADDR_START = 32'h8010_0000;
-    localparam DRAM_ADDR_END   = 32'h8013_FFFF;
+    // localparam DRAM_ADDR_START = 32'h8010_0000;
+    // localparam DRAM_ADDR_END   = 32'h8013_FFFF;
     localparam SW0_ADDR  = 32'h8020_0000;  // sw[31:0]
     localparam SW1_ADDR  = 32'h8020_0004;  // sw[63:32]
     localparam KEY_ADDR  = 32'h8020_0010;  // key[7:0]
@@ -118,7 +118,8 @@ module perip_bridge(
         .perip_addr			(perip_addr[17:0]),
         .perip_wdata		(perip_wdata),
         .perip_mask			(perip_mask),
-        .dram_wen 			(perip_wen & (perip_addr >= DRAM_ADDR_START && perip_addr < DRAM_ADDR_END)),
+        // .dram_wen 			(perip_wen & (perip_addr >= DRAM_ADDR_START && perip_addr < DRAM_ADDR_END)),
+        .dram_wen           (perip_wen),
         .perip_rdata		(dram_rdata)
     );
 
@@ -131,12 +132,7 @@ module perip_bridge(
         .perip_rdata		(cnt_rdata)
     );
 
-    assign perip_rdata = {32{perip_addr == SW0_ADDR}} & mmio_rdata |
-                        {32{perip_addr == SW1_ADDR}} & mmio_rdata |
-                        {32{perip_addr == KEY_ADDR}} & mmio_rdata |
-                        {32{perip_addr == SEG_ADDR}} & mmio_rdata |
-                        {32{perip_addr >= DRAM_ADDR_START && perip_addr < DRAM_ADDR_END}} & dram_rdata |
-                        {32{perip_addr == CNT_ADDR}} & cnt_rdata;
+    assign perip_rdata = dram_rdata;
     
     assign virtual_led_output = LED;
     assign virtual_seg_output = seg_output;
