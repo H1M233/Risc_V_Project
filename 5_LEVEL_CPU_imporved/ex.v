@@ -87,8 +87,6 @@ module ex(
             end
             `JAL: begin
                 rd_data_o   = value1_add_value2;
-                jump_en     = 1'b1;
-                jump_addr_o = jump1_add_jump2;
             end
             `JALR: begin
                 rd_data_o   = value1_add_value2;
@@ -97,40 +95,20 @@ module ex(
             end
             `TYPE_B: begin
                 update_en = 1'b1;
+                actual_target_pc = jump1_add_jump2;
                 case(funct3)
-                    `BEQ:begin
-                        actual_taken     = value1_eq_value2;
-                        actual_target_pc = (value1_eq_value2) ? jump1_add_jump2 : 32'b0;
-                    end
-                    `BNE:begin
-                        actual_taken     = ~value1_eq_value2;
-                        actual_target_pc = (~value1_eq_value2) ? jump1_add_jump2 : 32'b0;
-                    end
-                    `BLT:begin
-                        actual_taken     = value1_lt_value2_signed;
-                        actual_target_pc = (value1_lt_value2_signed) ? jump1_add_jump2 : 32'b0;
-                    end
-                    `BGE:begin
-                        actual_taken     = ~value1_lt_value2_signed;
-                        actual_target_pc = (~value1_lt_value2_signed) ? jump1_add_jump2 : 32'b0; 
-                    end
-                    `BLTU:begin
-                        actual_taken     = value1_lt_value2_unsigned;
-                        actual_target_pc = (value1_lt_value2_unsigned) ? jump1_add_jump2 : 32'b0;
-                    end
-                    `BGEU:begin
-                        actual_taken     = ~value1_lt_value2_unsigned;
-                        actual_target_pc = (~value1_lt_value2_unsigned) ? jump1_add_jump2 : 32'b0;
-                    end
-                    default: begin
-                        actual_taken     = 1'b0;
-                        actual_target_pc = 32'b0;
-                    end
+                    `BEQ:       actual_taken    = value1_eq_value2;
+                    `BNE:       actual_taken    = ~value1_eq_value2;
+                    `BLT:       actual_taken    = value1_lt_value2_signed;
+                    `BGE:       actual_taken    = ~value1_lt_value2_signed;
+                    `BLTU:      actual_taken    = value1_lt_value2_unsigned;
+                    `BGEU:      actual_taken    = ~value1_lt_value2_unsigned;
+                    default:    actual_taken    = 1'b0;
                 endcase
                 if(pred_taken_i != actual_taken) pred_mispredict = 1'b1;
                 // 分支预测跳转
                 jump_en     = pred_mispredict;
-                jump_addr_o = (actual_taken) ? actual_target_pc : pc_addr_i + 32'h4;
+                jump_addr_o = (pred_mispredict) ? actual_target_pc : pc_addr_i + 32'h4;
             end
             `TYPE_L: begin
                 case(funct3)

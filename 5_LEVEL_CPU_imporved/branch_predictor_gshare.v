@@ -42,13 +42,29 @@ module branch_predictor_gshare #(
     wire    [BHR_WIDTH - 1:0]   pht_index           = pc_addr[BHR_WIDTH + 1:2] ^ ghr;
     wire    [BHR_WIDTH - 1:0]   update_pht_index    = update_pc[BHR_WIDTH + 1:2] ^ bhr_d2;
 
+    // 处理JAL
+    wire            is_JAL = (pc_inst[6:0] == `JAL);
+    wire    [31:0]  JAL_imm = {{12{pc_inst[31]}}, pc_inst[19:12], pc_inst[20], pc_inst[30:21], 1'b0};
+
     // 处理TYPE_B
-    wire    is_b_type = (pc_inst[6:0] == `TYPE_B);
-    wire    [31:0] b_imm = {{20{pc_inst[31]}}, pc_inst[7], pc_inst[30:25], pc_inst[11:8], 1'b0};
+    wire            is_b_type = (pc_inst[6:0] == `TYPE_B);
+    wire    [31:0]  b_imm = {{20{pc_inst[31]}}, pc_inst[7], pc_inst[30:25], pc_inst[11:8], 1'b0};
 
     always@(*) begin
-        pred_taken = pht[pht_index][1];     // 返回计数器中的高位（即为1则预测跳转）
-        pred_pc = (pred_taken && is_b_type) ? pc_addr + b_imm: pc_addr + 32'h4;        
+        case(pc_inst[6:0])
+            `JAL: begin
+                pred_taken = 1'b1;
+                pred_pc = pc_addr + JAL_imm;
+            end
+            `TYPE_B: begin
+                pred_taken = pht[pht_index][1];     // 返回计数器中的高位（即为1则预测跳转）
+                pred_pc = (pred_taken && is_b_type) ? pc_addr + b_imm: pc_addr + 32'h4;      
+            end
+            default: begin
+                pred_taken = 1'b0;
+                pred_pc = 32'b0;
+            end
+        endcase
     end
 
     integer i;
