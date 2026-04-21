@@ -129,8 +129,8 @@ module ex(
                 endcase
                 if(pred_taken_i != actual_taken) pred_mispredict = 1'b1;
                 // 分支预测跳转
-                jump_en     = actual_taken;
-                jump_addr_o = actual_taken ? actual_target_pc : pc_addr_i + 4;
+                jump_en     = pred_mispredict;
+                jump_addr_o = (actual_taken) ? actual_target_pc : pc_addr_i + 32'h4;
             end
             `TYPE_L: begin
                 case(funct3)
