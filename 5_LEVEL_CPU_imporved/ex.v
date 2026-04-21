@@ -41,9 +41,7 @@ module ex(
     output reg [31:0]   pc_addr_o,
     output reg          actual_taken,       // ex阶段判断跳转为真
     output reg [31:0]   actual_target_pc,   // ex阶段判断跳转目标地址
-
-    // to pred_cnt
-    output reg          pred_taken_o
+    output reg          pred_mispredict
 );
     // 提取指令
     wire [6:0]  opcode = inst_i[6:0];
@@ -78,8 +76,7 @@ module ex(
         update_en       = 1'b0;
         actual_taken    = 1'b0;
         actual_target_pc= 32'b0;
-
-        pred_taken_o    = pred_taken_i;
+        pred_mispredict = 1'b0;
 
         case(opcode)
             `LUI: begin
@@ -130,15 +127,10 @@ module ex(
                         actual_target_pc = 32'b0;
                     end
                 endcase
-                // 分支预测错误跳转
-                if(pred_taken_i == actual_taken) begin
-                    jump_en = 1'b0;
-                    jump_addr_o = 32'b0;
-                end
-                else begin
-                    jump_en = 1'b1;
-                    jump_addr_o = actual_target_pc;
-                end
+                if(pred_taken_i != actual_taken) pred_mispredict = 1'b1;
+                // 分支预测跳转
+                jump_en     = actual_taken;
+                jump_addr_o = actual_taken ? actual_target_pc : pc_addr_i + 4;
             end
             `TYPE_L: begin
                 case(funct3)

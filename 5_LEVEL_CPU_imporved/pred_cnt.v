@@ -3,8 +3,7 @@ module pred_cnt(
     input       rst,
 
     input       update_en,
-    input       pred_taken,
-    input       actual_taken
+    input       pred_mispredict
 );
 
     reg [31:0]  pred_correct;
@@ -17,7 +16,7 @@ module pred_cnt(
         end
         else begin
             if(update_en) begin
-                if(pred_taken == actual_taken) pred_correct <= pred_correct + 1;
+                if(!pred_mispredict) pred_correct <= pred_correct + 1;
                 else pred_uncorrect <= pred_uncorrect + 1;
             end
         end

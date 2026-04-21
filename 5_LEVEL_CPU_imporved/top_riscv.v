@@ -137,9 +137,7 @@ module top_riscv(
     wire [31:0]     ex_pc_addr_o;
     wire            ex_actual_taken;
     wire [31:0]     ex_actual_target_pc;
-
-    // ex to pred_cnt
-    wire            ex_pred_taken_o;
+    wire            ex_pred_mispredict;
 
     // 连接各模块
     pc PC(
@@ -364,9 +362,7 @@ module top_riscv(
         .pc_addr_o          (ex_pc_addr_o),
         .actual_taken       (ex_actual_taken),
         .actual_target_pc   (ex_actual_target_pc),
-
-        // to pred_cnt
-        .pred_taken_o       (ex_pred_taken_o)
+        .pred_mispredict    (ex_pred_mispredict)
     );
 
     ex_mem EX_MEM(
@@ -471,7 +467,8 @@ module top_riscv(
         .update_en          (ex_pred_update_en),
         .update_pc          (ex_pc_addr_o),
         .actual_taken       (ex_actual_taken),
-        .actual_target_pc   (ex_actual_target_pc)
+        .actual_target_pc   (ex_actual_target_pc),
+        .pred_mispredict    (ex_pred_mispredict)
     );
 
     pred_cnt PRED_CNT(
@@ -479,7 +476,6 @@ module top_riscv(
         .rst                (cpu_rst),
 
         .update_en          (ex_pred_update_en),
-        .pred_taken         (ex_pred_taken_o),
-        .actual_taken       (ex_actual_taken)
+        .pred_mispredict    (ex_pred_mispredict)
     );
 endmodule
