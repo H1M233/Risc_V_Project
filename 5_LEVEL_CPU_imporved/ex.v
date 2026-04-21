@@ -2,6 +2,7 @@
 
 module ex(
     // from id_ex
+    input      [31:0]   pc_addr_i,
     input      [31:0]   inst_i,
     input      [31:0]   jump1_i,
     input      [31:0]   jump2_i,
@@ -11,6 +12,7 @@ module ex(
     input      [31:0]   rs2_data_i,
     input      [31:0]   value1_i,
     input      [31:0]   value2_i,
+    input               pred_taken_i,
 
     // to hazard
     output reg [6:0]    hazard_opcode,
@@ -32,7 +34,16 @@ module ex(
     output reg          jump_en,
 
     // 没用上
-    output reg [31:0]   rs1_data_o
+    output reg [31:0]   rs1_data_o,
+
+    // to Gshare
+    output reg          update_en,          // PHT计数器的更新使能
+    output reg [31:0]   pc_addr_o,
+    output reg          actual_taken,       // ex阶段判断跳转为真
+    output reg [31:0]   actual_target_pc,   // ex阶段判断跳转目标地址
+
+    // to pred_cnt
+    output reg          pred_taken_o
 );
     // 提取指令
     wire [6:0]  opcode = inst_i[6:0];
@@ -51,6 +62,7 @@ module ex(
     wire [31:0] value1_sub_value2           = value1_i - value2_i;                          // 操作数减
 
     always@(*) begin
+        pc_addr_o     = pc_addr_i;
         regs_wen_o      = regs_wen_i;
         mem_wen         = 1'b0;
         mem_req         = 1'b0;
@@ -63,6 +75,11 @@ module ex(
         jump_addr_o     = 32'b0;
         hazard_opcode   = opcode;  // 将opcode传递给hazard模块，用于冒险检测
         inst_o          = inst_i;
+        update_en       = 1'b0;
+        actual_taken    = 1'b0;
+        actual_target_pc= 32'b0;
+
+        pred_taken_o    = pred_taken_i;
 
         case(opcode)
             `LUI: begin
@@ -82,36 +99,46 @@ module ex(
                 jump_addr_o = jump1_add_jump2;
             end
             `TYPE_B: begin
+                update_en = 1'b1;
                 case(funct3)
                     `BEQ:begin
-                        jump_en     = value1_eq_value2;
-                        jump_addr_o = (value1_eq_value2) ? jump1_add_jump2 : 32'b0;
+                        actual_taken     = value1_eq_value2;
+                        actual_target_pc = (value1_eq_value2) ? jump1_add_jump2 : 32'b0;
                     end
                     `BNE:begin
-                        jump_en     = ~value1_eq_value2;
-                        jump_addr_o = (~value1_eq_value2) ? jump1_add_jump2 : 32'b0;
+                        actual_taken     = ~value1_eq_value2;
+                        actual_target_pc = (~value1_eq_value2) ? jump1_add_jump2 : 32'b0;
                     end
                     `BLT:begin
-                        jump_en     = value1_lt_value2_signed;
-                        jump_addr_o = (value1_lt_value2_signed) ? jump1_add_jump2 : 32'b0;
+                        actual_taken     = value1_lt_value2_signed;
+                        actual_target_pc = (value1_lt_value2_signed) ? jump1_add_jump2 : 32'b0;
                     end
                     `BGE:begin
-                        jump_en     = ~value1_lt_value2_signed;
-                        jump_addr_o = (~value1_lt_value2_signed) ? jump1_add_jump2 : 32'b0; 
+                        actual_taken     = ~value1_lt_value2_signed;
+                        actual_target_pc = (~value1_lt_value2_signed) ? jump1_add_jump2 : 32'b0; 
                     end
                     `BLTU:begin
-                        jump_en     = value1_lt_value2_unsigned;
-                        jump_addr_o = (value1_lt_value2_unsigned) ? jump1_add_jump2 : 32'b0;
+                        actual_taken     = value1_lt_value2_unsigned;
+                        actual_target_pc = (value1_lt_value2_unsigned) ? jump1_add_jump2 : 32'b0;
                     end
                     `BGEU:begin
-                        jump_en     = ~value1_lt_value2_unsigned;
-                        jump_addr_o = (~value1_lt_value2_unsigned) ? jump1_add_jump2 : 32'b0;
+                        actual_taken     = ~value1_lt_value2_unsigned;
+                        actual_target_pc = (~value1_lt_value2_unsigned) ? jump1_add_jump2 : 32'b0;
                     end
                     default: begin
-                        jump_en     = 1'b0;
-                        jump_addr_o = 32'b0;
+                        actual_taken     = 1'b0;
+                        actual_target_pc = 32'b0;
                     end
                 endcase
+                // 分支预测错误跳转
+                if(pred_taken_i == actual_taken) begin
+                    jump_en = 1'b0;
+                    jump_addr_o = 32'b0;
+                end
+                else begin
+                    jump_en = 1'b1;
+                    jump_addr_o = actual_target_pc;
+                end
             end
             `TYPE_L: begin
                 case(funct3)

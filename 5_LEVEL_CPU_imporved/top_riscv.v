@@ -39,15 +39,18 @@ module top_riscv(
     wire [31:0]     reg_rs1_data_o;
     wire [31:0]     reg_rs2_data_o;
 
-    // if to if_id
+    // if to if_id & Gshare
     wire [31:0]     if_pc_addr_o;
     wire [31:0]     if_inst_o;
+    wire            if_pred_taken_o;
 
     // if_id to id
     wire [31:0]     id_pc_addr_i;
     wire [31:0]     id_inst_i;
+    wire            id_pred_taken_i;
 
     // id to id_ex
+    wire [31:0]     id_pc_addr_o;
     wire [31:0]     id_inst_o;
     wire [31:0]     id_value1_o;
     wire [31:0]     id_value2_o;
@@ -59,8 +62,10 @@ module top_riscv(
     wire [4:0]      id_rs1_addr_o;
     wire [4:0]      id_rs2_addr_o;
     wire [4:0]      id_rd_addr_o;
+    wire            id_pred_taken_o;
 
     // id_ex to ex
+    wire [31:0]     ex_pc_addr_i;
     wire            ex_regs_wen_i;
     wire [31:0]     ex_inst_i;
     wire [31:0]     ex_value1_i;
@@ -70,6 +75,7 @@ module top_riscv(
     wire [4:0]      ex_rd_addr_i;
     wire [31:0]     ex_rs1_data_i;
     wire [31:0]     ex_rs2_data_i;
+    wire            ex_pred_taken_i;
 
     // ex to jump
     wire            ex_jump_en_o;
@@ -120,6 +126,21 @@ module top_riscv(
     wire [4:0]      wb_rd_addr_o;
     wire            wb_regs_wen_o;
 
+    // Gshare to pc
+    wire [31:0]     gshare_pred_pc;
+
+    // Gshare to if
+    wire            gshare_pred_taken;
+
+    // ex to Gshare
+    wire            ex_pred_update_en;
+    wire [31:0]     ex_pc_addr_o;
+    wire            ex_actual_taken;
+    wire [31:0]     ex_actual_target_pc;
+
+    // ex to pred_cnt
+    wire            ex_pred_taken_o;
+
     // 连接各模块
     pc PC(
         .clk                (cpu_clk),
@@ -133,7 +154,11 @@ module top_riscv(
         .jump_en            (jump_jump_en_o),
 
         // to if & IROM
-        .pc_addr_o          (pc_pc_addr_o)
+        .pc_addr_o          (pc_pc_addr_o),
+
+        // to Gshare
+        .pred_pc            (gshare_pred_pc),
+        .pred_taken         (gshare_pred_taken)
     );
 
     jump JUMP(
@@ -197,9 +222,13 @@ module top_riscv(
         // from pc
         .pc_addr_i          (pc_pc_addr_o),
 
+        // from Gshare
+        .pred_taken_i       (gshare_pred_taken),
+
         // to if_id
         .inst_o             (if_inst_o),
-        .pc_addr_o          (if_pc_addr_o)
+        .pc_addr_o          (if_pc_addr_o),
+        .pred_taken_o       (if_pred_taken_o)
     );
 
     if_id IF_ID(
@@ -212,13 +241,15 @@ module top_riscv(
         // from if
         .inst_i             (if_inst_o),
         .pc_addr_i          (if_pc_addr_o),
+        .pred_taken_i       (if_pred_taken_o),
 
         // from jump
         .jump_en            (jump_jump_en_o),
 
         // to id
         .inst_o             (id_inst_i),
-        .pc_addr_o          (id_pc_addr_i)
+        .pc_addr_o          (id_pc_addr_i),
+        .pred_taken_o       (id_pred_taken_i)
     );
 
     id ID(
@@ -231,12 +262,14 @@ module top_riscv(
         // from if_id
         .inst_i             (id_inst_i),
         .pc_addr_i          (id_pc_addr_i),
+        .pred_taken_i       (id_pred_taken_i),
 
         // from regs
         .rs1_data_i         (reg_rs1_data_o),
         .rs2_data_i         (reg_rs2_data_o),
 
         // to id_ex
+        .pc_addr_o          (id_pc_addr_o),
         .inst_o             (id_inst_o),
         .jump1_o            (id_jump1_o),
         .jump2_o            (id_jump2_o),
@@ -246,6 +279,7 @@ module top_riscv(
         .rs2_data_o         (id_rs2_data_o),
         .value1_o           (id_value1_o),
         .value2_o           (id_value2_o),
+        .pred_taken_o       (id_pred_taken_o),
 
         // to regs & hazard
         .rs1_addr_o         (id_rs1_addr_o),
@@ -260,6 +294,7 @@ module top_riscv(
         .hazard_en          (hazard_hazard_en),
 
         // from id
+        .pc_addr_i          (id_pc_addr_o),
         .inst_i             (id_inst_o),
         .jump1_i            (id_jump1_o),
         .jump2_i            (id_jump2_o),
@@ -269,11 +304,13 @@ module top_riscv(
         .rs2_data_i         (id_rs2_data_o),
         .value1_i           (id_value1_o),
         .value2_i           (id_value2_o),
+        .pred_taken_i       (id_pred_taken_o),
 
         // from jump
         .jump_en            (jump_jump_en_o),
 
         // to ex
+        .pc_addr_o          (ex_pc_addr_i),
         .inst_o             (ex_inst_i),
         .jump1_o            (ex_jump1_i), 
         .jump2_o            (ex_jump2_i), 
@@ -282,11 +319,13 @@ module top_riscv(
         .rs1_data_o         (ex_rs1_data_i), 
         .rs2_data_o         (ex_rs2_data_i),
         .value1_o           (ex_value1_i),
-        .value2_o           (ex_value2_i)
+        .value2_o           (ex_value2_i),
+        .pred_taken_o       (ex_pred_taken_i)
     );
 
     ex EX(
         // from id_ex
+        .pc_addr_i          (ex_pc_addr_i),
         .inst_i             (ex_inst_i),
         .jump1_i            (ex_jump1_i),
         .jump2_i            (ex_jump2_i),
@@ -296,6 +335,7 @@ module top_riscv(
         .rs2_data_i         (ex_rs2_data_i),
         .value1_i           (ex_value1_i),
         .value2_i           (ex_value2_i),
+        .pred_taken_i       (ex_pred_taken_i),
 
         // to hazard
         .hazard_opcode      (ex_hazard_opcode_o),
@@ -317,7 +357,16 @@ module top_riscv(
         .jump_addr_o        (ex_jump_addr_o),
 
         // 没用上
-        .rs1_data_o         (ex_rs1_data_o)
+        .rs1_data_o         (ex_rs1_data_o),
+
+        // to Gshare
+        .update_en          (ex_pred_update_en),
+        .pc_addr_o          (ex_pc_addr_o),
+        .actual_taken       (ex_actual_taken),
+        .actual_target_pc   (ex_actual_target_pc),
+
+        // to pred_cnt
+        .pred_taken_o       (ex_pred_taken_o)
     );
 
     ex_mem EX_MEM(
@@ -398,5 +447,39 @@ module top_riscv(
         .rd_addr_o          (wb_rd_addr_o),
         .rd_data_o          (wb_rd_data_o),
         .regs_wen_o         (wb_regs_wen_o)
+    );
+
+    branch_predictor_gshare #(
+        .BHR_WIDTH  (10),
+        .PHT_SIZE   (1024)
+    ) GSHARE(
+        .clk                (cpu_clk),
+        .rst                (cpu_rst),
+
+        // from pc
+        .pc_addr            (if_pc_addr_o),
+        .pc_inst            (if_inst_o),
+
+        // to pc & ex
+        .pred_pc            (gshare_pred_pc),
+        .pred_taken         (gshare_pred_taken),
+
+        // to if
+        //.pred_index, 
+
+        // from ex
+        .update_en          (ex_pred_update_en),
+        .update_pc          (ex_pc_addr_o),
+        .actual_taken       (ex_actual_taken),
+        .actual_target_pc   (ex_actual_target_pc)
+    );
+
+    pred_cnt PRED_CNT(
+        .clk                (cpu_clk),
+        .rst                (cpu_rst),
+
+        .update_en          (ex_pred_update_en),
+        .pred_taken         (ex_pred_taken_o),
+        .actual_taken       (ex_actual_taken)
     );
 endmodule

@@ -9,12 +9,14 @@ module id(
     // from if_id
     input      [31:0]   inst_i,             // 从if_id模块传来的指令内容
     input      [31:0]   pc_addr_i,          // 从if_id模块传来的指令地址
+    input               pred_taken_i,
     
     // from regs
     input      [31:0]   rs1_data_i,         // 从寄存器堆读出的寄存rs1的数据
     input      [31:0]   rs2_data_i,         // 从寄存器堆读出的寄存rs2的数据
 
     // to id_ex
+    output reg [31:0]   pc_addr_o,
     output reg [31:0]   inst_o,             // 传入给id_ex模块的指令内容
     output reg [31:0]   jump1_o,            // 传入跳转指令地址1
     output reg [31:0]   jump2_o,            // 传入跳转指令地址2
@@ -24,6 +26,7 @@ module id(
     output reg [31:0]   rs2_data_o,
     output reg [31:0]   value1_o,           // 传入寄存器1的数据
     output reg [31:0]   value2_o,           // 传入寄存器2的数据
+    output reg          pred_taken_o,
 
     // to regs & hazard
     output reg [4:0]    rs1_addr_o,
@@ -40,6 +43,7 @@ module id(
     wire [4:0]  rs2_o       = inst_i[24:20];            // 传入指令rs2地址
 
     always@(*) begin
+        pc_addr_o   = pc_addr_i;
         inst_o      = inst_i;
         rs1_data_o  = data1;        
         rs2_data_o  = data2;  
@@ -51,6 +55,7 @@ module id(
         rs1_addr_o  = 5'b0;            
         rs2_addr_o  = 5'b0; 
         rd_addr_o   = 5'b0;
+        pred_taken_o = pred_taken_i;
 
         case(opcode_o)
             `LUI: begin

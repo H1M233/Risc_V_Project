@@ -7,13 +7,20 @@ module ifif(
     // from pc
     input      [31:0]   pc_addr_i,      // 当前指令地址
 
-    // to if_id
+    // to if_id & Gshare
     output reg [31:0]   inst_o,         // 传递指令内容
-    output reg [31:0]   pc_addr_o       // 传递指令地址
+    output reg [31:0]   pc_addr_o,      // 传递指令地址
+
+    // from gshare
+    input               pred_taken_i,
+
+    // to if_id
+    output  reg         pred_taken_o
 );
     always @(*) begin
-        pc_addr_o   = pc_addr_i;        // 将输入的指令地址传递给输出
-        inst_o      = inst_i;           // 将输入的指令内容传递给输出
+        pc_addr_o   =   pc_addr_i;      // 将输入的指令地址传递给输出
+        inst_o      =   inst_i;         // 将输入的指令内容传递给输出
+        pred_taken_o=   pred_taken_i;
     end
 endmodule
 

@@ -1,0 +1,25 @@
+module pred_cnt(
+    input       clk,
+    input       rst,
+
+    input       update_en,
+    input       pred_taken,
+    input       actual_taken
+);
+
+    reg [31:0]  pred_correct;
+    reg [31:0]  pred_uncorrect;
+
+    always@(posedge clk or negedge rst) begin
+        if(!rst) begin
+            pred_correct = 32'b0;
+            pred_uncorrect = 32'b0;
+        end
+        else begin
+            if(update_en) begin
+                if(pred_taken == actual_taken) pred_correct <= pred_correct + 1;
+                else pred_uncorrect <= pred_uncorrect + 1;
+            end
+        end
+    end
+endmodule

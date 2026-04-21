@@ -7,6 +7,7 @@ module id_ex(
     input               hazard_en,      // 来自控制单元的冒险使能信号
 
     // from id
+    input      [31:0]   pc_addr_i,
     input      [31:0]   inst_i,
     input      [31:0]   jump1_i,
     input      [31:0]   jump2_i,
@@ -16,11 +17,13 @@ module id_ex(
     input      [31:0]   rs2_data_i,
     input      [31:0]   value1_i,
     input      [31:0]   value2_i,
+    input               pred_taken_i,
 
     // from jump
     input               jump_en,        // 来自控制单元的跳转使能信号
 
     //  to ex
+    output reg [31:0]   pc_addr_o,
     output reg [31:0]   inst_o,
     output reg [31:0]   jump1_o,
     output reg [31:0]   jump2_o,
@@ -29,10 +32,12 @@ module id_ex(
     output reg [31:0]   rs1_data_o,
     output reg [31:0]   rs2_data_o,
     output reg [31:0]   value1_o,
-    output reg [31:0]   value2_o
+    output reg [31:0]   value2_o,
+    output reg          pred_taken_o
 );
     always @(posedge clk or negedge rst) begin
         if(!rst) begin
+            pc_addr_o   <= 32'b0;
             regs_wen_o  <= 1'b0;
             inst_o      <= `NOP;
             value1_o    <= 32'b0;
@@ -41,9 +46,11 @@ module id_ex(
             jump2_o     <= 32'b0;
             rd_addr_o   <= 5'b0;
             rs1_data_o  <= 32'b0;
-            rs2_data_o  <= 32'b0;     
+            rs2_data_o  <= 32'b0;
+            pred_taken_o<= 1'b0;
         end
         else if(jump_en) begin
+            pc_addr_o   <= 32'b0;
             regs_wen_o  <= 1'b0;
             inst_o      <= `NOP;
             value1_o    <= 32'b0;
@@ -52,9 +59,11 @@ module id_ex(
             jump2_o     <= 32'b0;
             rd_addr_o   <= 5'b0;
             rs1_data_o  <= 32'b0;
-            rs2_data_o  <= 32'b0;  
+            rs2_data_o  <= 32'b0;
+            pred_taken_o<= 1'b0;
         end
         else if(hazard_en) begin
+            pc_addr_o   <= 32'b0;
             regs_wen_o  <= 1'b0;
             inst_o      <= `NOP;
             value1_o    <= 32'b0;
@@ -63,9 +72,11 @@ module id_ex(
             jump2_o     <= 32'b0;
             rd_addr_o   <= 5'b0;
             rs1_data_o  <= 32'b0;
-            rs2_data_o  <= 32'b0;  
+            rs2_data_o  <= 32'b0;
+            pred_taken_o<= 1'b0;
         end
         else begin
+            pc_addr_o   <= pc_addr_i;
             regs_wen_o  <= regs_wen_i;
             inst_o      <= inst_i;
             value1_o    <= value1_i;
@@ -74,7 +85,8 @@ module id_ex(
             jump2_o     <= jump2_i;
             rd_addr_o   <= rd_addr_i;
             rs1_data_o  <= rs1_data_i;
-            rs2_data_o  <= rs2_data_i;       
+            rs2_data_o  <= rs2_data_i;
+            pred_taken_o<= pred_taken_i;
         end
     end
 endmodule
