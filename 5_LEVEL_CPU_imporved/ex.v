@@ -40,7 +40,6 @@ module ex(
     output reg          update_en,          // PHT计数器的更新使能
     output reg [31:0]   pc_addr_o,
     output reg          actual_taken,       // ex阶段判断跳转为真
-    output reg [31:0]   actual_target_pc,   // ex阶段判断跳转目标地址
     output reg          pred_mispredict
 );
     // 提取指令
@@ -75,7 +74,6 @@ module ex(
         inst_o          = inst_i;
         update_en       = 1'b0;
         actual_taken    = 1'b0;
-        actual_target_pc= 32'b0;
         pred_mispredict = 1'b0;
 
         case(opcode)
@@ -95,7 +93,6 @@ module ex(
             end
             `TYPE_B: begin
                 update_en = 1'b1;
-                actual_target_pc = jump1_add_jump2;
                 case(funct3)
                     `BEQ:       actual_taken    = value1_eq_value2;
                     `BNE:       actual_taken    = ~value1_eq_value2;
@@ -105,8 +102,9 @@ module ex(
                     `BGEU:      actual_taken    = ~value1_lt_value2_unsigned;
                     default:    actual_taken    = 1'b0;
                 endcase
-                pred_mispredict = (pred_taken_i != actual_taken);
+                
                 // 分支预测跳转
+                pred_mispredict = (pred_taken_i != actual_taken);
                 jump_en         = pred_mispredict;
                 jump_addr_o     = (pred_mispredict) ? jump1_add_jump2 : 32'b0;
             end

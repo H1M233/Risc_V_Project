@@ -136,7 +136,6 @@ module top_riscv(
     wire            ex_pred_update_en;
     wire [31:0]     ex_pc_addr_o;
     wire            ex_actual_taken;
-    wire [31:0]     ex_actual_target_pc;
     wire            ex_pred_mispredict;
 
     // 连接各模块
@@ -361,7 +360,6 @@ module top_riscv(
         .update_en          (ex_pred_update_en),
         .pc_addr_o          (ex_pc_addr_o),
         .actual_taken       (ex_actual_taken),
-        .actual_target_pc   (ex_actual_target_pc),
         .pred_mispredict    (ex_pred_mispredict)
     );
 
@@ -467,7 +465,6 @@ module top_riscv(
         .update_en          (ex_pred_update_en),
         .update_pc          (ex_pc_addr_o),
         .actual_taken       (ex_actual_taken),
-        .actual_target_pc   (ex_actual_target_pc),
         .pred_mispredict    (ex_pred_mispredict)
     );
 
