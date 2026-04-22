@@ -44,13 +44,19 @@ module ras #(
 
             // 同时压栈出栈：指针不变
             else if(push_en && pop_en) begin 
-                stack_mem[ptr - 1]  <= push_addr_i;
+                if (ptr != 0) begin
+                    stack_mem[ptr - 1] <= push_addr_i;  // 替换栈顶
+                end 
+                else begin
+                    stack_mem[ptr] <= push_addr_i;      // 栈空时压入
+                    ptr <= ptr + 1'b1;
+                end
             end
         end
     end
 
     assign isempty_o    = (ptr == 0);
     assign isfull_o     = (ptr == DEPTH);
-    assign pop_addr_o   = (pop_en && !isempty_o) ? stack_mem[ptr - 1] : 32'hDEAD_BEEF;
+    assign pop_addr_o   = (pop_en && !isempty_o) ? stack_mem[ptr - 1] : 32'b0;
 
 endmodule

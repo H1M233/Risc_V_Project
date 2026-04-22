@@ -16,7 +16,7 @@ module branch_predictor_gshare #(
     input      [31:0]   pc_addr,            // if阶段指令地址
     input      [31:0]   pc_inst,            // pc取得的指令
 
-    // to pc & ex
+    // to pc & if
     output reg [31:0]   pred_pc,            // 向if输出预测的地址
     output reg          pred_taken,         // 从PHT中读取的计数器高位值
 
@@ -34,7 +34,10 @@ module branch_predictor_gshare #(
     // to ras
     output reg          ras_pop_en,
     output reg          ras_push_en,
-    output reg [31:0]   ras_push_addr
+    output reg [31:0]   ras_push_addr,
+
+    // from id
+    input      [31:0]   id_pc_addr          // id阶段的地址
 );
 
     reg     [BHR_WIDTH - 1:0]   bhr;                    // BHR分支历史寄存器：存储历史中跳转状态
@@ -49,8 +52,6 @@ module branch_predictor_gshare #(
     // 预测逻辑：取PC中间位与BHR异或得到索引
     wire    [BHR_WIDTH - 1:0]   pht_index           = pc_addr[BHR_WIDTH + 1:2] ^ ghr;
     wire    [BHR_WIDTH - 1:0]   update_pht_index    = update_pc[BHR_WIDTH + 1:2] ^ bhr_d2;
-
-    wire    [31:0]  pc_add_4    = pc_addr + 32'h4;
 
     wire    [4:0]   rd_addr     = pc_inst[11:7];
     wire    [4:0]   rs1_addr    = pc_inst[19:15];
@@ -81,13 +82,13 @@ module branch_predictor_gshare #(
             end
             `JAL: begin
                 ras_push_en     = (is_ret_JAL && !ras_isfull);
-                ras_push_addr   = (is_ret_JAL && !ras_isfull) ? pc_add_4 : 32'b0;
+                ras_push_addr   = (is_ret_JAL && !ras_isfull) ? id_pc_addr + 32'h8 : 32'b0;
                 pred_taken      = 1'b1;
                 pred_pc         = pc_addr + JAL_imm;
             end
             `TYPE_B: begin
                 pred_taken      = pht[pht_index][1];     // 返回计数器中的高位（即为1则预测跳转）
-                pred_pc         = (pred_taken && is_b_type) ? pc_addr + b_imm: pc_add_4;     
+                pred_pc         = (pred_taken && is_b_type) ? pc_addr + b_imm: pc_addr + 32'h4;     
             end
             default: begin
                 pred_taken      = 1'b0;

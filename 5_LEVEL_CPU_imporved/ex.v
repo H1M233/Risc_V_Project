@@ -13,6 +13,7 @@ module ex(
     input      [31:0]   value1_i,
     input      [31:0]   value2_i,
     input               pred_taken_i,
+    input      [31:0]   pred_pc_i,
 
     // to hazard
     output reg [6:0]    hazard_opcode,
@@ -36,7 +37,7 @@ module ex(
     // 没用上
     output reg [31:0]   rs1_data_o,
 
-    // to Gshare
+    // to bpu
     output reg          update_en,          // PHT计数器的更新使能
     output reg [31:0]   pc_addr_o,
     output reg          actual_taken,       // ex阶段判断跳转为真
@@ -87,9 +88,10 @@ module ex(
                 rd_data_o   = value1_add_value2;
             end
             `JALR: begin
-                rd_data_o       =   value1_add_value2;
-                jump_en         =   (pred_taken_i == 1'b0);
-                jump_addr_o     =   (jump_en) ? jump1_add_jump2 : 32'b0;
+                rd_data_o       = value1_add_value2;
+                pred_mispredict = (pred_taken_i && pred_pc_i != jump1_add_jump2);
+                jump_en         = (pred_mispredict || !pred_taken_i);
+                jump_addr_o     = (jump_en) ? jump1_add_jump2 : 32'b0;
             end
             `TYPE_B: begin
                 update_en = 1'b1;
