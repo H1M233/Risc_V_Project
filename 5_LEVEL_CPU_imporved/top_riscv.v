@@ -474,9 +474,6 @@ module top_riscv(
         .update_en          (ex_pred_update_en),
         .update_pc          (ex_pc_addr_o),
         .actual_taken       (ex_actual_taken),
-        .pred_mispredict    (ex_pred_mispredict),
-
-        // from id
-        .id_pc_addr         (id_pc_addr_o)
+        .pred_mispredict    (ex_pred_mispredict)
     );
 endmodule

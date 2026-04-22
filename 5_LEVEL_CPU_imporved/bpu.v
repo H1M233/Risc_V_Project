@@ -27,10 +27,7 @@ module bpu #(
     input               update_en,          // PHT计数器的更新使能
     input      [31:0]   update_pc,          // ex阶段返回更新的指令地址
     input               actual_taken,       // ex阶段判断跳转为真
-    input               pred_mispredict,
-
-    // from id
-    input      [31:0]   id_pc_addr          // 获取来自id的地址
+    input               pred_mispredict
 );
     wire        ras_push_en;
     wire        ras_pop_en;
@@ -68,10 +65,7 @@ module bpu #(
         // to ras
         .ras_pop_en         (ras_pop_en),
         .ras_push_en        (ras_push_en),
-        .ras_push_addr      (ras_push_addr),
-
-        // from id
-        .id_pc_addr         (id_pc_addr)
+        .ras_push_addr      (ras_push_addr)
     );
 
     pred_cnt PRED_CNT(

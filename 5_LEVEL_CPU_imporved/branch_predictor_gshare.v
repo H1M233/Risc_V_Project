@@ -34,10 +34,7 @@ module branch_predictor_gshare #(
     // to ras
     output reg          ras_pop_en,
     output reg          ras_push_en,
-    output reg [31:0]   ras_push_addr,
-
-    // from id
-    input      [31:0]   id_pc_addr          // id阶段的地址
+    output reg [31:0]   ras_push_addr
 );
 
     reg     [BHR_WIDTH - 1:0]   bhr;                    // BHR分支历史寄存器：存储历史中跳转状态
@@ -72,8 +69,9 @@ module branch_predictor_gshare #(
 
     // 计算预测地址并输出
     always@(*) begin
-        ras_pop_en  = 1'b0;
-        ras_push_en = 1'b0;
+        ras_pop_en      = 1'b0;
+        ras_push_en     = 1'b0;
+        ras_push_addr   = 32'b0;
         case(pc_inst[6:0])
             `JALR: begin
                 ras_pop_en      = (is_ret_JALR && !ras_isempty);
@@ -82,7 +80,7 @@ module branch_predictor_gshare #(
             end
             `JAL: begin
                 ras_push_en     = (is_ret_JAL && !ras_isfull);
-                ras_push_addr   = (is_ret_JAL && !ras_isfull) ? id_pc_addr + 32'h8 : 32'b0;
+                ras_push_addr   = (is_ret_JAL && !ras_isfull) ? pc_addr + 32'h4 : 32'b0;
                 pred_taken      = 1'b1;
                 pred_pc         = pc_addr + JAL_imm;
             end
