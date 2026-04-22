@@ -443,10 +443,11 @@ module top_riscv(
         .regs_wen_o         (wb_regs_wen_o)
     );
 
-    branch_predictor_gshare #(
+    bpu #(
         .BHR_WIDTH  (10),
-        .PHT_SIZE   (1024)
-    ) GSHARE(
+        .PHT_SIZE   (1024),
+        .RAS_DEPTH  (8)
+    ) BPU(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
 
@@ -458,21 +459,10 @@ module top_riscv(
         .pred_pc            (gshare_pred_pc),
         .pred_taken         (gshare_pred_taken),
 
-        // to if
-        //.pred_index, 
-
         // from ex
         .update_en          (ex_pred_update_en),
         .update_pc          (ex_pc_addr_o),
         .actual_taken       (ex_actual_taken),
-        .pred_mispredict    (ex_pred_mispredict)
-    );
-
-    pred_cnt PRED_CNT(
-        .clk                (cpu_clk),
-        .rst                (cpu_rst),
-
-        .update_en          (ex_pred_update_en),
         .pred_mispredict    (ex_pred_mispredict)
     );
 endmodule

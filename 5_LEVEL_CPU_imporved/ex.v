@@ -87,9 +87,9 @@ module ex(
                 rd_data_o   = value1_add_value2;
             end
             `JALR: begin
-                rd_data_o   = value1_add_value2;
-                jump_en     = 1'b1;
-                jump_addr_o = jump1_add_jump2;
+                rd_data_o       =   value1_add_value2;
+                jump_en         =   (pred_taken_i == 1'b0);
+                jump_addr_o     =   (jump_en) ? jump1_add_jump2 : 32'b0;
             end
             `TYPE_B: begin
                 update_en = 1'b1;
@@ -104,10 +104,10 @@ module ex(
                 endcase
                 
                 // 分支预测跳转
-                pred_mispredict = (pred_taken_i != actual_taken);
-                jump_en         = pred_mispredict;
-                jump_addr_o     = (pred_mispredict) ? 
-                                  ((actual_taken)   ? jump1_add_jump2 : pc_addr_i + 32'h4) : 32'b0;
+                pred_mispredict =   (pred_taken_i != actual_taken);
+                jump_en         =   pred_mispredict;
+                jump_addr_o     =   (pred_mispredict) ? 
+                                    ((actual_taken)   ? jump1_add_jump2 : pc_addr_i + 32'h4) : 32'b0;
             end
             `TYPE_L: begin
                 case(funct3)
