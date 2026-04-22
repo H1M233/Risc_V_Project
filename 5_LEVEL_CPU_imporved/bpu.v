@@ -20,8 +20,8 @@ module bpu #(
     input      [31:0]   pc_inst,            // pc取得的指令
 
     // to pc & ex
-    output reg [31:0]   pred_pc,            // 向if输出预测的地址
-    output reg          pred_taken,         // 从PHT中读取的计数器高位值
+    output     [31:0]   pred_pc,            // 向if输出预测的地址
+    output              pred_taken,         // 从PHT中读取的计数器高位值
 
     // from ex
     input               update_en,          // PHT计数器的更新使能
@@ -29,6 +29,12 @@ module bpu #(
     input               actual_taken,       // ex阶段判断跳转为真
     input               pred_mispredict
 );
+    wire        ras_push_en;
+    wire        ras_pop_en;
+    wire [31:0] ras_push_addr;
+    wire [31:0] ras_pop_addr;
+    wire        ras_isempty;
+    wire        ras_isfull;
 
     branch_predictor_gshare #(
         .BHR_WIDTH  (BHR_WIDTH),
@@ -69,13 +75,6 @@ module bpu #(
         .update_en          (update_en),
         .pred_mispredict    (pred_mispredict)
     );
-
-    wire        ras_push_en;
-    wire        ras_pop_en;
-    wire [31:0] ras_push_addr;
-    wire [31:0] ras_pop_addr;
-    wire        ras_isempty;
-    wire        ras_isfull;
 
     ras #(
         .DEPTH  (RAS_DEPTH)

@@ -24,7 +24,7 @@ module branch_predictor_gshare #(
     input               update_en,          // PHT计数器的更新使能
     input      [31:0]   update_pc,          // ex阶段返回更新的指令地址
     input               actual_taken,       // ex阶段判断跳转为真
-    input               pred_mispredict,
+    input               pred_mispredict,    
 
     // from ras
     input               ras_isempty,
@@ -32,9 +32,9 @@ module branch_predictor_gshare #(
     input      [31:0]   ras_pop_addr,
 
     // to ras
-    output              ras_pop_en,
-    output              ras_push_en,
-    output     [31:0]   ras_push_addr
+    output reg          ras_pop_en,
+    output reg          ras_push_en,
+    output reg [31:0]   ras_push_addr
 );
 
     reg     [BHR_WIDTH - 1:0]   bhr;                    // BHR分支历史寄存器：存储历史中跳转状态

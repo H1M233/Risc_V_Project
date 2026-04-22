@@ -51,6 +51,6 @@ module ras #(
 
     assign isempty_o    = (ptr == 0);
     assign isfull_o     = (ptr == DEPTH);
-    assign pop_addr_o   = (pop_en && !ras_isempty_o) ? stack_mem[ptr - 1] : 32'hDEAD_BEEF;
+    assign pop_addr_o   = (pop_en && !isempty_o) ? stack_mem[ptr - 1] : 32'hDEAD_BEEF;
 
 endmodule
