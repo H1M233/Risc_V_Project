@@ -105,10 +105,10 @@ module ex(
                     `BGEU:      actual_taken    = ~value1_lt_value2_unsigned;
                     default:    actual_taken    = 1'b0;
                 endcase
-                if(pred_taken_i != actual_taken) pred_mispredict = 1'b1;
+                pred_mispredict = (pred_taken_i != actual_taken);
                 // 分支预测跳转
-                jump_en     = pred_mispredict;
-                jump_addr_o = (pred_mispredict) ? actual_target_pc : pc_addr_i + 32'h4;
+                jump_en         = pred_mispredict;
+                jump_addr_o     = (pred_mispredict) ? jump1_add_jump2 : 32'b0;
             end
             `TYPE_L: begin
                 case(funct3)
