@@ -37,18 +37,17 @@ module branch_predictor_gshare #(
     output reg [31:0]   ras_push_addr
 );
 
-    reg     [BHR_WIDTH - 1:0]   bhr;                    // BHR分支历史寄存器：存储历史中跳转状态
     reg     [BHR_WIDTH - 1:0]   ghr;                    // GHR全局历史寄存器：用于投机更新
 
-    // 延迟BHR以匹配流水线深度
-    reg     [BHR_WIDTH - 1:0]   bhr_d1;                 // ID 阶段
-    reg     [BHR_WIDTH - 1:0]   bhr_d2;                 // EX 阶段
+    // 延迟GHR以匹配流水线
+    reg     [BHR_WIDTH - 1:0]   ghr_d1;                 // ID 阶段
+    reg     [BHR_WIDTH - 1:0]   ghr_d2;                 // EX 阶段
 
     reg     [1:0]               pht[0:PHT_SIZE - 1];    // PHT2位饱和计数器
 
     // 预测逻辑：取PC中间位与BHR异或得到索引
     wire    [BHR_WIDTH - 1:0]   pht_index           = pc_addr[BHR_WIDTH + 1:2] ^ ghr;
-    wire    [BHR_WIDTH - 1:0]   update_pht_index    = update_pc[BHR_WIDTH + 1:2] ^ bhr_d2;
+    wire    [BHR_WIDTH - 1:0]   update_pht_index    = update_pc[BHR_WIDTH + 1:2] ^ ghr_d2;
 
     wire    [4:0]   rd_addr     = pc_inst[11:7];
     wire    [4:0]   rs1_addr    = pc_inst[19:15];
@@ -100,16 +99,15 @@ module branch_predictor_gshare #(
     always@(posedge clk or negedge rst) begin
         if(!rst) begin
             // 复位
-            bhr     <= 0;
             ghr     <= 0;
-            bhr_d1  <= 0;
-            bhr_d2  <= 0;
+            ghr_d1  <= 0;
+            ghr_d2  <= 0;
             for(i = 0; i < PHT_SIZE; i = i + 1) pht[i] <= 2'b01;
         end
         else begin
             // 流水线延迟
-            bhr_d1  <= ghr;
-            bhr_d2  <= bhr_d1;
+            ghr_d1  <= ghr;
+            ghr_d2  <= ghr_d1;
             
             // 更新
             if(update_en) begin
@@ -121,14 +119,11 @@ module branch_predictor_gshare #(
                     2'b11:      pht[update_pht_index] <= (actual_taken) ? 2'b11 : 2'b10;
                     default:    pht[update_pht_index] <= 2'b00;
                 endcase
-
-                // BHR
-                bhr <= {bhr[BHR_WIDTH - 2:0], actual_taken};
             end
 
             // GHR
-            if      (update_en && pred_mispredict)      ghr <= {bhr_d2[BHR_WIDTH - 2:0], actual_taken};     // 预测错误回退GHR
-            else if (is_b_type || is_JAL || is_JALR)    ghr <= {ghr[BHR_WIDTH - 2:0], pred_taken};          // 预测投机更新GHR
+            if      (update_en && pred_mispredict)  ghr <= {ghr_d2[BHR_WIDTH - 2:0], actual_taken};     // 预测错误回退GHR
+            else if (is_b_type)                     ghr <= {ghr[BHR_WIDTH - 2:0], pred_taken};          // 预测投机更新GHR
             // 其他情况不更新GHR
         end
     end
