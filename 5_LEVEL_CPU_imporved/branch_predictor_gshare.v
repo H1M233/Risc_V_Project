@@ -85,6 +85,10 @@ module branch_predictor_gshare #(
                     pred_taken      = 1'b1;
                     pred_pc         = ras_pop_addr;
                 end
+                else if(is_ret_JALR && ras_isempty) begin   // 貌似不会发生，但是写一下
+                    pred_taken      = 1'b0;
+                    pred_pc         = 32'b0;
+                end
                 else begin                              // 非ret：使用btb预测
                     btb_query_pc    = pc_addr;
                     pred_taken      = btb_hit;

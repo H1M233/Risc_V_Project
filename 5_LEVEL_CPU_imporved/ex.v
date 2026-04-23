@@ -91,14 +91,14 @@ module ex(
             end
             `JALR: begin
                 rd_data_o       = value1_add_value2;
-                update_en       = 2'b10;
+                update_en[1]    = 1'b1;
                 update_target   = jump1_add_jump2;
-                pred_mispredict = (pred_taken_i && pred_pc_i != jump1_add_jump2);
-                jump_en         = (pred_mispredict || !pred_taken_i);
+                pred_mispredict = (!pred_taken_i || pred_pc_i != jump1_add_jump2);
+                jump_en         = pred_mispredict;
                 jump_addr_o     = (jump_en) ? jump1_add_jump2 : 32'b0;
             end
             `TYPE_B: begin
-                update_en = 2'b01;
+                update_en[0]    = 1'b1;
                 case(funct3)
                     `BEQ:       actual_taken    = value1_eq_value2;
                     `BNE:       actual_taken    = ~value1_eq_value2;

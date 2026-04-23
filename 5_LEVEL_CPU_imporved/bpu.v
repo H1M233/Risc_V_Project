@@ -28,7 +28,7 @@ module bpu #(
     input               actual_taken,       // ex阶段判断跳转为真
     input               pred_mispredict     // ex阶段判断预测错误
 );
-    // connect ras and Gshare
+    // connect ras with Gshare
     wire        ras_push_en;
     wire        ras_pop_en;
     wire [31:0] ras_push_addr;
@@ -36,7 +36,7 @@ module bpu #(
     wire        ras_isempty;
     wire        ras_isfull;
 
-    // connect btb and Gshare
+    // connect btb with Gshare
     wire [31:0] btb_query_pc;
     wire        btb_hit;
     wire [31:0] btb_target_pc;
