@@ -105,7 +105,7 @@ module bpu #(
         .isfull_o           (ras_isfull)
     );
 
-    btb_set_assoc #(
+    btb #(
         .SETS   (16)
     ) BTB(
         .clk                (clk),

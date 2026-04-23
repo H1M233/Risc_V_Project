@@ -1,6 +1,6 @@
 `include "rv32I.vh"
 // 为非返回JALR使用的2路组相联BTB模块
-module btb_set_assoc #(
+module btb #(
     parameter SETS          = 16,           // 组数
     parameter INDEX_WIDTH   = $clog2(SETS)
 )(
