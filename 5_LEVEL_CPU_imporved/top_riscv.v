@@ -135,8 +135,9 @@ module top_riscv(
     wire            bpu_pred_taken;
 
     // ex to bpu
-    wire            ex_pred_update_en;
+    wire [1:0]      ex_pred_update_en;
     wire [31:0]     ex_pc_addr_o;
+    wire [31:0]     ex_pred_update_target;
     wire            ex_actual_taken;
     wire            ex_pred_mispredict;
 
@@ -370,6 +371,7 @@ module top_riscv(
         // to Gshare
         .update_en          (ex_pred_update_en),
         .pc_addr_o          (ex_pc_addr_o),
+        .update_target      (ex_pred_update_target),
         .actual_taken       (ex_actual_taken),
         .pred_mispredict    (ex_pred_mispredict)
     );
@@ -473,6 +475,7 @@ module top_riscv(
         // from ex
         .update_en          (ex_pred_update_en),
         .update_pc          (ex_pc_addr_o),
+        .update_target      (ex_pred_update_target),
         .actual_taken       (ex_actual_taken),
         .pred_mispredict    (ex_pred_mispredict)
     );

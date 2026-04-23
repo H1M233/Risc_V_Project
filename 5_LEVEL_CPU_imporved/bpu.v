@@ -1,7 +1,5 @@
 `include "rv32I.vh"
-// 分支预测branch_predictor_gshare和返回栈RAS
-
-// 预测单元
+// 预测单元：包含分支预测branch_predictor_gshare.v和返回栈ras.v
 module bpu #(
     // 分支预测
     parameter BHR_WIDTH = 10,
@@ -24,17 +22,24 @@ module bpu #(
     output              pred_taken,         // 从PHT中读取的计数器高位值
 
     // from ex
-    input               update_en,          // PHT计数器的更新使能
+    input      [1:0]    update_en,          // ex阶段返回的0: PHT更新使能 1: BTB更新使能
     input      [31:0]   update_pc,          // ex阶段返回更新的指令地址
+    input      [31:0]   update_target,      // ex阶段返回的实际跳转地址
     input               actual_taken,       // ex阶段判断跳转为真
-    input               pred_mispredict
+    input               pred_mispredict     // ex阶段判断预测错误
 );
+    // connect ras and Gshare
     wire        ras_push_en;
     wire        ras_pop_en;
     wire [31:0] ras_push_addr;
     wire [31:0] ras_pop_addr;
     wire        ras_isempty;
     wire        ras_isfull;
+
+    // connect btb and Gshare
+    wire [31:0] btb_query_pc;
+    wire        btb_hit;
+    wire [31:0] btb_target_pc;
 
     branch_predictor_gshare #(
         .BHR_WIDTH  (BHR_WIDTH),
@@ -52,7 +57,7 @@ module bpu #(
         .pred_taken         (pred_taken),
 
         // from ex
-        .update_en          (update_en),
+        .update_en          (update_en[0]),
         .update_pc          (update_pc),
         .actual_taken       (actual_taken),
         .pred_mispredict    (pred_mispredict),
@@ -65,7 +70,14 @@ module bpu #(
         // to ras
         .ras_pop_en         (ras_pop_en),
         .ras_push_en        (ras_push_en),
-        .ras_push_addr      (ras_push_addr)
+        .ras_push_addr      (ras_push_addr),
+
+        // to btb
+        .btb_query_pc       (btb_query_pc),
+
+        // from btb
+        .btb_hit            (btb_hit),
+        .btb_target_pc      (btb_target_pc)
     );
 
     pred_cnt PRED_CNT(
@@ -91,6 +103,23 @@ module bpu #(
         .pop_addr_o         (ras_pop_addr),
         .isempty_o          (ras_isempty),
         .isfull_o           (ras_isfull)
+    );
+
+    btb_set_assoc #(
+        .SETS   (16)
+    ) BTB(
+        .clk                (clk),
+        .rst                (rst),
+    
+        // 查询
+        .query_pc           (btb_query_pc),
+        .hit                (btb_hit),
+        .target_pc          (btb_target_pc),
+    
+        // 更新
+        .update_en          (update_en[1]),
+        .update_pc          (update_pc),
+        .update_target      (update_target)
     );
 
 endmodule
