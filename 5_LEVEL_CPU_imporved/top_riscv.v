@@ -42,14 +42,10 @@ module top_riscv(
     // if to if_id & bpu
     wire [31:0]     if_pc_addr_o;
     wire [31:0]     if_inst_o;
-    wire            if_pred_taken_o;
-    wire [31:0]     if_pred_pc_o;
 
     // if_id to id
     wire [31:0]     id_pc_addr_i;
     wire [31:0]     id_inst_i;
-    wire            id_pred_taken_i;
-    wire [31:0]     id_pred_pc_i;
 
     // id to id_ex
     wire [31:0]     id_pc_addr_o;
@@ -130,12 +126,13 @@ module top_riscv(
     wire [4:0]      wb_rd_addr_o;
     wire            wb_regs_wen_o;
 
-    // bpu to pc & if
+    // bpu to pc & id
     wire [31:0]     bpu_pred_pc;
     wire            bpu_pred_taken;
 
     // ex to bpu
-    wire [1:0]      ex_pred_update_en;
+    wire            ex_pred_update_btb_en;
+    wire            ex_pred_update_gshare_en;
     wire [31:0]     ex_pc_addr_o;
     wire [31:0]     ex_pred_update_target;
     wire            ex_actual_taken;
@@ -222,15 +219,9 @@ module top_riscv(
         // from pc
         .pc_addr_i          (pc_pc_addr_o),
 
-        // from bpu
-        .pred_taken_i       (bpu_pred_taken),
-        .pred_pc_i          (bpu_pred_pc),
-
         // to if_id
         .inst_o             (if_inst_o),
-        .pc_addr_o          (if_pc_addr_o),
-        .pred_taken_o       (if_pred_taken_o),
-        .pred_pc_o          (if_pred_pc_o)
+        .pc_addr_o          (if_pc_addr_o)
     );
 
     if_id IF_ID(
@@ -243,17 +234,15 @@ module top_riscv(
         // from if
         .inst_i             (if_inst_o),
         .pc_addr_i          (if_pc_addr_o),
-        .pred_taken_i       (if_pred_taken_o),
-        .pred_pc_i          (if_pred_pc_o),
-
         // from jump
         .jump_en            (jump_jump_en_o),
 
         // to id
         .inst_o             (id_inst_i),
         .pc_addr_o          (id_pc_addr_i),
-        .pred_taken_o       (id_pred_taken_i),
-        .pred_pc_o          (id_pred_pc_i)
+
+        // from bpu
+        .pred_taken         (bpu_pred_taken)
     );
 
     id ID(
@@ -266,8 +255,10 @@ module top_riscv(
         // from if_id
         .inst_i             (id_inst_i),
         .pc_addr_i          (id_pc_addr_i),
-        .pred_taken_i       (id_pred_taken_i),
-        .pred_pc_i          (id_pred_pc_i),
+
+        // from bpu
+        .pred_taken_i       (bpu_pred_taken),
+        .pred_pc_i          (bpu_pred_pc),
 
         // from regs
         .rs1_data_i         (reg_rs1_data_o),
@@ -369,7 +360,8 @@ module top_riscv(
         .rs1_data_o         (ex_rs1_data_o),
 
         // to Gshare
-        .update_en          (ex_pred_update_en),
+        .update_btb_en      (ex_pred_update_btb_en),
+        .update_gshare_en   (ex_pred_update_gshare_en),
         .pc_addr_o          (ex_pc_addr_o),
         .update_target      (ex_pred_update_target),
         .actual_taken       (ex_actual_taken),
@@ -456,7 +448,7 @@ module top_riscv(
         .regs_wen_o         (wb_regs_wen_o)
     );
 
-    bpu #(
+    bpu_top #(
         .BHR_WIDTH  (10),
         .PHT_SIZE   (1024),
         .RAS_DEPTH  (8)
@@ -473,10 +465,12 @@ module top_riscv(
         .pred_taken         (bpu_pred_taken),
 
         // from ex
-        .update_en          (ex_pred_update_en),
+        .update_btb_en      (ex_pred_update_btb_en),
+        .update_gshare_en   (ex_pred_update_gshare_en),
         .update_pc          (ex_pc_addr_o),
         .update_target      (ex_pred_update_target),
         .actual_taken       (ex_actual_taken),
-        .pred_mispredict    (ex_pred_mispredict)
+        .pred_mispredict    (ex_pred_mispredict),
+        .hazard_en          (hazard_hazard_en)
     );
 endmodule

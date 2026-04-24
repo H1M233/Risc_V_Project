@@ -14,7 +14,7 @@ module mem_wb(
     output reg [31:0]   rd_data_o,
     output reg          regs_wen_o
 );
-    always@(posedge clk or negedge rst) begin
+    always@(posedge clk) begin
         if(!rst) begin
             rd_data_o   <= 32'b0;
             rd_addr_o   <= 5'b0;

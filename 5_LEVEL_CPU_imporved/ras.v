@@ -11,8 +11,8 @@ module ras #(
     input               rst,
 
     // from gshare
-    input               push_en,
-    input               pop_en,
+    input               push_en_i,
+    input               pop_en_i,
     input      [31:0]   push_addr_i,
 
     // to gshare
@@ -25,25 +25,25 @@ module ras #(
     reg [PTR_WIDTH:0] ptr;
 
     integer i;
-    always@(posedge clk or negedge rst) begin
+    always@(posedge clk) begin
         if(!rst) begin
             ptr <= 0;
             for(i = 0; i < DEPTH; i = i + 1) stack_mem[i] <= 32'b0;
         end
         else begin
             // 仅压栈
-            if(push_en && !pop_en && ptr != DEPTH) begin
+            if(push_en_i && !pop_en_i && ptr != DEPTH) begin
                 stack_mem[ptr]  <= push_addr_i;
                 ptr             <= ptr + 1'b1;
             end
 
             // 仅出栈
-            else if(!push_en && pop_en && ptr != 1'b0) begin
+            else if(!push_en_i && pop_en_i && ptr != 1'b0) begin
                 ptr             <= ptr - 1'b1;
             end
 
             // 同时压栈出栈：指针不变
-            else if(push_en && pop_en) begin 
+            else if(push_en_i && pop_en_i) begin 
                 if (ptr != 0) begin
                     stack_mem[ptr - 1] <= push_addr_i;  // 替换栈顶
                 end 
@@ -57,6 +57,6 @@ module ras #(
 
     assign isempty_o    = (ptr == 0);
     assign isfull_o     = (ptr == DEPTH);
-    assign pop_addr_o   = (pop_en && !isempty_o) ? stack_mem[ptr - 1] : 32'b0;
+    assign pop_addr_o   = (pop_en_i && !isempty_o) ? stack_mem[ptr - 1] : 32'b0;
 
 endmodule

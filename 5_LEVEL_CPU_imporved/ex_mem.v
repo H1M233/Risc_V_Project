@@ -24,7 +24,7 @@ module ex_mem(
     output reg          regs_wen_o,
     output reg [31:0]   rs2_data_o
 );
-    always@(posedge clk or negedge rst) begin
+    always@(posedge clk) begin
         if(!rst) begin
             inst_o      <= `NOP;
             mem_addr_o  <= 32'b0;

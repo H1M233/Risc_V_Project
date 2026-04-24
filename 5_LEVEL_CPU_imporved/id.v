@@ -9,6 +9,8 @@ module id(
     // from if_id
     input      [31:0]   inst_i,             // 从if_id模块传来的指令内容
     input      [31:0]   pc_addr_i,          // 从if_id模块传来的指令地址
+
+    // from bpu
     input               pred_taken_i,
     input      [31:0]   pred_pc_i,
     

@@ -38,7 +38,8 @@ module ex(
     output reg [31:0]   rs1_data_o,
 
     // to bpu
-    output reg [1:0]    update_en,          // 0: PHT更新使能 1: BTB更新使能
+    output reg          update_btb_en,          // 0: PHT更新使能 1: BTB更新使能
+    output reg          update_gshare_en,          // 0: PHT更新使能 1: BTB更新使能
     output reg [31:0]   pc_addr_o,
     output reg [31:0]   update_target,      // ex阶段真实跳转地址
     output reg          actual_taken,       // ex阶段判断是否跳转
@@ -74,7 +75,8 @@ module ex(
         jump_addr_o     = 32'b0;
         hazard_opcode   = opcode;  // 将opcode传递给hazard模块，用于冒险检测
         inst_o          = inst_i;
-        update_en       = 2'b0;
+        update_btb_en   = 2'b0;
+        update_gshare_en= 2'b0;
         update_target   = 32'b0;
         actual_taken    = 1'b0;
         pred_mispredict = 1'b0;
@@ -91,14 +93,14 @@ module ex(
             end
             `JALR: begin
                 rd_data_o       = value1_add_value2;
-                update_en[1]    = 1'b1;
+                update_btb_en   = 1'b1;
                 update_target   = jump1_add_jump2;
                 pred_mispredict = (!pred_taken_i || pred_pc_i != jump1_add_jump2);
                 jump_en         = pred_mispredict;
                 jump_addr_o     = (jump_en) ? jump1_add_jump2 : 32'b0;
             end
             `TYPE_B: begin
-                update_en[0]    = 1'b1;
+                update_gshare_en = 1'b1;
                 case(funct3)
                     `BEQ:       actual_taken    = value1_eq_value2;
                     `BNE:       actual_taken    = ~value1_eq_value2;

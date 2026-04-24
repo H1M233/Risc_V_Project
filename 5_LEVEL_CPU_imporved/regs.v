@@ -46,7 +46,7 @@ module regs(
 
     integer i;
     // 写寄存器
-    always @(posedge clk or negedge rst) begin
+    always @(posedge clk) begin
         if (!rst) begin
             // 复位时将所有寄存器清零
             for (i = 0; i < 32; i = i + 1) begin

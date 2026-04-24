@@ -37,7 +37,7 @@ module id_ex(
     output reg          pred_taken_o,
     output reg [31:0]   pred_pc_o
 );
-    always @(posedge clk or negedge rst) begin
+    always @(posedge clk) begin
         if(!rst) begin
             pc_addr_o   <= 32'b0;
             regs_wen_o  <= 1'b0;

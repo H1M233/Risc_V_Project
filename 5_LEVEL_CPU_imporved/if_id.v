@@ -10,8 +10,6 @@ module if_id(
     // from if
     input      [31:0]   inst_i,
     input      [31:0]   pc_addr_i,
-    input               pred_taken_i,
-    input      [31:0]   pred_pc_i,
 
     // from jump
     input               jump_en,
@@ -19,33 +17,30 @@ module if_id(
     // to id
     output reg [31:0]   inst_o,         // 传递指令内容
     output reg [31:0]   pc_addr_o,      // 传递指令地址
-    output reg          pred_taken_o,
-    output reg [31:0]   pred_pc_o
+
+    // from bpu
+    input               pred_taken
 );
-    always @(posedge clk or negedge rst) begin
+    always @(posedge clk) begin
         if(!rst) begin
             pc_addr_o   <= 32'b0;
             inst_o      <= `NOP;
-            pred_taken_o<= 1'b0;
-            pred_pc_o   <= 32'b0;
         end
         else if(jump_en) begin
-            pc_addr_o   <= pc_addr_i;
+            pc_addr_o   <= 32'b0;
             inst_o      <= `NOP;
-            pred_taken_o<= 1'b0;
-            pred_pc_o   <= 32'b0;
         end
         else if(hazard_en) begin
             pc_addr_o   <= pc_addr_o;
             inst_o      <= inst_o;
-            pred_taken_o<= pred_taken_i;
-            pred_pc_o   <= pred_pc_i;
+        end
+        else if (pred_taken) begin
+            pc_addr_o   <= 32'b0;
+            inst_o      <= `NOP;
         end
         else begin
             pc_addr_o   <= pc_addr_i;
             inst_o      <= inst_i;
-            pred_taken_o<= pred_taken_i;
-            pred_pc_o   <= pred_pc_i;
         end
     end
 endmodule
