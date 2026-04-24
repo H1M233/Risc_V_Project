@@ -1,9 +1,16 @@
 `include "rv32I.vh"
-// 预测单元：包含分支预测branch_predictor_gshare.v和返回栈ras.v
+
+// 预测单元顶层，包含：
+// 控制模块 bpu_controller.v
+// 为B类型跳转使用的Gshare预测器 gshare.v
+// 为返回JALR使用的RAS栈 ras.v
+// 为非返回JALR使用的2路组相联BTB模块 btb.v
+// 命中计数器 pred_cnt.v
+
 module bpu_top #(
     // 分支预测
-    parameter BHR_WIDTH = 10,
-    parameter PHT_SIZE  = 1024,
+    parameter BHR_WIDTH = 10,               // BHR宽度：PHT索引根据
+    parameter PHT_SIZE  = 1024,             // PHT深度
 
     // RAS
     parameter RAS_DEPTH = 8
@@ -11,7 +18,6 @@ module bpu_top #(
     input               clk,
     input               rst,
     
-    // 分支预测
     // from if
     input      [31:0]   pc_addr,            // if阶段指令地址
     input      [31:0]   pc_inst,            // if取得的指令

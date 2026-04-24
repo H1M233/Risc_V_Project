@@ -1,7 +1,7 @@
 `include "rv32I.vh"
-// 在ID阶段输入出栈压栈信号，返回出栈地址给PC
-// jal x1, offset：压栈PC + 4
-// jalr x0, x1, 0：出栈
+
+// 为返回类 JALR 使用的 RAS 栈
+// 就是一个物理栈
 
 module ras #(
     parameter DEPTH     = 8,
@@ -11,18 +11,22 @@ module ras #(
     input               rst,
 
     // from gshare
-    input               push_en_i,
-    input               pop_en_i,
-    input      [31:0]   push_addr_i,
+    input               push_en_i,      // 压栈使能
+    input               pop_en_i,       // 弹栈使能
+    input      [31:0]   push_addr_i,    // 压栈地址
 
     // to gshare
-    output     [31:0]   pop_addr_o,
-    output              isempty_o,
-    output              isfull_o
+    output     [31:0]   pop_addr_o,     // 弹栈地址
+    output              isempty_o,      // 为空
+    output              isfull_o        // 为满
 );
 
     reg [31:0] stack_mem [DEPTH - 1:0];
     reg [PTR_WIDTH:0] ptr;
+
+    assign isempty_o    = (ptr == 0);
+    assign isfull_o     = (ptr == DEPTH);
+    assign pop_addr_o   = (pop_en_i && !isempty_o) ? stack_mem[ptr - 1] : 32'b0;
 
     integer i;
     always@(posedge clk) begin
@@ -54,9 +58,4 @@ module ras #(
             end
         end
     end
-
-    assign isempty_o    = (ptr == 0);
-    assign isfull_o     = (ptr == DEPTH);
-    assign pop_addr_o   = (pop_en_i && !isempty_o) ? stack_mem[ptr - 1] : 32'b0;
-
 endmodule

@@ -1,21 +1,24 @@
 `include "rv32I.vh"
-// 为非返回JALR使用的2路组相联BTB模块
+
+// 为非返回 JALR 使用的 2 路组相联 BTB 模块
+// 即根据地址的部分位建立的历史记录表 2 路可以提升准确率
+
 module btb #(
-    parameter SETS          = 16,           // 组数
+    parameter SETS          = 16,           // 组数：最多记录多少历史
     parameter INDEX_WIDTH   = $clog2(SETS)
 )(
     input               clk,
     input               rst,
     
     // 查询
-    input      [31:0]   query_pc_i,     // 查询的pc
-    output              hit_o,          // 返回是否命中
-    output     [31:0]   target_pc_o,    // 返回预测的目标地址
+    input      [31:0]   query_pc_i,         // 查询的 pc
+    output              hit_o,              // 返回是否命中
+    output     [31:0]   target_pc_o,        // 返回预测的目标地址
     
     // 更新
-    input               update_en_i,    // ex阶段返回的BTB更新使能
-    input      [31:0]   update_pc_i,    // ex阶段返回更新的指令地址
-    input      [31:0]   update_target_i // ex阶段返回的实际目标地址
+    input               update_en_i,        // ex 阶段返回的BTB更新使能
+    input      [31:0]   update_pc_i,        // ex 阶段返回更新的指令地址
+    input      [31:0]   update_target_i     // ex 阶段返回的实际目标地址
 );
 
     // 提取索引和tag（tag取pc高位，用于区分映射到同一索引的不同地址）

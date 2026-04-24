@@ -61,6 +61,6 @@ module hazard(
                 forward_rs2_en      = 1'b1;     // 数据转发，解决数据冒险
                 forward_rs2_data    = mem_wdata_i; 
             end
-        end 
+        end
     end
 endmodule
