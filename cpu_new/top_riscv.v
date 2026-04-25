@@ -36,17 +36,7 @@ module top_riscv(
     // ============================================================
     wire            hazard_hazard_en;
     wire            dcache_stall;
-
     wire            bpu_hold_en;
-
-    // 注意：
-    // 原始 icache_stall 不能直接控制流水线。
-    // 如果当前周期已经要 jump 或 BPU pred_taken，则当前 IF 指令会被冲刷，
-    // 不应该因为这条错误路径指令的 I-cache miss 而卡住前端。
-    assign icache_block = icache_stall & ~bpu_pred_taken & ~jump_jump_en_o;
-
-    // BPU 只在真正需要 hold 的时候暂停。
-    assign bpu_hold_en = dcache_stall | hazard_hazard_en | icache_block;
 
     // ============================================================
     // hazard to id
@@ -148,8 +138,13 @@ module top_riscv(
     wire [4:0]      mem_rd_addr_i;
     wire [31:0]     mem_rs2_data_i;
 
+    // MEM 阶段当前是否是 load
+    // 用于 hazard 判断：MEM load 不再向 ID 前递，直接多停一拍
+    wire            mem_is_load;
+    assign mem_is_load = mem_mem_req_i && !mem_mem_wen_i;
+
     // ============================================================
-    // mem to mem_wb & hazard
+    // mem to mem_wb
     // ============================================================
     wire [31:0]     mem_rd_data_o;
     wire [4:0]      mem_rd_addr_o;
@@ -184,6 +179,13 @@ module top_riscv(
     // ============================================================
     wire [31:0]     bpu_pred_pc;
     wire            bpu_pred_taken;
+
+    // I-cache 原始 miss 信号不能直接阻塞流水线。
+    // jump 或 BPU 预测跳转时，当前 IF 指令会被冲刷，不应被错误路径 I-cache miss 卡住。
+    assign icache_block = icache_stall & ~bpu_pred_taken & ~jump_jump_en_o;
+
+    // BPU 在真正需要 hold 的时候暂停
+    assign bpu_hold_en = dcache_stall | hazard_hazard_en | icache_block;
 
     // ============================================================
     // ex to bpu
@@ -223,12 +225,10 @@ module top_riscv(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
 
-        // CPU / IF side
         .cpu_addr           (pc_pc_addr_o),
         .cpu_inst           (icache_inst),
         .stall              (icache_stall),
 
-        // IROM side
         .mem_addr           (irom_addr),
         .mem_inst           (irom_data)
     );
@@ -246,23 +246,36 @@ module top_riscv(
 
     // ============================================================
     // Hazard
+    //
+    // 关键修改：
+    // mem_waddr_i 使用 mem_rd_addr_i
+    // mem_wdata_i 使用 mem_rd_data_i
+    //
+    // 不再用 mem_rd_data_o，因为 mem_rd_data_o 对 load 会经过 DCache/DROM，
+    // 那条路径就是现在的最差时序路径。
     // ============================================================
     hazard HAZARD(
+        // from ex
         .ex_waddr_i         (ex_rd_addr_o),
         .ex_wdata_i         (ex_rd_data_o),
         .opcode             (ex_hazard_opcode_o),
 
+        // from id
         .id_rs1_raddr_i     (id_rs1_addr_o),
         .id_rs2_raddr_i     (id_rs2_addr_o),
 
-        .mem_waddr_i        (mem_rd_addr_o),
-        .mem_wdata_i        (mem_rd_data_o),
+        // from mem
+        .mem_waddr_i        (mem_rd_addr_i),
+        .mem_wdata_i        (mem_rd_data_i),
+        .mem_is_load        (mem_is_load),
 
+        // to id
         .forward_rs1_data   (hazard_forward_rs1_data),
         .forward_rs1_en     (hazard_forward_rs1_en),
         .forward_rs2_data   (hazard_forward_rs2_data),
         .forward_rs2_en     (hazard_forward_rs2_en),
 
+        // to if_id, id_ex, pc
         .hazard_en          (hazard_hazard_en)
     );
 
@@ -288,10 +301,7 @@ module top_riscv(
     // IF
     // ============================================================
     ifif IFIF(
-        // from I-cache
         .inst_i             (icache_inst),
-
-        // from PC
         .pc_addr_i          (pc_pc_addr_o),
 
         .inst_o             (if_inst_o),
@@ -441,36 +451,31 @@ module top_riscv(
 
     // ============================================================
     // EX/MEM
-    // I-cache stall 不冻结 EX/MEM。
-    // D-cache stall 才冻结 EX/MEM。
     // ============================================================
-ex_mem EX_MEM(
-    .clk                (cpu_clk),
-    .rst                (cpu_rst),
+    ex_mem EX_MEM(
+        .clk                (cpu_clk),
+        .rst                (cpu_rst),
 
-    // from D-cache stall
-    .dcache_stall       (dcache_stall),
+        .dcache_stall       (dcache_stall),
 
-    // from ex
-    .inst_i             (ex_inst_o),
-    .mem_addr_i         (ex_mem_addr_o),
-    .mem_req_i          (ex_mem_req),
-    .mem_wen_i          (ex_mem_wen),
-    .rd_addr_i          (ex_rd_addr_o),
-    .rd_data_i          (ex_rd_data_o),
-    .regs_wen_i         (ex_regs_wen_o),
-    .rs2_data_i         (ex_rs2_data_o),
+        .inst_i             (ex_inst_o),
+        .mem_addr_i         (ex_mem_addr_o),
+        .mem_req_i          (ex_mem_req),
+        .mem_wen_i          (ex_mem_wen),
+        .rd_addr_i          (ex_rd_addr_o),
+        .rd_data_i          (ex_rd_data_o),
+        .regs_wen_i         (ex_regs_wen_o),
+        .rs2_data_i         (ex_rs2_data_o),
 
-    // to mem
-    .inst_o             (mem_inst_i),
-    .mem_addr_o         (mem_mem_addr_i),
-    .mem_req_o          (mem_mem_req_i),
-    .mem_wen_o          (mem_mem_wen_i),
-    .rd_addr_o          (mem_rd_addr_i),
-    .rd_data_o          (mem_rd_data_i),
-    .regs_wen_o         (mem_regs_wen_i),
-    .rs2_data_o         (mem_rs2_data_i)
-);
+        .inst_o             (mem_inst_i),
+        .mem_addr_o         (mem_mem_addr_i),
+        .mem_req_o          (mem_mem_req_i),
+        .mem_wen_o          (mem_mem_wen_i),
+        .rd_addr_o          (mem_rd_addr_i),
+        .rd_data_o          (mem_rd_data_i),
+        .regs_wen_o         (mem_regs_wen_i),
+        .rs2_data_o         (mem_rs2_data_i)
+    );
 
     // ============================================================
     // MEM
@@ -485,10 +490,8 @@ ex_mem EX_MEM(
         .regs_wen           (mem_regs_wen_i),
         .rs2_data_i         (mem_rs2_data_i),
 
-        // from D-cache
         .perip_rdata        (dcache_rdata),
 
-        // to D-cache
         .perip_req          (mem_perip_req),
         .perip_addr         (mem_perip_addr),
         .perip_mask         (mem_perip_mask),
@@ -525,22 +528,17 @@ ex_mem EX_MEM(
 
     // ============================================================
     // MEM/WB
-    // D-cache stall 时插入 bubble，避免错误写回。
-    // I-cache stall 不影响 MEM/WB。
     // ============================================================
     mem_wb MEM_WB(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
-    
-        // from D-cache stall
+
         .dcache_stall       (dcache_stall),
-    
-        // from mem
+
         .rd_addr_i          (mem_rd_addr_o),
         .rd_data_i          (mem_rd_data_o),
         .regs_wen_i         (mem_regs_wen_o),
-    
-        // to wb
+
         .rd_addr_o          (wb_rd_addr_i),
         .rd_data_o          (wb_rd_data_i),
         .regs_wen_o         (wb_regs_wen_i)
@@ -583,7 +581,6 @@ ex_mem EX_MEM(
         .actual_taken       (ex_actual_taken),
         .pred_mispredict    (ex_pred_mispredict),
 
-        // hazard、D-cache miss、真正的 I-cache block 都要暂停 BPU 查询状态
         .hazard_en          (bpu_hold_en)
     );
 
