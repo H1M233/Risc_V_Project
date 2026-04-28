@@ -4,8 +4,7 @@
 // 即根据地址的部分位建立的历史记录表 2 路可以提升准确率
 
 module btb #(
-    parameter SETS          = 16,           // 组数：最多记录多少历史
-    parameter INDEX_WIDTH   = $clog2(SETS)
+    parameter INDEX_WIDTH = 4               // 截取地址长度
 )(
     input               clk,
     input               rst,
@@ -20,6 +19,7 @@ module btb #(
     input      [31:0]   update_pc_i,        // ex 阶段返回更新的指令地址
     input      [31:0]   update_target_i     // ex 阶段返回的实际目标地址
 );
+    localparam SETS = 2 ** INDEX_WIDTH;     // 组数：最多记录多少历史
 
     // 提取索引和tag（tag取pc高位，用于区分映射到同一索引的不同地址）
     wire [INDEX_WIDTH - 1:0]        query_index     = query_pc_i[INDEX_WIDTH + 1:2];

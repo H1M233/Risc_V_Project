@@ -1,82 +1,203 @@
 `include "rv32I.vh"
 
-module icache(
+module icache #(
+    parameter INDEX_WIDTH   = 6,        // 索引宽度
+    parameter TAG_WIDTH     = 24,       // tag 宽度
+    parameter WAYS          = 4         // 路数
+)(
     input               clk,
     input               rst,
 
     // CPU / IF side
     input      [31:0]   cpu_addr,
     output     [31:0]   cpu_inst,
-    output              stall,
+    input               flush,
+    output              stall,  
 
     // IROM side
-    output     [31:0]   mem_addr,
+    output reg [31:0]   mem_addr,
     input      [31:0]   mem_inst
 );
-    localparam INDEX_WIDTH = 6;
-    localparam TAG_WIDTH   = 24;
-    localparam LINE_NUM    = 64;
+    localparam LINE_NUM    = 2 ** INDEX_WIDTH;  // 组数
 
-    localparam S_IDLE      = 1'b0;
-    localparam S_REFILL    = 1'b1;
-
-    reg state;
-
-    wire [INDEX_WIDTH-1:0] index = cpu_addr[INDEX_WIDTH+1:2];
-    wire [TAG_WIDTH-1:0]   tag   = cpu_addr[31:INDEX_WIDTH+2];
-
-    reg [31:0]             data_array  [0:LINE_NUM-1];
-    reg [TAG_WIDTH-1:0]    tag_array   [0:LINE_NUM-1];
-    reg                    valid_array [0:LINE_NUM-1];
-
-    reg [31:0]             miss_addr;
-    reg [INDEX_WIDTH-1:0]  miss_index;
-    reg [TAG_WIDTH-1:0]    miss_tag;
-
-    wire hit  = valid_array[index] && (tag_array[index] == tag);
-    wire miss = !hit;
-
-    assign stall = rst && ((state == S_REFILL) || ((state == S_IDLE) && miss));
-
-    assign mem_addr = (state == S_REFILL) ? miss_addr : {cpu_addr[31:2], 2'b00};
-
-    assign cpu_inst = hit ? data_array[index] : `NOP;
-
-    integer i;
-
-    always @(posedge clk) begin
+    // ============================================================
+    //
+    // 命中计数器
+    reg [31:0] icache_hit;
+    reg [31:0] icache_miss;
+    always@(posedge clk) begin
         if(!rst) begin
-            state     <= S_IDLE;
-            miss_addr <= 32'b0;
-            miss_index <= {INDEX_WIDTH{1'b0}};
-            miss_tag   <= {TAG_WIDTH{1'b0}};
-
-            for(i = 0; i < LINE_NUM; i = i + 1) begin
-                valid_array[i] <= 1'b0;
-            end
+            icache_hit  <= 32'b0;
+            icache_miss <= 32'b0;
         end
         else begin
-            case(state)
-                S_IDLE: begin
-                    if(miss) begin
-                        miss_addr  <= {cpu_addr[31:2], 2'b00};
-                        miss_index <= index;
-                        miss_tag   <= tag;
-                        state      <= S_REFILL;
+            icache_hit  <= (state == S_QUERY && hit) ? icache_hit + 1'b1 : icache_hit;
+            icache_miss <= (state == S_QUERY && miss) ? icache_miss + 1'b1 : icache_miss;
+        end
+    end
+    //
+    // ============================================================
+    
+    // 状态
+    localparam S_QUERY  = 2'b00;
+    localparam S_REFILL = 2'b01;
+    localparam S_OUTPUT = 2'b10;
+    reg [1:0] state;
+
+    // 提取索引和 tag
+    wire [INDEX_WIDTH - 1:0] index  = cpu_addr[INDEX_WIDTH + 1:2];
+    wire [TAG_WIDTH - 1:0]   tag    = cpu_addr[31:INDEX_WIDTH + 2];
+
+    // 存储结构：
+    (* ram_style = "block" *) reg [31:0]             data_array  [0:WAYS - 1][0:LINE_NUM - 1];
+    reg [TAG_WIDTH - 1:0]  tag_array   [0:WAYS - 1][0:LINE_NUM - 1];
+    reg                    valid_array [0:WAYS - 1][0:LINE_NUM - 1];
+
+    // ==================== PLRU 替换策略 ====================
+    // 每组的访问历史（用于选择替换哪一路）
+    // 用 4×4 矩阵跟踪每对 way 的访问顺序（简化版：只用 3 位状态）
+    reg [2:0] plru_state [0:LINE_NUM - 1];  // 3 位足够编码 4 路的 PLRU 树
+
+    // 命中检测
+    wire [WAYS - 1:0] hit_way;
+    genvar way;
+    generate
+        for(way = 0; way < WAYS; way = way + 1) begin : hit_gen
+            assign hit_way[way] = valid_array[way][index] && (tag_array[way][index] == tag);
+        end
+    endgenerate
+
+    wire hit = |hit_way;
+    wire miss = !hit;
+
+    // 优先选择低路
+    reg [1:0] hit_way_idx;
+    always @(*) begin
+        casez (hit_way)
+            4'b???1: hit_way_idx = 2'd0;
+            4'b??10: hit_way_idx = 2'd1;
+            4'b?100: hit_way_idx = 2'd2;
+            4'b1000: hit_way_idx = 2'd3;
+            default: hit_way_idx = 2'd0;
+        endcase
+    end
+
+    // 选择替换的路
+    reg [1:0] replace_way;
+    always @(*) begin
+        // PLRU 树的叶节点选择
+        // plru_state[2]: way0/1 vs way2/3 的选择
+        // plru_state[1]: way0 vs way1
+        // plru_state[0]: way2 vs way3
+        if (plru_state[index][2] == 1'b0) begin
+            // 左侧 (way0/1) 更近被使用，选右侧 (way2/3)
+            if (plru_state[index][0] == 1'b0)
+                replace_way = 2'd2;
+            else
+                replace_way = 2'd3;
+        end else begin
+            // 右侧 (way2/3) 更近被使用，选左侧 (way0/1)
+            if (plru_state[index][1] == 1'b0)
+                replace_way = 2'd0;
+            else
+                replace_way = 2'd1;
+        end
+    end
+
+    // PLRU更新
+    wire        update_plru     = (state == S_QUERY && hit);
+    wire [1:0]  accessed_way    = hit_way_idx;  // need to debug
+
+    // CPU接口
+    reg [31:0]              miss_addr;
+    reg [INDEX_WIDTH-1:0]   miss_index;
+    reg [TAG_WIDTH-1:0]     miss_tag;
+    reg [1:0]               miss_way;
+
+    assign stall    = (state != S_OUTPUT) || flush;
+    always@(*) begin
+        mem_addr = cpu_addr;
+    end
+
+    reg [31:0] cpu_inst_reg;
+    always@(posedge clk)begin
+        case(hit_way_idx)
+            2'd0: cpu_inst_reg <= data_array[0][index];
+            2'd1: cpu_inst_reg <= data_array[1][index];
+            2'd2: cpu_inst_reg <= data_array[2][index];
+            2'd3: cpu_inst_reg <= data_array[3][index];
+            default: cpu_inst_reg <= 32'b0;
+        endcase
+    end
+
+    assign cpu_inst = (state == S_OUTPUT) ? cpu_inst_reg : `NOP;
+
+   // 主状态机
+    integer i, w;
+    always @(posedge clk) begin
+        if (!rst) begin
+            state           <= S_QUERY;
+            miss_addr       <= 0;
+            miss_index      <= 0;
+            miss_tag        <= 0;
+            miss_way        <= 0;
+
+            // 清除所有 valid
+            for (w = 0; w < WAYS; w = w + 1) begin
+                for (i = 0; i < LINE_NUM; i = i + 1) begin
+                    valid_array[w][i] <= 1'b0;
+                end
+            end
+
+            // 初始化 PLRU 状态
+            for (i = 0; i < LINE_NUM; i = i + 1) plru_state[i] <= 3'b0;
+        end 
+        else begin
+            if(state == S_QUERY || flush) begin
+                if(hit) begin
+                    state <= S_OUTPUT;
+                end
+                else begin
+                    miss_addr  <= cpu_addr;
+                    miss_index <= index;
+                    miss_tag   <= tag;
+                    miss_way   <= replace_way;  // 选择替换的路
+                    state      <= S_REFILL;
+                end
+            end
+            else if(state == S_REFILL)begin
+                // 写入选中的路
+                valid_array[miss_way][miss_index] <= 1'b1;
+                tag_array[miss_way][miss_index]   <= miss_tag;
+                data_array[miss_way][miss_index]  <= mem_inst;
+                state <= S_QUERY;
+            end
+            else begin
+                state <= S_QUERY;
+            end
+
+            // PLRU 更新（独立于状态机）
+            if (update_plru) begin
+                // 基于访问的路更新 PLRU 树
+                case (accessed_way)
+                    2'd0: begin
+                        plru_state[index][2] <= 1'b0;  // 左侧被使用
+                        plru_state[index][1] <= 1'b0;  // way0 被使用
                     end
-                end
-
-                S_REFILL: begin
-                    valid_array[miss_index] <= 1'b1;
-                    tag_array[miss_index]   <= miss_tag;
-                    data_array[miss_index]  <= mem_inst;
-                    state                   <= S_IDLE;
-                end
-
-                default: begin
-                    state <= S_IDLE;
-                end
-            endcase
+                    2'd1: begin
+                        plru_state[index][2] <= 1'b0;
+                        plru_state[index][1] <= 1'b1;  // way1 被使用
+                    end
+                    2'd2: begin
+                        plru_state[index][2] <= 1'b1;  // 右侧被使用
+                        plru_state[index][0] <= 1'b0;  // way2 被使用
+                    end
+                    2'd3: begin
+                        plru_state[index][2] <= 1'b1;
+                        plru_state[index][0] <= 1'b1;  // way3 被使用
+                    end
+                endcase
+            end
         end
     end
 endmodule

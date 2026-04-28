@@ -22,7 +22,10 @@ module pc(
 
     // from bpu
     input      [31:0]   pred_pc,
-    input               pred_taken
+    input               pred_taken,
+
+    // to I-cache
+    output reg          icache_flush
 );
     always @(posedge clk) begin
         if(!rst) begin
@@ -46,5 +49,9 @@ module pc(
         else begin
             pc_addr_o <= pc_addr_o + 4;
         end
+    end
+
+    always@(posedge clk) begin
+        icache_flush <= (jump_en || pred_taken) ? 1'b1 : 1'b0;
     end
 endmodule

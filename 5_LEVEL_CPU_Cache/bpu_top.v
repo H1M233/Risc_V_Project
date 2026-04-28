@@ -169,7 +169,7 @@ module bpu_top #(
     );
 
     btb #(
-        .SETS   (16)
+        .INDEX_WIDTH (4)
     ) BTB(
         .clk                        (clk),
         .rst                        (rst),

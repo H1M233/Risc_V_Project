@@ -24,6 +24,7 @@ module top_riscv(
     wire [31:0]     icache_inst;
     wire            icache_stall;
     wire            icache_block;
+    wire            icache_flush;
 
     // ============================================================
     // jump
@@ -138,11 +139,6 @@ module top_riscv(
     wire [4:0]      mem_rd_addr_i;
     wire [31:0]     mem_rs2_data_i;
 
-    // MEM 阶段当前是否是 load
-    // 用于 hazard 判断：MEM load 不再向 ID 前递，直接多停一拍
-    wire            mem_is_load;
-    assign mem_is_load = mem_mem_req_i && !mem_mem_wen_i;
-
     // ============================================================
     // mem to mem_wb
     // ============================================================
@@ -215,7 +211,8 @@ module top_riscv(
         .pc_addr_o          (pc_pc_addr_o),
 
         .pred_pc            (bpu_pred_pc),
-        .pred_taken         (bpu_pred_taken)
+        .pred_taken         (bpu_pred_taken),
+        .icache_flush       (icache_flush)
     );
 
     // ============================================================
@@ -227,6 +224,7 @@ module top_riscv(
 
         .cpu_addr           (pc_pc_addr_o),
         .cpu_inst           (icache_inst),
+        .flush              (icache_flush),
         .stall              (icache_stall),
 
         .mem_addr           (irom_addr),
@@ -267,7 +265,6 @@ module top_riscv(
         // from mem
         .mem_waddr_i        (mem_rd_addr_i),
         .mem_wdata_i        (mem_rd_data_i),
-        .mem_is_load        (mem_is_load),
 
         // to id
         .forward_rs1_data   (hazard_forward_rs1_data),
@@ -423,6 +420,15 @@ module top_riscv(
         .value2_i           (ex_value2_i),
         .pred_taken_i       (ex_pred_taken_i),
         .pred_pc_i          (ex_pred_pc_i),
+
+        .mem_forward_rd_addr_i  (mem_rd_addr_i),
+        .mem_forward_rd_data_i  (mem_rd_data_i),
+        .mem_forward_regs_wen_i (mem_regs_wen_i),
+        .mem_forward_opcode_i   (mem_inst_i[6:0]),
+
+        .wb_forward_rd_addr_i   (wb_rd_addr_i),
+        .wb_forward_rd_data_i   (wb_rd_data_i),
+        .wb_forward_regs_wen_i  (wb_regs_wen_i),
 
         .hazard_opcode      (ex_hazard_opcode_o),
 
