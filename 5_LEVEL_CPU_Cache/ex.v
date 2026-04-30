@@ -31,9 +31,10 @@ module ex(
 
     // to ex_mem
     output reg [31:0]   inst_o,
-    output reg [31:0]   mem_addr_o,
+    output reg [31:0]   mem_addr_o,     // 转发 dcache
     output reg          mem_req,
-    output reg          mem_wen,
+    output reg          mem_wen,        // 转发 dcache
+    output reg [1:0]    mem_mask,       // 转发 dcache
     output reg          regs_wen_o,
     output reg [31:0]   rs2_data_o,
 
@@ -54,7 +55,15 @@ module ex(
     output reg [31:0]   pc_addr_o,
     output reg [31:0]   update_target,
     output reg          actual_taken,
-    output reg          pred_mispredict
+    output reg          pred_mispredict,
+
+    // to dcache
+    output reg          dcache_req_load,
+    output reg          dcache_req_store,
+    output reg          dcache_wen,
+    output reg [1:0]    dcache_mask,
+    output reg [31:0]   dcache_addr,
+    output reg [31:0]   dcache_wdata
 );
     wire [6:0] opcode   = inst_i[6:0];
     wire [2:0] funct3   = inst_i[14:12];
@@ -137,24 +146,31 @@ module ex(
     end
 
     always @(*) begin
-        pc_addr_o        = pc_addr_i;
-        regs_wen_o       = regs_wen_i;
-        mem_wen          = 1'b0;
-        mem_req          = 1'b0;
-        mem_addr_o       = 32'b0;
-        rd_data_o        = 32'b0;
-        rd_addr_o        = rd_addr_i;
-        rs1_data_o       = rs1_fwd_data;
-        rs2_data_o       = rs2_fwd_data;
-        jump_en          = 1'b0;
-        jump_addr_o      = 32'b0;
-        hazard_opcode    = opcode;
-        inst_o           = inst_i;
-        update_btb_en    = 1'b0;
-        update_gshare_en = 1'b0;
-        update_target    = 32'b0;
-        actual_taken     = 1'b0;
-        pred_mispredict  = 1'b0;
+        pc_addr_o           = pc_addr_i;
+        regs_wen_o          = regs_wen_i;
+        mem_wen             = (opcode == `TYPE_S);
+        mem_req             = (opcode == `TYPE_S & opcode == `TYPE_L);
+        mem_mask            = 2'b0;
+        mem_addr_o          = add_res;
+        rd_data_o           = 32'b0;
+        rd_addr_o           = rd_addr_i;
+        rs1_data_o          = rs1_fwd_data;
+        rs2_data_o          = rs2_fwd_data;
+        jump_en             = 1'b0;
+        jump_addr_o         = 32'b0;
+        hazard_opcode       = opcode;
+        inst_o              = inst_i;
+        update_btb_en       = 1'b0;
+        update_gshare_en    = 1'b0;
+        update_target       = 32'b0;
+        actual_taken        = 1'b0;
+        pred_mispredict     = 1'b0;
+        dcache_req_load     = (opcode == `TYPE_L);
+        dcache_req_store    = (opcode == `TYPE_S);
+        dcache_wen          = (opcode == `TYPE_S);
+        dcache_mask         = 2'b0;
+        dcache_addr         = add_res;
+        dcache_wdata        = rs2_fwd_data;
 
         case (opcode)
 
@@ -196,33 +212,45 @@ module ex(
             end
 
             `TYPE_L: begin
-                case (funct3)
-                    `LB, `LH, `LW, `LBU, `LHU: begin
-                        mem_req    = 1'b1;
-                        mem_wen    = 1'b0;
-                        mem_addr_o = add_res;
+                case(funct3)
+                    `LB: begin
+                        dcache_mask  = 2'b00;
                     end
-
+                    `LH: begin
+                        dcache_mask  = 2'b01;
+                    end
+                    `LW: begin
+                        dcache_mask  = 2'b10;
+                    end
+                    `LBU: begin
+                        dcache_mask  = 2'b00;
+                    end
+                    `LHU: begin
+                        dcache_mask  = 2'b01;
+                    end
                     default: begin
-                        mem_req    = 1'b0;
-                        mem_wen    = 1'b0;
-                        mem_addr_o = 32'b0;
+                        dcache_mask  = 2'b00;
                     end
                 endcase
             end
 
             `TYPE_S: begin
                 case (funct3)
-                    `SB, `SH, `SW: begin
-                        mem_req    = 1'b1;
-                        mem_wen    = 1'b1;
-                        mem_addr_o = add_res;
+                    `SB: begin
+                        mem_mask  = 2'b00;
+                        dcache_mask = 2'b00;
                     end
-
+                    `SH: begin
+                        mem_mask  = 2'b01;
+                        dcache_mask = 2'b01;
+                    end
+                    `SW: begin
+                        mem_mask  = 2'b10;
+                        dcache_mask = 2'b10;
+                    end
                     default: begin
-                        mem_req    = 1'b0;
-                        mem_wen    = 1'b0;
-                        mem_addr_o = 32'b0;
+                        mem_mask  = 2'b00;
+                        dcache_mask = 2'b00;
                     end
                 endcase
             end
@@ -333,9 +361,6 @@ module ex(
 
             default: begin
                 rd_data_o        = 32'b0;
-                mem_req          = 1'b0;
-                mem_wen          = 1'b0;
-                mem_addr_o       = 32'b0;
                 jump_en          = 1'b0;
                 jump_addr_o      = 32'b0;
                 update_btb_en    = 1'b0;

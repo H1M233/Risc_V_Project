@@ -1,5 +1,12 @@
 `include "rv32I.vh"
 
+
+
+
+// bypass
+
+
+
 module icache #(
     parameter INDEX_WIDTH   = 6,        // 索引宽度
     parameter TAG_WIDTH     = 24,       // tag 宽度
@@ -23,18 +30,18 @@ module icache #(
     // ============================================================
     //
     // 命中计数器
-    reg [31:0] icache_hit;
-    reg [31:0] icache_miss;
-    always@(posedge clk) begin
-        if(!rst) begin
-            icache_hit  <= 32'b0;
-            icache_miss <= 32'b0;
-        end
-        else begin
-            icache_hit  <= (state == S_QUERY && hit) ? icache_hit + 1'b1 : icache_hit;
-            icache_miss <= (state == S_QUERY && miss) ? icache_miss + 1'b1 : icache_miss;
-        end
-    end
+    // reg [31:0] icache_hit;
+    // reg [31:0] icache_miss;
+    // always@(posedge clk) begin
+    //     if(!rst) begin
+    //         icache_hit  <= 32'b0;
+    //         icache_miss <= 32'b0;
+    //     end
+    //     else begin
+    //         icache_hit  <= (state == S_QUERY && hit) ? icache_hit + 1'b1 : icache_hit;
+    //         icache_miss <= (state == S_QUERY && miss) ? icache_miss + 1'b1 : icache_miss;
+    //     end
+    // end
     //
     // ============================================================
     
@@ -49,7 +56,7 @@ module icache #(
     wire [TAG_WIDTH - 1:0]   tag    = cpu_addr[31:INDEX_WIDTH + 2];
 
     // 存储结构：
-    (* ram_style = "block" *) reg [31:0]             data_array  [0:WAYS - 1][0:LINE_NUM - 1];
+    (* ram_style = "block" *) reg [31:0] data_array  [0:WAYS - 1][0:LINE_NUM - 1];
     reg [TAG_WIDTH - 1:0]  tag_array   [0:WAYS - 1][0:LINE_NUM - 1];
     reg                    valid_array [0:WAYS - 1][0:LINE_NUM - 1];
 
@@ -114,7 +121,7 @@ module icache #(
     reg [TAG_WIDTH-1:0]     miss_tag;
     reg [1:0]               miss_way;
 
-    assign stall    = (state != S_OUTPUT) || flush;
+    assign stall    = (state == S_QUERY) || flush;
     always@(*) begin
         mem_addr = cpu_addr;
     end
@@ -130,7 +137,8 @@ module icache #(
         endcase
     end
 
-    assign cpu_inst = (state == S_OUTPUT) ? cpu_inst_reg : `NOP;
+    assign cpu_inst =   (state == S_OUTPUT) ? cpu_inst_reg : 
+                        (state == S_REFILL) ? mem_inst : `NOP;
 
    // 主状态机
     integer i, w;

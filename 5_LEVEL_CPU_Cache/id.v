@@ -39,9 +39,9 @@ module id(
     // 提取指令
     wire [31:0] data1       = forward_rs1_en ? forward_rs1_data : rs1_data_i;
     wire [31:0] data2       = forward_rs2_en ? forward_rs2_data : rs2_data_i;
-    wire [6:0]  opcode_o    = inst_i[6:0];              // 传入指令opcode
-    wire [2:0]  funct3_o    = inst_i[14:12];            // 传入指令funct3
-    wire [6:0]  funct7_o    = inst_i[31:25];            // 传入指令funct7
+    wire [6:0]  opcode      = inst_i[6:0];              // 传入指令opcode
+    wire [2:0]  funct3      = inst_i[14:12];            // 传入指令funct3
+    wire [6:0]  funct7      = inst_i[31:25];            // 传入指令funct7
     wire [4:0]  rd_o        = inst_i[11:7];             // 传入指令rd地址
     wire [4:0]  rs1_o       = inst_i[19:15];            // 传入指令rs1地址
     wire [4:0]  rs2_o       = inst_i[24:20];            // 传入指令rs2地址
@@ -61,8 +61,7 @@ module id(
         rd_addr_o   = 5'b0;
         pred_taken_o = pred_taken_i;
         pred_pc_o   = pred_pc_i;
-
-        case(opcode_o)
+        case(opcode)
             `LUI: begin
                 reg_wen     = 1'b1;             
                 value1_o    = {inst_i[31:12], 12'b0};   

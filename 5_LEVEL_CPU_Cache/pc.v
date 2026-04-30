@@ -31,9 +31,6 @@ module pc(
         if(!rst) begin
             pc_addr_o <= 32'h8000_0000;
         end
-        else if(dcache_stall) begin
-            pc_addr_o <= pc_addr_o;
-        end
         else if(jump_en) begin
             pc_addr_o <= jump_addr_i;
         end
@@ -42,6 +39,9 @@ module pc(
         end
         else if(pred_taken) begin
             pc_addr_o <= pred_pc;
+        end
+        else if(dcache_stall) begin
+            pc_addr_o <= pc_addr_o;
         end
         else if(icache_block) begin
             pc_addr_o <= pc_addr_o;

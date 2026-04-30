@@ -20,10 +20,11 @@ module top_riscv(
     // PC / I-cache
     // ============================================================
     wire [31:0]     pc_pc_addr_o;
+    assign irom_addr = pc_pc_addr_o;
 
     wire [31:0]     icache_inst;
     wire            icache_stall;
-    wire            icache_block;
+    wire            icache_block = 1'b0;
     wire            icache_flush;
 
     // ============================================================
@@ -83,6 +84,15 @@ module top_riscv(
     wire            id_pred_taken_o;
     wire [31:0]     id_pred_pc_o;
 
+    // id to dcache
+
+    wire [31:0]     dcache_addr_i;
+    wire            dcache_req_load_i;
+    wire            dcache_req_store_i;
+    wire            dcache_wen_i;
+    wire [1:0]      dcache_mask_i;
+    wire [31:0]     dcache_wdata_i;
+
     // ============================================================
     // id_ex to ex
     // ============================================================
@@ -111,6 +121,7 @@ module top_riscv(
     wire            ex_regs_wen_o;
     wire [31:0]     ex_inst_o;
     wire            ex_mem_wen;
+    wire [1:0]      ex_mem_mask;
     wire            ex_mem_req;
     wire [31:0]     ex_mem_addr_o;
     wire [31:0]     ex_rs2_data_o;
@@ -178,7 +189,7 @@ module top_riscv(
 
     // I-cache 原始 miss 信号不能直接阻塞流水线。
     // jump 或 BPU 预测跳转时，当前 IF 指令会被冲刷，不应被错误路径 I-cache miss 卡住。
-    assign icache_block = icache_stall & ~bpu_pred_taken & ~jump_jump_en_o;
+    // assign icache_block = icache_stall & ~bpu_pred_taken & ~jump_jump_en_o;
 
     // BPU 在真正需要 hold 的时候暂停
     assign bpu_hold_en = dcache_stall | hazard_hazard_en | icache_block;
@@ -218,18 +229,18 @@ module top_riscv(
     // ============================================================
     // I-cache
     // ============================================================
-    icache ICACHE(
-        .clk                (cpu_clk),
-        .rst                (cpu_rst),
+    // icache ICACHE(
+    //     .clk                (cpu_clk),
+    //     .rst                (cpu_rst),
 
-        .cpu_addr           (pc_pc_addr_o),
-        .cpu_inst           (icache_inst),
-        .flush              (icache_flush),
-        .stall              (icache_stall),
+    //     .cpu_addr           (pc_pc_addr_o),
+    //     .cpu_inst           (icache_inst),
+    //     .flush              (icache_flush),
+    //     .stall              (icache_stall),
 
-        .mem_addr           (irom_addr),
-        .mem_inst           (irom_data)
-    );
+    //     .mem_addr           (irom_addr),
+    //     .mem_inst           (irom_data)
+    // );
 
     // ============================================================
     // Jump
@@ -298,7 +309,8 @@ module top_riscv(
     // IF
     // ============================================================
     ifif IFIF(
-        .inst_i             (icache_inst),
+        // .inst_i             (icache_inst),
+        .inst_i             (irom_data),
         .pc_addr_i          (pc_pc_addr_o),
 
         .inst_o             (if_inst_o),
@@ -436,6 +448,7 @@ module top_riscv(
         .mem_addr_o         (ex_mem_addr_o),
         .mem_req            (ex_mem_req),
         .mem_wen            (ex_mem_wen),
+        .mem_mask           (ex_mem_mask),
         .regs_wen_o         (ex_regs_wen_o),
         .rs2_data_o         (ex_rs2_data_o),
 
@@ -452,7 +465,14 @@ module top_riscv(
         .pc_addr_o          (ex_pc_addr_o),
         .update_target      (ex_pred_update_target),
         .actual_taken       (ex_actual_taken),
-        .pred_mispredict    (ex_pred_mispredict)
+        .pred_mispredict    (ex_pred_mispredict),
+
+        .dcache_req_load    (dcache_req_load_i),
+        .dcache_req_store   (dcache_req_store_i),
+        .dcache_wen         (dcache_wen_i),
+        .dcache_mask        (dcache_mask_i),
+        .dcache_addr        (dcache_addr_i),
+        .dcache_wdata       (dcache_wdata_i)
     );
 
     // ============================================================
@@ -517,11 +537,12 @@ module top_riscv(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
 
-        .cpu_req            (mem_perip_req),
-        .cpu_wen            (mem_perip_wen),
-        .cpu_mask           (mem_perip_mask),
-        .cpu_addr           (mem_perip_addr),
-        .cpu_wdata          (mem_perip_wdata),
+        .cpu_req_load       (dcache_req_load_i),
+        .cpu_req_store      (dcache_req_store_i),
+        .cpu_wen            (dcache_wen_i),
+        .cpu_mask           (dcache_mask_i),
+        .cpu_addr           (dcache_addr_i),
+        .cpu_wdata          (dcache_wdata_i),
         .cpu_rdata          (dcache_rdata),
         .stall              (dcache_stall),
 
@@ -587,7 +608,8 @@ module top_riscv(
         .actual_taken       (ex_actual_taken),
         .pred_mispredict    (ex_pred_mispredict),
 
-        .hazard_en          (bpu_hold_en)
+        .hazard_en          (bpu_hold_en),
+        .dcache_stall       (dcache_stall)
     );
 
 endmodule

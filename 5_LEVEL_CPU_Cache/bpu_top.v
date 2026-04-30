@@ -35,7 +35,8 @@ module bpu_top #(
     input               pred_mispredict,    // ex阶段判断预测错误
 
     // from hazard
-    input               hazard_en
+    input               hazard_en,
+    input               dcache_stall
     
 );
     // connect gshare with bpu_controller
@@ -95,6 +96,7 @@ module bpu_top #(
 
         // from hazard
         .hazard_en                  (hazard_en),
+        .dcache_stall               (dcache_stall),
 
         // Gshare - 查询
         .gshare_pht_index           (gshare_pht_index_i),

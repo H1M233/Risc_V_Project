@@ -37,8 +37,7 @@ module dram_driver(
     assign offset = perip_addr[1:0];
     assign perip_rdata = dout;
 
-    blk_mem_gen_0 Mem_DRAM (
-        .clka       (clk),
+    blk_mem_g`
         .addra      (dram_addr),
         .douta      (dram_rdata_raw),
         .wea        (dram_wen),

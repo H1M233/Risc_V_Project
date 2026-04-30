@@ -38,6 +38,7 @@ module bpu_controller #(
 
     // from hazard
     input                           hazard_en,
+    input                           dcache_stall,
 
     // Gshare - 查询
     output reg [BHR_WIDTH - 1:0]    gshare_pht_index,
@@ -148,7 +149,7 @@ module bpu_controller #(
             ras_push_en         <= 0;
             ras_push_addr       <= 0;
         end
-        else if(hazard_en) begin
+        else if(hazard_en | dcache_stall) begin
             // hazard发生时暂停
         end
         else begin

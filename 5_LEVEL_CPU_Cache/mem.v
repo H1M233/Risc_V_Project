@@ -11,10 +11,10 @@ module mem(
     input               regs_wen,
     input      [31:0]   rs2_data_i,
 
-    // from DCache
+    // from DRAM
     input      [31:0]   perip_rdata,
 
-    // to DCache
+    // to DRAM
     output reg          perip_req,
     output reg [31:0]   perip_addr,
     output reg [1:0]    perip_mask,
@@ -25,7 +25,7 @@ module mem(
     output reg [31:0]   rd_data_o,
     output reg          regs_wen_o,
 
-    // to mem_wb & hazard
+    // to mem_wb & hazrd
     output reg [4:0]    rd_addr_o
 );
     wire [6:0]  opcode  = inst_i[6:0];
@@ -35,44 +35,37 @@ module mem(
         rd_data_o   = rd_data_i;
         rd_addr_o   = rd_addr_i;
         regs_wen_o  = regs_wen;
-
         perip_req   = mem_req;
         perip_addr  = mem_addr_i;
         perip_wen   = mem_wen && mem_req;
         perip_mask  = 2'b00;
-        perip_wdata = 32'b0;
+        perip_wdata = rs2_data_i;
         
         case(opcode)
             `TYPE_L: begin
                 perip_wdata = 32'b0;
+                perip_mask = 2'b10;     // 让 DCACHE 从 DRAM 获得整个 Word
                 case(funct3)
                     `LB: begin
-                        perip_mask  = 2'b00;
                         rd_data_o   = {{24{perip_rdata[7]}}, perip_rdata[7:0]};
                     end
                     `LH: begin
-                        perip_mask  = 2'b01;
                         rd_data_o   = {{16{perip_rdata[15]}}, perip_rdata[15:0]};
                     end
                     `LW: begin
-                        perip_mask  = 2'b10;
                         rd_data_o   = perip_rdata;
                     end
                     `LBU: begin
-                        perip_mask  = 2'b00;
                         rd_data_o   = {24'b0, perip_rdata[7:0]};
                     end
                     `LHU: begin
-                        perip_mask  = 2'b01;
                         rd_data_o   = {16'b0, perip_rdata[15:0]};
                     end
                     default: begin
-                        perip_mask  = 2'b00;
                         rd_data_o   = 32'b0;
                     end
                 endcase
             end
-
             `TYPE_S: begin
                 case(funct3)
                     `SB: begin
@@ -93,7 +86,6 @@ module mem(
                     end
                 endcase
             end
-
             default: begin
                 perip_mask  = 2'b00;
                 perip_wdata = 32'b0;
