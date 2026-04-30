@@ -47,14 +47,6 @@ module ex_mem(
             rd_data_o   <= 32'b0;
             regs_wen_o  <= 1'b0;
             rs2_data_o  <= 32'b0;
-            // inst_o      <= inst_o;
-            // mem_addr_o  <= mem_addr_o;
-            // mem_req_o   <= mem_req_o;
-            // mem_wen_o   <= mem_wen_o;
-            // rd_addr_o   <= rd_addr_o;
-            // rd_data_o   <= rd_data_o;
-            // regs_wen_o  <= regs_wen_o;
-            // rs2_data_o  <= rs2_data_o;
         end
         else begin
             inst_o      <= inst_i;

@@ -560,8 +560,6 @@ module top_riscv(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
 
-        .dcache_stall       (dcache_stall),
-
         .rd_addr_i          (mem_rd_addr_o),
         .rd_data_i          (mem_rd_data_o),
         .regs_wen_i         (mem_regs_wen_o),

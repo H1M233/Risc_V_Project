@@ -78,8 +78,8 @@ module bpu_controller #(
     wire    [4:0]   rs1_addr    = pc_inst[19:15];
 
     // 处理 TYPE_B
-    wire            is_b_type   = (pc_inst[6:0] == `TYPE_B);
-    wire    [31:0]  b_imm       = {{20{pc_inst[31]}}, pc_inst[7], pc_inst[30:25], pc_inst[11:8], 1'b0};
+    wire            is_B_type   = (pc_inst[6:0] == `TYPE_B);
+    wire    [31:0]  B_imm       = {{20{pc_inst[31]}}, pc_inst[7], pc_inst[30:25], pc_inst[11:8], 1'b0};
 
     // 处理 JALR
     wire            is_JALR     = (pc_inst[6:0] == `JALR);
@@ -94,7 +94,7 @@ module bpu_controller #(
     wire            is_ras_push = (is_ret_JAL && !ras_isfull);
 
     // 综合计算以减少资源占用
-    wire    [31:0]  imm         = (is_JAL) ? JAL_imm : (is_b_type) ? b_imm : 32'b0;
+    wire    [31:0]  imm         = (is_JAL) ? JAL_imm : (is_B_type) ? B_imm : 32'b0;
     wire    [31:0]  pc_add_4    = pc_addr + 32'h4;
     wire    [31:0]  pc_add_imm  = pc_addr + imm;
 
@@ -132,7 +132,7 @@ module bpu_controller #(
 
     // 查询
     always@(posedge clk) begin
-        if(!rst || pred_mispredict || pred_taken) begin
+        if(!rst | pred_mispredict | pred_taken) begin
             // TYPE_B
             gshare_prev_b       <= 0;
             pred_next_pc        <= 0;
@@ -154,7 +154,7 @@ module bpu_controller #(
         end
         else begin
             // TYPE_B
-            gshare_prev_b       <= is_b_type;
+            gshare_prev_b       <= is_B_type;
             pred_next_pc        <= pc_add_imm;
             gshare_pht_index    <= pht_index;
 

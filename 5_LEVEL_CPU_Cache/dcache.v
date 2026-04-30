@@ -44,23 +44,22 @@ module dcache#(
     //         dcache_miss <= 32'b0;
     //     end
     //     else begin
-    //         if(state == S_QUERY)
-    //         dcache_hit  <= (state == S_OUTPUT && state == S_CHECK) ? dcache_hit + 1'b1 : dcache_hit;
-    //         dcache_miss <= (state == S_WAIT && store_miss) ? dcache_miss + 1'b1 : dcache_miss;
+    //         dcache_hit  <= (state == LOAD_HIT_OUTPUT & state == STORE_HIT) ? dcache_hit + 1'b1 : dcache_hit;
+    //         dcache_miss <= (state == LOAD_MISS_OUTPUT && state == STORE_MISS) ? dcache_miss + 1'b1 : dcache_miss;
     //     end
     // end
     //
     // ============================================================
 
     // 存储结构：
-    (* ram_style = "block" *) reg [31:0]    data_array[0:WAYS - 1][0:LINE_NUM - 1];
-    reg [TAG_WIDTH - 1:0]   tag_array[0:WAYS - 1][0:LINE_NUM - 1];
+    (* ram_style = "block" *) reg [31:0] data_array[0:WAYS - 1][0:LINE_NUM - 1];
+    reg [TAG_WIDTH - 1:0] tag_array[0:WAYS - 1][0:LINE_NUM - 1];
     reg valid_array[0:WAYS - 1][0:LINE_NUM - 1];
     reg plru_state [0:LINE_NUM - 1];                // 每组的访问历史（用于选择替换哪一路）
 
     // 提取索引
-    wire [INDEX_WIDTH - 1:0] index = cpu_addr[INDEX_WIDTH + 1:2];
-    wire [TAG_WIDTH - 1:0]   tag = cpu_addr[31:INDEX_WIDTH + 2];
+    wire [INDEX_WIDTH - 1:0] index  = cpu_addr[INDEX_WIDTH + 1:2];
+    wire [TAG_WIDTH - 1:0]   tag    = cpu_addr[31:INDEX_WIDTH + 2];
 
     // 命中检测
     wire [WAYS - 1:0] hit_way;
@@ -115,19 +114,22 @@ module dcache#(
 
     always @(posedge clk) begin
         if(!rst) begin
-            state <= 1'b0;
+            state       <= QUERY_AND_LOAD;
+            cpu_rdata   <= 32'b0;
+            finished    <= 1'b0;
+            mem_addr    <= 32'b0;
+            mem_wdata   <= 32'b0;
+            mem_mask    <= 2'b0;
+            mem_wen     <= 1'b0;
         end
         else begin
             case(state)
                 QUERY_AND_LOAD: begin
                     if(cpu_req) begin
-                        // 清空状态
-                        cpu_rdata       <= 32'b0;
-
                         // 传输给 DRAM
                         mem_addr        <= cpu_addr;
                         mem_wdata       <= cpu_wdata;
-                        mem_mask        <= (cpu_req_store) ? cpu_mask : 2'b10;   // 读出所有内容;
+                        mem_mask        <= (cpu_req_store) ? cpu_mask : 2'b10;   // 读出所有内容
                         mem_wen         <= cpu_wen;
 
                         // 状态判断
@@ -158,11 +160,19 @@ module dcache#(
                         index_reg       <= index;
                         tag_reg         <= tag;
 
-                        case (hit_way)
-                            2'b01: hit_way_idx <= 1'b0;
+                        casez (hit_way)
+                            2'b?1: hit_way_idx <= 1'b0;
                             2'b10: hit_way_idx <= 1'b1;
                             default: hit_way_idx <= 1'b0;
                         endcase
+                    end
+                    else begin
+                        cpu_rdata   <= 32'b0;
+                        finished    <= 1'b0;
+                        mem_addr    <= 32'b0;
+                        mem_wdata   <= 32'b0;
+                        mem_mask    <= 2'b0;
+                        mem_wen     <= 1'b0;
                     end
                 end
 

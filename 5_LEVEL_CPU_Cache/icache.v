@@ -10,7 +10,7 @@
 module icache #(
     parameter INDEX_WIDTH   = 6,        // 索引宽度
     parameter TAG_WIDTH     = 24,       // tag 宽度
-    parameter WAYS          = 4         // 路数
+    parameter WAYS          = 2         // 路数
 )(
     input               clk,
     input               rst,
@@ -18,8 +18,8 @@ module icache #(
     // CPU / IF side
     input      [31:0]   cpu_addr,
     output     [31:0]   cpu_inst,
-    input               flush,
-    output              stall,  
+    input               pred_mispredict,
+    output              dcache_stall,  
 
     // IROM side
     output reg [31:0]   mem_addr,
@@ -46,19 +46,19 @@ module icache #(
     // ============================================================
     
     // 状态
-    localparam S_QUERY  = 2'b00;
-    localparam S_REFILL = 2'b01;
-    localparam S_OUTPUT = 2'b10;
     reg [1:0] state;
+    localparam S_QUERY  = 2'd0;
+    localparam S_REFILL = 2'd1;
+    localparam S_OUTPUT = 2'd2;
 
     // 提取索引和 tag
     wire [INDEX_WIDTH - 1:0] index  = cpu_addr[INDEX_WIDTH + 1:2];
     wire [TAG_WIDTH - 1:0]   tag    = cpu_addr[31:INDEX_WIDTH + 2];
 
     // 存储结构：
-    (* ram_style = "block" *) reg [31:0] data_array  [0:WAYS - 1][0:LINE_NUM - 1];
-    reg [TAG_WIDTH - 1:0]  tag_array   [0:WAYS - 1][0:LINE_NUM - 1];
-    reg                    valid_array [0:WAYS - 1][0:LINE_NUM - 1];
+    (* ram_style = "block" *) reg [31:0] data_array [0:WAYS - 1][0:LINE_NUM - 1];
+    reg [TAG_WIDTH - 1:0] tag_array   [0:WAYS - 1][0:LINE_NUM - 1];
+    reg valid_array [0:WAYS - 1][0:LINE_NUM - 1];
 
     // ==================== PLRU 替换策略 ====================
     // 每组的访问历史（用于选择替换哪一路）
@@ -74,137 +74,58 @@ module icache #(
         end
     endgenerate
 
-    wire hit = |hit_way;
-    wire miss = !hit;
+    reg hit;
+    reg hit_s
 
     // 优先选择低路
-    reg [1:0] hit_way_idx;
-    always @(*) begin
-        casez (hit_way)
-            4'b???1: hit_way_idx = 2'd0;
-            4'b??10: hit_way_idx = 2'd1;
-            4'b?100: hit_way_idx = 2'd2;
-            4'b1000: hit_way_idx = 2'd3;
-            default: hit_way_idx = 2'd0;
-        endcase
-    end
+    reg hit_way_idx;
 
-    // 选择替换的路
-    reg [1:0] replace_way;
-    always @(*) begin
-        // PLRU 树的叶节点选择
-        // plru_state[2]: way0/1 vs way2/3 的选择
-        // plru_state[1]: way0 vs way1
-        // plru_state[0]: way2 vs way3
-        if (plru_state[index][2] == 1'b0) begin
-            // 左侧 (way0/1) 更近被使用，选右侧 (way2/3)
-            if (plru_state[index][0] == 1'b0)
-                replace_way = 2'd2;
-            else
-                replace_way = 2'd3;
-        end else begin
-            // 右侧 (way2/3) 更近被使用，选左侧 (way0/1)
-            if (plru_state[index][1] == 1'b0)
-                replace_way = 2'd0;
-            else
-                replace_way = 2'd1;
-        end
-    end
-
-    // PLRU更新
-    wire        update_plru     = (state == S_QUERY && hit);
-    wire [1:0]  accessed_way    = hit_way_idx;
-
-    // CPU接口
-    reg [31:0]              miss_addr;
-    reg [INDEX_WIDTH-1:0]   miss_index;
-    reg [TAG_WIDTH-1:0]     miss_tag;
-    reg [1:0]               miss_way;
-
-    assign stall    = (state == S_QUERY) || flush;
-    always@(*) begin
-        mem_addr = cpu_addr;
-    end
-
-    reg [31:0] cpu_inst_reg;
-    always@(posedge clk)begin
-        case(hit_way_idx)
-            2'd0: cpu_inst_reg <= data_array[0][index];
-            2'd1: cpu_inst_reg <= data_array[1][index];
-            2'd2: cpu_inst_reg <= data_array[2][index];
-            2'd3: cpu_inst_reg <= data_array[3][index];
-            default: cpu_inst_reg <= 32'b0;
-        endcase
-    end
-
-    assign cpu_inst =   (state == S_OUTPUT) ? cpu_inst_reg : 
-                        (state == S_REFILL) ? mem_inst : `NOP;
-
-   // 主状态机
-    integer i, w;
+    // 流水线阶段
+    reg         pipe_hit    [0:2];
+    reg        pipe_way [0:2];
+    reg [31:0] pipe_index [0:2];
+    reg        pipe_valid [0:2];
     always @(posedge clk) begin
-        if (!rst) begin
-            state           <= S_QUERY;
-            miss_addr       <= 0;
-            miss_index      <= 0;
-            miss_tag        <= 0;
-            miss_way        <= 0;
-
-            // 清除所有 valid
-            for (w = 0; w < WAYS; w = w + 1) begin
-                for (i = 0; i < LINE_NUM; i = i + 1) begin
-                    valid_array[w][i] <= 1'b0;
-                end
-            end
-
-            // 初始化 PLRU 状态
-            for (i = 0; i < LINE_NUM; i = i + 1) plru_state[i] <= 3'b0;
-        end 
+        if(!rst) begin
+            pipe_valid[0] <= 1'b0;
+            pipe_valid[1] <= 1'b0;
+            pipe_valid[2] <= 1'b0;
+        end
         else begin
-            if(state == S_QUERY || flush) begin
-                if(hit) begin
-                    state <= S_OUTPUT;
-                end
-                else begin
-                    miss_addr  <= cpu_addr;
-                    miss_index <= index;
-                    miss_tag   <= tag;
-                    miss_way   <= replace_way;  // 选择替换的路
-                    state      <= S_REFILL;
-                end
-            end
-            else if(state == S_REFILL)begin
-                // 写入选中的路
-                valid_array[miss_way][miss_index] <= 1'b1;
-                tag_array[miss_way][miss_index]   <= miss_tag;
-                data_array[miss_way][miss_index]  <= mem_inst;
-                state <= S_QUERY;
+
+            // Stage 0: 查询
+            if(!dcache_stall | pred_mispredict) begin
+                pipe_valid[0] <= !flush;
+                mem_addr <= cpu_addr;
             end
             else begin
-                state <= S_QUERY;
+                pipe_valid[0] <= 1'b0;
             end
 
-            // PLRU 更新（独立于状态机）
-            if (update_plru) begin
-                // 基于访问的路更新 PLRU 树
-                case (accessed_way)
-                    2'd0: begin
-                        plru_state[index][2] <= 1'b0;  // 左侧被使用
-                        plru_state[index][1] <= 1'b0;  // way0 被使用
-                    end
-                    2'd1: begin
-                        plru_state[index][2] <= 1'b0;
-                        plru_state[index][1] <= 1'b1;  // way1 被使用
-                    end
-                    2'd2: begin
-                        plru_state[index][2] <= 1'b1;  // 右侧被使用
-                        plru_state[index][0] <= 1'b0;  // way2 被使用
-                    end
-                    2'd3: begin
-                        plru_state[index][2] <= 1'b1;
-                        plru_state[index][0] <= 1'b1;  // way3 被使用
-                    end
-                endcase
+            pipe_hit[0] <= |hit_way;
+            casez (hit_way)
+                2'b?1: pipe_way[0] <= 1'b0;
+                2'b10: pipe_way[0] <= 1'b1;
+                default: pipe_way[0] <= 1'b0;
+            endcase
+
+            // 流水线传递
+            pipe_valid[1] <= pipe_valid[0] && !flush;
+            pipe_valid[2] <= pipe_valid[1] && !flush;
+
+            // Stage 1: BRAM 输入数据
+            
+
+            // Stage 2: 等待 BRAM 数据
+
+            // Stage 3: BRAM 数据到达，判断命中并输出
+            if (pipe_valid[2]) begin
+                if (hit) begin
+                    cpu_inst <= data_array[hit_way_idx][index];
+                end
+                else begin
+                    cpu_inst <= mem_inst;
+                end
             end
         end
     end
