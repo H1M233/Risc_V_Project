@@ -84,15 +84,8 @@ module dcache#(
     localparam LOAD_MISS_OUTPUT = 3'd4;
     localparam STORE_HIT    = 3'd5;
     localparam STORE_MISS = 3'd6;
-
-    // ===================================
-    // DRAM 穿透与 DCACHE 查询 - EX 阶段输入
-    // ===================================
-    reg load_req;
-    reg store_req;
+    
     wire hit = |hit_way;
-    reg hit_reg;
-    reg cpu_req_reg;
     reg [31:0] cpu_wdata_reg;
     reg [31:0] cpu_addr_reg;
     reg [1:0] cpu_mask_reg;
@@ -107,6 +100,16 @@ module dcache#(
     assign stall = cpu_req & !finished;
 
     reg [1:0] hit_way_idx;      // 优先选择低路
+
+    // PLRU 更新
+    reg        update_plru;
+    reg [1:0]  accessed_way;
+
+    reg [1:0]   miss_way;
+    reg [INDEX_WIDTH - 1:0]  miss_index;
+    reg [TAG_WIDTH - 1:0] miss_tag;
+    reg [31:0] miss_addr;
+    reg [1:0] miss_mask;
 
     always @(posedge clk) begin
         if(!rst) begin
@@ -124,11 +127,6 @@ module dcache#(
                         mem_wdata       <= cpu_wdata;
                         mem_mask        <= (cpu_req_store) ? cpu_mask : 2'b10;   // 读出所有内容;
                         mem_wen         <= cpu_wen;
-
-                        // 判断命中并传递数据
-                        load_req        <= cpu_req_load;
-                        store_req       <= cpu_req_store;
-                        hit_reg         <= hit;
 
                         // 状态判断
                         if (cpu_req_load) begin
@@ -152,7 +150,6 @@ module dcache#(
                             end
                         end
 
-                        cpu_req_reg     <= (cpu_req_load | cpu_req_store);
                         cpu_wdata_reg   <= cpu_wdata;
                         cpu_addr_reg    <= cpu_addr;
                         cpu_mask_reg    <= cpu_mask;
@@ -225,101 +222,6 @@ module dcache#(
             endcase
         end
     end
-
-    // ================================
-    // 判断命中 - MEM 阶段
-    // ================================
-    
-    // PLRU 更新
-    reg        update_plru;
-    reg [1:0]  accessed_way;
-    wire        load_hit  = (load_req & hit);
-    wire        load_miss = (load_req & !hit);
-    reg         load_hit_reg;
-    reg         load_miss_reg;
-    reg         load_miss_reg_reg;
-    reg         load_req_reg;
-
-    reg [1:0]   miss_way;
-    reg [INDEX_WIDTH - 1:0]  miss_index;
-    reg [TAG_WIDTH - 1:0] miss_tag;
-    reg [31:0] miss_addr;
-    reg [1:0] miss_mask;
-
-    // always @(posedge clk) begin
-    //     if(!rst) begin
-    //         update_plru     <= 0;
-    //         accessed_way    <= 0;
-    //         load_hit_reg    <= 0;
-    //         load_miss_reg   <= 0;
-    //         load_miss_reg_reg<= 0;
-    //         load_req_reg    <= 0;
-
-    //         miss_way        <= 0;
-    //         miss_index      <= 0;
-    //         miss_tag        <= 0;
-    //         miss_addr       <= 0;
-    //         miss_mask       <= 0;
-
-    //     end
-    //     else begin
-    //         update_plru     <= (hit && (cpu_req_reg));
-    //         accessed_way    <= hit_way_idx;
-    //         load_hit_reg    <= load_hit;
-    //         load_miss_reg   <= load_miss;
-    //         load_miss_reg_reg<= load_miss_reg;
-    //         load_req_reg    <= load_req;
-            
-    //         if(load_miss) begin
-    //             miss_way    <= hit_way_idx;
-    //             miss_index  <= index_reg;
-    //             miss_tag    <= tag_reg;
-    //             miss_addr   <= cpu_addr_reg;
-    //             miss_mask   <= cpu_mask_reg;
-    //         end
-
-    //         if(store_req & hit) begin       // store_hit
-    //             data_array[hit_way_idx][index_reg] <= store_merge(
-    //                 cache_rdata_reg[hit_way_idx],
-    //                 cpu_wdata_reg,
-    //                 cpu_addr_reg[1:0],
-    //                 cpu_mask_reg
-    //             );
-    //         end
-    //     end
-    // end
-
-    // // 输出读回
-    // always@(posedge clk) begin
-    //     if(!rst) begin
-    //         cpu_rdata <= 32'b0;
-    //     end
-    //     else begin
-    //         if(load_hit) begin 
-    //             cpu_rdata <= load_shift(cache_rdata_reg[hit_way_idx], cpu_addr_reg[1:0], cpu_mask_reg);
-    //         end
-    //         else if(load_miss_reg_reg) begin
-    //             cpu_rdata <= load_shift(mem_rdata, miss_addr[1:0], miss_mask);
-    //         end
-    //         else begin
-    //             cpu_rdata <= 32'b0;
-    //         end
-    //     end
-    // end
-
-    // // load_miss:
-    // always@(posedge clk) begin
-    //     if(!rst) begin
-    //         // 1
-    //     end
-    //     else begin
-    //         if(load_miss_reg) begin
-    //             valid_array[miss_way][miss_index] <= 1'b1;
-    //             tag_array[miss_way][miss_index]   <= miss_tag;
-    //             data_array[miss_way][miss_index]  <= mem_rdata;
-    //         end
-    //     end
-    // end
 
     // 主状态机
     integer i, w;

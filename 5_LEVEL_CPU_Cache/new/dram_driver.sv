@@ -27,7 +27,12 @@ module dram_driver(
     input  logic [31:0]  perip_wdata		,
 	input  logic [1:0]	 perip_mask			,
     input  logic         dram_wen           ,
-    output logic [31:0]  perip_rdata		
+    output logic [31:0]  perip_rdata		,
+    
+    // delay
+    input  logic [17:0]  perip_addr_delay   ,
+    input  logic [ 1:0]  perip_mask_delay   
+    
 );
     logic [15:0] dram_addr;
     logic [ 1:0] offset;
@@ -36,8 +41,14 @@ module dram_driver(
     assign dram_addr = perip_addr[17:2];
     assign offset = perip_addr[1:0];
     assign perip_rdata = dout;
+    
+    // delay
+    logic [ 1:0] offset_delay;
+    
+    assign offset_delay = perip_addr_delay[1:0];
 
-    blk_mem_g`
+    blk_mem_gen_0 Mem_DRAM (
+        .clka       (clk),
         .addra      (dram_addr),
         .douta      (dram_rdata_raw),
         .wea        (dram_wen),
@@ -47,18 +58,18 @@ module dram_driver(
     // dram_rdata_raw process, lh lb
     always_comb begin
         dout = 0;
-        case (perip_mask)
+        case (perip_mask_delay)
             2'b00: // lb/lbu
-                case (offset)
+                case (offset_delay[0])
                     2'b00:  dout = {24'b0, dram_rdata_raw[7:0]};
                     2'b01:  dout = {24'b0, dram_rdata_raw[15:8]};
                     2'b10:  dout = {24'b0, dram_rdata_raw[23:16]};
                     2'b11:  dout = {24'b0, dram_rdata_raw[31:24]};
                 endcase
             2'b01: // lh/lhu
-                case (offset[1])
-                    1'b0:  dout = {16'b0, dram_rdata_raw[15:0]};
-                    1'b1:  dout = {16'b0, dram_rdata_raw[31:16]};
+                case (offset_delay[1])
+                    1'b0:  dout = {24'b0, dram_rdata_raw[15:0]};
+                    1'b1:  dout = {24'b0, dram_rdata_raw[31:16]};
                 endcase
             2'b10: dout = dram_rdata_raw;
             default: dout = 0;
@@ -86,5 +97,4 @@ module dram_driver(
             default: dram_data = perip_wdata;
         endcase
     end
-
 endmodule
