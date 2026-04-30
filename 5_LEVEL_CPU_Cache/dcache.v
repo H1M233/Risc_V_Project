@@ -1,9 +1,15 @@
 `include "rv32I.vh"
 
+// 实现：
+// load_miss: 暂停 3 个周期，向 DRAM 请求数据 -> 根据 plur 选择路并更新 plur -> 等待数据 -> 转发并更新 DCACHE
+// load_hit: 暂停 1 个周期，计算命中 -> 直接从 DCACHE 传出数据
+// store_miss: 暂停 1 个周期，直接写入 DRAM（暂停是为了避免store and use）
+// store_hit: 暂停 1 个周期，写入 DRAM -> 根据计算的路更新 DCACHE
+
 module dcache#(
     parameter INDEX_WIDTH   = 6,
     parameter TAG_WIDTH     = 24,
-    parameter WAYS          = 4
+    parameter WAYS          = 2     // DCACHE 使用 2 路足够
 )(
     input               clk,
     input               rst,
@@ -47,16 +53,18 @@ module dcache#(
     // ============================================================
 
     // 存储结构：
-    (* ram_style = "block" *) reg [31:0] data_array[0:WAYS - 1][0:LINE_NUM - 1];
+    (* ram_style = "block" *) reg [31:0]    data_array[0:WAYS - 1][0:LINE_NUM - 1];
     reg [TAG_WIDTH - 1:0]   tag_array[0:WAYS - 1][0:LINE_NUM - 1];
-    reg                     valid_array[0:WAYS - 1][0:LINE_NUM - 1];
-    reg [2:0]               plru_state [0:LINE_NUM - 1];  // 每组的访问历史（用于选择替换哪一路）
+    reg valid_array[0:WAYS - 1][0:LINE_NUM - 1];
+    reg plru_state [0:LINE_NUM - 1];                // 每组的访问历史（用于选择替换哪一路）
 
-    // 冻结流水线条件
-    // assign stall = (cpu_req_load & !(load_hit | load_miss_reg_reg)) | (cpu_req_store & !store_req);
+    // 提取索引
+    wire [INDEX_WIDTH - 1:0] index = cpu_addr[INDEX_WIDTH + 1:2];
+    wire [TAG_WIDTH - 1:0]   tag = cpu_addr[31:INDEX_WIDTH + 2];
 
     // 命中检测
-    wire [WAYS - 1:0]   hit_way;
+    wire [WAYS - 1:0] hit_way;
+    wire hit = |hit_way;
     genvar w0;
     generate
         for(w0 = 0; w0 < WAYS; w0 = w0 + 1) begin : hit_gen
@@ -64,11 +72,11 @@ module dcache#(
         end
     endgenerate
     
-    // 读数据输出
-    reg [31:0] cache_rdata_reg [0:3];
+    // BRAM 缓存
+    reg [31:0] cache_rdata_reg [0:WAYS - 1];
     genvar w1;
     generate
-        for(w1 = 0; w1 < WAYS; w1 = w1 + 1) begin
+        for(w1 = 0; w1 < WAYS; w1 = w1 + 1) begin : pre_data
             always @(posedge clk) begin
                 cache_rdata_reg[w1] <= data_array[w1][index];
             end
@@ -82,30 +90,24 @@ module dcache#(
     localparam LOAD_MISS_WAIT_1 = 3'd2;
     localparam LOAD_MISS_WAIT_2 = 3'd3;
     localparam LOAD_MISS_OUTPUT = 3'd4;
-    localparam STORE_HIT    = 3'd5;
+    localparam STORE_HIT = 3'd5;
     localparam STORE_MISS = 3'd6;
-    
-    wire hit = |hit_way;
-    reg [31:0] cpu_wdata_reg;
-    reg [31:0] cpu_addr_reg;
-    reg [1:0] cpu_mask_reg;
 
-    wire [INDEX_WIDTH - 1:0] index = cpu_addr[INDEX_WIDTH + 1:2];
-    wire [TAG_WIDTH - 1:0]   tag = cpu_addr[31:INDEX_WIDTH + 2];
-    reg [INDEX_WIDTH - 1:0] index_reg;
-    reg [TAG_WIDTH - 1:0] tag_reg;
-
-    wire cpu_req = (cpu_req_load | cpu_req_store);
-    reg finished;
+    // 冻结流水线条件
     assign stall = cpu_req & !finished;
 
-    reg [1:0] hit_way_idx;      // 优先选择低路
-
-    // PLRU 更新
-    reg        update_plru;
-    reg [1:0]  accessed_way;
-
-    reg [1:0]   miss_way;
+    // 数据传递寄存器
+    wire cpu_req = (cpu_req_load | cpu_req_store);
+    reg finished;
+    reg [31:0] cpu_wdata_reg;
+    reg [31:0] cpu_addr_reg;
+    reg [1:0]  cpu_mask_reg;
+    reg [INDEX_WIDTH - 1:0] index_reg;
+    reg [TAG_WIDTH - 1:0]   tag_reg;
+    reg hit_way_idx;
+    
+    // load_miss 寄存器
+    reg miss_way;
     reg [INDEX_WIDTH - 1:0]  miss_index;
     reg [TAG_WIDTH - 1:0] miss_tag;
     reg [31:0] miss_addr;
@@ -153,18 +155,14 @@ module dcache#(
                         cpu_wdata_reg   <= cpu_wdata;
                         cpu_addr_reg    <= cpu_addr;
                         cpu_mask_reg    <= cpu_mask;
-
                         index_reg       <= index;
                         tag_reg         <= tag;
 
-                        casez (hit_way)
-                            4'b???1: hit_way_idx <= 2'd0;
-                            4'b??10: hit_way_idx <= 2'd1;
-                            4'b?100: hit_way_idx <= 2'd2;
-                            4'b1000: hit_way_idx <= 2'd3;
-                            default: hit_way_idx <= 2'd0;
+                        case (hit_way)
+                            2'b01: hit_way_idx <= 1'b0;
+                            2'b10: hit_way_idx <= 1'b1;
+                            default: hit_way_idx <= 1'b0;
                         endcase
-
                     end
                 end
 
@@ -175,12 +173,14 @@ module dcache#(
                 end
 
                 LOAD_MISS_WAIT_1: begin
-                    miss_way    <= hit_way_idx;
-                    miss_index  <= index_reg;
-                    miss_tag    <= tag_reg;
-                    miss_addr   <= cpu_addr_reg;
-                    miss_mask   <= cpu_mask_reg;
-                    state       <= LOAD_MISS_WAIT_2;
+                    miss_way            <= plru_state[index];
+                    miss_index          <= index_reg;
+                    miss_tag            <= tag_reg;
+                    miss_addr           <= cpu_addr_reg;
+                    miss_mask           <= cpu_mask_reg;
+
+                    plru_state[index]   <= ~plru_state[index];
+                    state               <= LOAD_MISS_WAIT_2;
                 end
 
                 LOAD_MISS_WAIT_2: begin
@@ -210,7 +210,7 @@ module dcache#(
                 end
 
                 STORE_MISS: begin
-                    // BRAM 存储也需要停顿
+                    // BRAM 存储也需要停顿 可引入 store_buffer 解决
                     state <= QUERY_AND_LOAD;
                     finished <= 1'b0;
                 end
@@ -223,7 +223,7 @@ module dcache#(
         end
     end
 
-    // 主状态机
+    // 重置寄存器
     integer i, w;
     always @(posedge clk) begin
         if (!rst) begin
@@ -232,31 +232,7 @@ module dcache#(
                     valid_array[w][i] <= 1'b0;
                 end
             end
-
-            for (i = 0; i < LINE_NUM; i = i + 1) plru_state[i] <= 3'b0;
-        end
-        else begin
-            // PLRU 更新
-            if (update_plru) begin
-                case (accessed_way)
-                    2'd0: begin
-                        plru_state[index][2] <= 1'b0;
-                        plru_state[index][1] <= 1'b0;
-                    end
-                    2'd1: begin
-                        plru_state[index][2] <= 1'b0;
-                        plru_state[index][1] <= 1'b1;
-                    end
-                    2'd2: begin
-                        plru_state[index][2] <= 1'b1;
-                        plru_state[index][0] <= 1'b0;
-                    end
-                    2'd3: begin
-                        plru_state[index][2] <= 1'b1;
-                        plru_state[index][0] <= 1'b1;
-                    end
-                endcase
-            end
+            for (i = 0; i < LINE_NUM; i = i + 1) plru_state[i] <= 1'b0;
         end
     end
 

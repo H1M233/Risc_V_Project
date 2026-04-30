@@ -113,7 +113,7 @@ module icache #(
 
     // PLRU更新
     wire        update_plru     = (state == S_QUERY && hit);
-    wire [1:0]  accessed_way    = hit_way_idx;  // need to debug
+    wire [1:0]  accessed_way    = hit_way_idx;
 
     // CPU接口
     reg [31:0]              miss_addr;
