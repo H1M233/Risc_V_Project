@@ -10,9 +10,9 @@ module mem_wb(
     input               regs_wen_i,
 
     // to wb
-    output reg [4:0]    rd_addr_o,
-    output reg [31:0]   rd_data_o,
-    output reg          regs_wen_o
+    (* max_fanout = 32 *) output reg [4:0]  rd_addr_o,
+    (* max_fanout = 64 *) output reg [31:0] rd_data_o,
+    (* max_fanout = 32 *) output reg        regs_wen_o
 );
     always@(posedge clk) begin
         if(!rst) begin

@@ -28,11 +28,9 @@ module pc(
     output reg          icache_flush
 );
     wire pc_hold = hazard_en | dcache_stall | icache_block;
-    wire [31:0] pc_plus4 = pc_addr_o + 32'd4;
-    wire [31:0] pc_fallthrough = pred_taken ? pred_pc : pc_plus4;
     wire [31:0] pc_next = jump_en ? jump_addr_i :
                           pc_hold ? pc_addr_o   :
-                                    pc_fallthrough;
+                                    pred_pc;
 
     always @(posedge clk) begin
         if(!rst) begin

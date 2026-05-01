@@ -125,6 +125,7 @@ module ex(
 
     wire [31:0] add_res       = value1_eff + value2_eff;
     wire [31:0] sub_res       = value1_eff - value2_eff;
+    wire [31:0] mem_addr_calc = rs1_fwd_data + value2_i;
     wire [31:0] branch_target = jump1_i + jump2_i;
     wire [31:0] jalr_target   = jalr_rs1_data + jump2_i;
     wire [31:0] pc_plus4      = pc_addr_i + 32'd4;
@@ -181,7 +182,7 @@ module ex(
         mem_wen             = valid_i && (opcode_raw == `TYPE_S);
         mem_req             = valid_i && ((opcode_raw == `TYPE_S) || (opcode_raw == `TYPE_L));
         mem_mask            = 2'b0;
-        mem_addr_o          = add_res;
+        mem_addr_o          = mem_addr_calc;
 
         rd_data_o           = 32'b0;
         rd_addr_o           = rd_addr_i;
@@ -205,7 +206,7 @@ module ex(
         dcache_req_store    = valid_i && (opcode_raw == `TYPE_S);
         dcache_wen          = valid_i && (opcode_raw == `TYPE_S);
         dcache_mask         = 2'b0;
-        dcache_addr         = add_res;
+        dcache_addr         = mem_addr_calc;
         dcache_wdata        = rs2_fwd_data;
 
         case (opcode)

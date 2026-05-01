@@ -49,7 +49,7 @@ module perip_bridge(
 
     logic [31:0] LED;
     logic [31:0] seg_wdata, cnt_rdata, mmio_rdata, dram_rdata;
-    logic [39:0] seg_output;
+    logic [39:0] seg_output, seg_output_q;
     logic cnt_enable_cfg;
     logic [63:0] virtual_sw_meta, virtual_sw_sync;
     logic [7:0]  virtual_key_meta, virtual_key_sync;
@@ -160,6 +160,17 @@ module perip_bridge(
     assign seg_output[17] = 0;
     assign seg_output[27] = 0;
     assign seg_output[37] = 0;
+
+    // Register display outputs in the CPU clock domain before crossing into
+    // the 50 MHz observation domain, so the CDC path only carries registered data.
+    always_ff @(posedge clk) begin
+        if (rst) begin
+            seg_output_q <= '0;
+        end
+        else begin
+            seg_output_q <= seg_output;
+        end
+    end
     
 
     // dram rw
@@ -193,6 +204,6 @@ module perip_bridge(
                         {32{perip_addr_delay == CNT_ADDR}} & cnt_rdata;
     
     assign virtual_led_output = LED;
-    assign virtual_seg_output = seg_output;
+    assign virtual_seg_output = seg_output_q;
 
 endmodule

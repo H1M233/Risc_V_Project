@@ -41,7 +41,7 @@ module bpu_controller #(
     input                           dcache_stall,
 
     // Gshare - 查询
-    output reg [BHR_WIDTH - 1:0]    gshare_pht_index,
+    (* max_fanout = 32 *) output reg [BHR_WIDTH - 1:0] gshare_pht_index,
     output reg                      gshare_prev_b,
     input                           gshare_pred_taken,
     input      [BHR_WIDTH - 1:0]    gshare_ghr,
@@ -49,7 +49,7 @@ module bpu_controller #(
 
     // Gshare - 更新
     output reg                      gshare_update_en,
-    output reg [BHR_WIDTH - 1:0]    gshare_update_pht_index,
+    (* max_fanout = 32 *) output reg [BHR_WIDTH - 1:0] gshare_update_pht_index,
     output reg                      gshare_actual_taken,
     output reg                      gshare_pred_mispredict,
 
@@ -64,13 +64,13 @@ module bpu_controller #(
     input                           ras_isfull,
 
     // btb - 查询
-    output reg [31:0]               btb_query_pc,
+    (* max_fanout = 32 *) output reg [31:0] btb_query_pc,
     input                           btb_hit,
     input      [31:0]               btb_target_pc,
 
     // btb - 更新
     output reg                      btb_update_en,
-    output reg [31:0]               btb_update_pc,
+    (* max_fanout = 32 *) output reg [31:0] btb_update_pc,
     output reg [31:0]               btb_update_target
 );
     // 取出 rd 和 rs1 的地址
