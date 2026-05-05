@@ -9,11 +9,10 @@ Vivado_Project/
 MODELSIM/
 
 3_LEVEL_CPU/
-5_LEVEL_CPU/auto sim/out.vvp
 
-5_LEVEL_CPU/auto sim/__pycache__/
-
-5_LEVEL_CPU/auto sim/generated/inst_data.txt
+AutoSim/__pycache__
+AutoSim/out.vvp
+AutoSim/generated/inst_data.txt
 
 twin/
 

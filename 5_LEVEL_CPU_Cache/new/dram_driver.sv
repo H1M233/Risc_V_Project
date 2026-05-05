@@ -23,78 +23,65 @@
 module dram_driver(
     input  logic         clk				,
 
+    input  logic         perip_en           ,
     input  logic [17:0]  perip_addr			,
     input  logic [31:0]  perip_wdata		,
-	input  logic [1:0]	 perip_mask			,
-    input  logic         dram_wen           ,
-    output logic [31:0]  perip_rdata		,
-    
-    // delay
-    input  logic [17:0]  perip_addr_delay   ,
-    input  logic [ 1:0]  perip_mask_delay   
-    
+    input  logic [3:0]   perip_we           ,
+    output logic [31:0]  perip_rdata		
 );
     logic [15:0] dram_addr;
-    logic [ 1:0] offset;
-    logic [31:0] dram_data, dram_rdata_raw, dout;
 
     assign dram_addr = perip_addr[17:2];
-    assign offset = perip_addr[1:0];
-    assign perip_rdata = dout;
-    
-    // delay
-    logic [ 1:0] offset_delay;
-    
-    assign offset_delay = perip_addr_delay[1:0];
 
     blk_mem_gen_0 Mem_DRAM (
-        .clka       (clk),
         .addra      (dram_addr),
-        .douta      (dram_rdata_raw),
-        .wea        (dram_wen),
-        .dina       (dram_data)
+        .clka       (clk),
+        .dina       (perip_wdata),
+        .douta      (perip_rdata),
+        .ena        (perip_en),
+        .wea        (perip_we)
     );
 
-    // dram_rdata_raw process, lh lb
-    always_comb begin
-        dout = 0;
-        case (perip_mask_delay)
-            2'b00: // lb/lbu
-                case (offset_delay[0])
-                    2'b00:  dout = {24'b0, dram_rdata_raw[7:0]};
-                    2'b01:  dout = {24'b0, dram_rdata_raw[15:8]};
-                    2'b10:  dout = {24'b0, dram_rdata_raw[23:16]};
-                    2'b11:  dout = {24'b0, dram_rdata_raw[31:24]};
-                endcase
-            2'b01: // lh/lhu
-                case (offset_delay[1])
-                    1'b0:  dout = {24'b0, dram_rdata_raw[15:0]};
-                    1'b1:  dout = {24'b0, dram_rdata_raw[31:16]};
-                endcase
-            2'b10: dout = dram_rdata_raw;
-            default: dout = 0;
-        endcase
-    end
+    // // dram_rdata_raw process, lh lb
+    // always_comb begin
+    //     dout = 0;
+    //     case (perip_mask_delay)
+    //         2'b00: // lb/lbu
+    //             case (offset_delay[0])
+    //                 2'b00:  dout = {24'b0, dram_rdata_raw[7:0]};
+    //                 2'b01:  dout = {24'b0, dram_rdata_raw[15:8]};
+    //                 2'b10:  dout = {24'b0, dram_rdata_raw[23:16]};
+    //                 2'b11:  dout = {24'b0, dram_rdata_raw[31:24]};
+    //             endcase
+    //         2'b01: // lh/lhu
+    //             case (offset_delay[1])
+    //                 1'b0:  dout = {24'b0, dram_rdata_raw[15:0]};
+    //                 1'b1:  dout = {24'b0, dram_rdata_raw[31:16]};
+    //             endcase
+    //         2'b10: dout = dram_rdata_raw;
+    //         default: dout = 0;
+    //     endcase
+    // end
 
-    // dram_data_raw process, sh, sb
-    always_comb begin
-        case (perip_mask)
-            2'b10: dram_data = perip_wdata;  // sw
-            2'b01: begin           // sh
-                case (offset[1])
-                    1'b0: dram_data = {dram_rdata_raw[31:16], perip_wdata[15:0]};
-                    1'b1: dram_data = {perip_wdata[15:0], dram_rdata_raw[15:0]};
-                endcase
-            end
-            2'b00: begin           // sb
-                case (offset)
-                    2'b00: dram_data = {dram_rdata_raw[31:8], perip_wdata[7:0]};
-                    2'b01: dram_data = {dram_rdata_raw[31:16], perip_wdata[7:0], dram_rdata_raw[7:0]};
-                    2'b10: dram_data = {dram_rdata_raw[31:24], perip_wdata[7:0], dram_rdata_raw[15:0]};
-                    2'b11: dram_data = {perip_wdata[7:0], dram_rdata_raw[23:0]};
-                endcase
-            end
-            default: dram_data = perip_wdata;
-        endcase
-    end
+    // // dram_data_raw process, sh, sb
+    // always_comb begin
+    //     case (perip_mask)
+    //         2'b10: dram_data = perip_wdata;  // sw
+    //         2'b01: begin           // sh
+    //             case (offset[1])
+    //                 1'b0: dram_data = {dram_rdata_raw[31:16], perip_wdata[15:0]};
+    //                 1'b1: dram_data = {perip_wdata[15:0], dram_rdata_raw[15:0]};
+    //             endcase
+    //         end
+    //         2'b00: begin           // sb
+    //             case (offset)
+    //                 2'b00: dram_data = {dram_rdata_raw[31:8], perip_wdata[7:0]};
+    //                 2'b01: dram_data = {dram_rdata_raw[31:16], perip_wdata[7:0], dram_rdata_raw[7:0]};
+    //                 2'b10: dram_data = {dram_rdata_raw[31:24], perip_wdata[7:0], dram_rdata_raw[15:0]};
+    //                 2'b11: dram_data = {perip_wdata[7:0], dram_rdata_raw[23:0]};
+    //             endcase
+    //         end
+    //         default: dram_data = perip_wdata;
+    //     endcase
+    // end
 endmodule

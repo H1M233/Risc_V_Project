@@ -25,9 +25,11 @@ module dcache#(
     output              stall,
 
     // external DROM side
+    output reg          mem_en,
+    input               mem_ready,
     output reg [31:0]   mem_addr,
+    output reg [3:0]    mem_we,
     output reg          mem_wen,
-    output reg [1:0]    mem_mask,
     output reg [31:0]   mem_wdata,
     input      [31:0]   mem_rdata
 );
@@ -71,7 +73,7 @@ module dcache#(
         end
     endgenerate
     
-    // BRAM 缓存
+    // DCACHE 输出缓存
     reg [31:0] cache_rdata_reg [0:WAYS - 1];
     genvar w1;
     generate
@@ -93,7 +95,7 @@ module dcache#(
     localparam STORE_MISS = 3'd6;
 
     // 冻结流水线条件
-    assign stall = cpu_req & !finished;
+    assign stall = cpu_req & !finished | !mem_ready;
 
     // 数据传递寄存器
     wire cpu_req = (cpu_req_load | cpu_req_store);
@@ -117,63 +119,56 @@ module dcache#(
             state       <= QUERY_AND_LOAD;
             cpu_rdata   <= 32'b0;
             finished    <= 1'b0;
+            mem_en      <= 1'b0;
             mem_addr    <= 32'b0;
             mem_wdata   <= 32'b0;
-            mem_mask    <= 2'b0;
+            mem_we      <= 4'b0;
             mem_wen     <= 1'b0;
         end
         else begin
+            // 传输 DRAM
+            mem_en      <= (state == QUERY_AND_LOAD) & cpu_req;
+            mem_addr    <= cpu_addr;
+            mem_wdata   <= cpu_wdata;
+            mem_we      <= (cpu_req_store) ? unmask(cpu_mask, cpu_addr[1:0]) : 4'b0;
+            mem_wen     <= cpu_req_store;
+
             case(state)
                 QUERY_AND_LOAD: begin
-                    if(cpu_req) begin
-                        // 传输给 DRAM
-                        mem_addr        <= cpu_addr;
-                        mem_wdata       <= cpu_wdata;
-                        mem_mask        <= (cpu_req_store) ? cpu_mask : 2'b10;   // 读出所有内容
-                        mem_wen         <= cpu_wen;
-
-                        // 状态判断
-                        if (cpu_req_load) begin
-                            if (hit) begin
-                                state <= LOAD_HIT_OUTPUT;
-                                finished <= 1'b1;
-                            end
-                            else begin
-                                state <= LOAD_MISS_WAIT_1;
-                                finished <= 1'b0;
-                            end
+                    // 状态判断
+                    if (cpu_req_load) begin
+                        if (hit) begin
+                            state <= LOAD_HIT_OUTPUT;
+                            finished <= 1'b1;
                         end
                         else begin
-                            if (hit) begin
-                                state <= STORE_HIT;
-                                finished <= 1'b1;
-                            end
-                            else begin
-                                state <= STORE_MISS;
-                                finished <= 1'b1;
-                            end
+                            state <= LOAD_MISS_WAIT_1;
+                            finished <= 1'b0;
                         end
-
-                        cpu_wdata_reg   <= cpu_wdata;
-                        cpu_addr_reg    <= cpu_addr;
-                        cpu_mask_reg    <= cpu_mask;
-                        index_reg       <= index;
-                        tag_reg         <= tag;
-
-                        casez (hit_way)
-                            2'b?1: hit_way_idx <= 1'b0;
-                            2'b10: hit_way_idx <= 1'b1;
-                            default: hit_way_idx <= 1'b0;
-                        endcase
                     end
-                    else begin
-                        cpu_rdata   <= 32'b0;
-                        finished    <= 1'b0;
-                        mem_addr    <= 32'b0;
-                        mem_wdata   <= 32'b0;
-                        mem_mask    <= 2'b0;
-                        mem_wen     <= 1'b0;
+                    else if (cpu_req_store) begin
+                        if (hit) begin
+                            state <= STORE_HIT;
+                            finished <= 1'b1;
+                        end
+                        else begin
+                            state <= STORE_MISS;
+                            finished <= 1'b1;
+                        end
                     end
+
+                    cpu_wdata_reg   <= cpu_wdata;
+                    cpu_addr_reg    <= cpu_addr;
+                    cpu_mask_reg    <= cpu_mask;
+                    index_reg       <= index;
+                    tag_reg         <= tag;
+
+                    // casez (hit_way)
+                    //     2'b?1: hit_way_idx <= 1'b0;
+                    //     2'b10: hit_way_idx <= 1'b1;
+                    //     default: hit_way_idx <= 1'b0;
+                    // endcase 
+                    hit_way_idx <= ~hit_way[0];     // 由于只有两路直接优化判断 way0 是否命中，已有 hit 在外层做判断
                 end
 
                 LOAD_HIT_OUTPUT: begin
@@ -194,9 +189,15 @@ module dcache#(
                 end
 
                 LOAD_MISS_WAIT_2: begin
-                    // 纯等
-                    state       <= LOAD_MISS_OUTPUT;
-                    finished    <= 1'b1;
+                    // 等待接收数据
+                    if (mem_ready) begin
+                        cpu_rdata <= load_shift(mem_rdata, miss_addr[1:0], miss_mask);
+                        valid_array[miss_way][miss_index] <= 1'b1;
+                        tag_array[miss_way][miss_index]   <= miss_tag;
+                        data_array[miss_way][miss_index]  <= mem_rdata;
+                        state       <= QUERY_AND_LOAD;
+                        finished    <= 1'b1;
+                    end
                 end
 
                 LOAD_MISS_OUTPUT: begin
@@ -247,6 +248,32 @@ module dcache#(
     end
 
     // 函数：
+    // 
+    function [3:0] unmask;
+        input [1:0] mask;
+        input [1:0] addr_low;
+        begin
+            case (mask)
+                2'b00: begin
+                    case (addr_low)
+                        2'b00: unmask = 4'b0001;
+                        2'b01: unmask = 4'b0010;
+                        2'b10: unmask = 4'b0100;
+                        2'b11: unmask = 4'b1000;
+                    endcase
+                end
+                2'b01: begin
+                    case (addr_low[1])
+                        1'b0: unmask = 4'b0011;
+                        1'b1: unmask = 4'b1100;
+                    endcase
+                end
+                2'b10: unmask = 4'b1111;
+            endcase
+        end
+    endfunction
+
+
     // 把完整 word 根据 addr[1:0] 和 mask 移到低位
     function [31:0] load_shift;
         input [31:0] word;

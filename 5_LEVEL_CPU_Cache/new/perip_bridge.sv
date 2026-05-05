@@ -24,10 +24,12 @@ module perip_bridge(
     input  logic         cnt_clk			,
     input  logic         rst                ,
 
+    input  logic         dram_en           ,
+    output logic         dram_ready        ,
     input  logic [31:0]  perip_addr			,
     input  logic [31:0]  perip_wdata		,
-    input  logic         perip_wen			,
-	input  logic [1:0]	 perip_mask			,
+    input  logic [3:0]   perip_we			,
+    input  logic         perip_wen          ,
     output logic [31:0]  perip_rdata		,
 
     input  logic [63:0]  virtual_sw_input	,
@@ -52,41 +54,30 @@ module perip_bridge(
     logic [39:0] seg_output;
     logic cnt_enable_cfg;
     
-    // delay perip_addr, perip_wen, perip_mask
-    reg [31:0] perip_addr_d [0:2];
-    reg perip_wen_d [0:2];
-    reg [1:0] perip_mask_d [0:2];
-    
+    // delay
+    typedef struct packed {
+        logic        en;
+        logic [31:0] addr;
+        logic [3:0]  we;
+    } perip_t;
+
     localparam READ_DELAY = 2'd2;
-    wire [31:0] perip_addr_delay = perip_addr_d[READ_DELAY - 1];
-    wire perip_wen_delay = perip_wen_d[READ_DELAY - 1];
-    wire [1:0] perip_mask_delay = perip_mask_d[READ_DELAY - 1];
+    perip_t perip_d [0: READ_DELAY - 1];
+
+    assign       dram_ready        = (|{dram_en, perip_d[0].en, perip_d[1].en}) ? 1'b0 : 1'b1;
+    logic [31:0] perip_addr_delay   = perip_d[READ_DELAY - 1].addr;
+    logic [3:0]  perip_wen_delay    = perip_d[READ_DELAY - 1].we;
     
     always_ff @(posedge clk) begin
         if (rst) begin
-            perip_addr_d[0]   <= 32'b0;
-            perip_addr_d[1]   <= 32'b0;
-            perip_addr_d[2]   <= 32'b0 ;
-            perip_wen_d[0]    <= 1'b0;
-            perip_wen_d[1]    <= 1'b0;
-            perip_wen_d[2]    <= 1'b0;
-            perip_mask_d[0]   <= 2'b0;
-            perip_mask_d[1]   <= 2'b0;
-            perip_mask_d[2]   <= 2'b0;
+            for (int i = 0; i < READ_DELAY; i++) perip_d[i] <= '0;
         end
         else begin
-            perip_addr_d[0]   <= perip_addr;
-            perip_addr_d[1]   <= perip_addr_d[0];
-            perip_addr_d[2]   <= perip_addr_d[1];
-            perip_wen_d[0]    <= perip_wen;
-            perip_wen_d[1]    <= perip_wen_d[0];
-            perip_wen_d[2]    <= perip_wen_d[1];
-            perip_mask_d[0]   <= perip_mask;
-            perip_mask_d[1]   <= perip_mask_d[0];
-            perip_mask_d[2]   <= perip_mask_d[1];
+            perip_d[0]  <= '{en: dram_en, addr: perip_addr, we: perip_we};
+
+            for (int i = 1; i < READ_DELAY; i++) perip_d[i] <= perip_d[i-1];
         end
     end
-    
     
     // we don't care perip_mask in LED, SEG, SW & KEY, only care in DRAM
     // write process
@@ -112,7 +103,7 @@ module perip_bridge(
 
     // read process: in one cycle
     always_comb begin
-        if (~perip_wen) begin
+        if (~perip_wen_delay) begin
             case (perip_addr_delay)
                 SW0_ADDR:  mmio_rdata = virtual_sw_input[31:0];
                 SW1_ADDR:  mmio_rdata = virtual_sw_input[63:32];
@@ -136,7 +127,7 @@ module perip_bridge(
         .seg4   (seg_output[36:30]),
         .ans    ({seg_output[39:38], seg_output[29:28], seg_output[19:18], seg_output[9:8]})
     ); 
-   
+    
     assign seg_output[7]  = 0;
     assign seg_output[17] = 0;
     assign seg_output[27] = 0;
@@ -146,15 +137,11 @@ module perip_bridge(
     // dram rw
     dram_driver dram_driver_inst (
         .clk				(clk),
+        .perip_en           (dram_en),
         .perip_addr			(perip_addr[17:0]),
         .perip_wdata		(perip_wdata),
-        .perip_mask			(perip_mask),
-        .dram_wen 			(perip_wen & (perip_addr >= DRAM_ADDR_START && perip_addr < DRAM_ADDR_END)),
-        .perip_rdata		(dram_rdata),
-        
-        // delay
-        .perip_addr_delay   (perip_addr_delay),
-        .perip_mask_delay   (perip_mask_delay)
+        .perip_we 			(perip_wen & (perip_addr >= DRAM_ADDR_START && perip_addr < DRAM_ADDR_END)),
+        .perip_rdata		(dram_rdata)
     );
 
     // counter rw
