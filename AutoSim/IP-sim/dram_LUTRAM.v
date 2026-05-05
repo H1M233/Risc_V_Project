@@ -1,4 +1,4 @@
-module dram(
+module dram_LUTRAM(
     input               clk,
     input               rst,
 
@@ -12,7 +12,7 @@ module dram(
     // 设置65536个32位空间
     reg [31:0] ram_mem[0:65535];
 
-    wire [15:0] dram_word_addr = dram_addr_i[15:0];
+    wire [15:0] dram_word_addr = dram_addr_i[17:2];
     wire [31:0] dram_rdata_raw = ram_mem[dram_word_addr];
 
     always @(*) begin

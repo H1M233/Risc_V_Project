@@ -37,14 +37,23 @@ def compile(prj_name, dram_type):
                     '-o', 'out.vvp',                                                # 编译生成文件
                     '-y', str(rtl_dir),                                             # 添加 test_rtl 下的所有 .v 文件
                     '-I', str(rtl_dir),                                             # 添加头文件
-                    str(AutoSim_dir / 'tb.v'),                                      # 测试平台 testbench 代码
+                    str(AutoSim_dir / f'tb_{dram_type}.v'),                         # 测试平台 testbench 代码
                     str(AutoSim_dir / 'IP-sim' / 'irom.v'),                         # IROM
-                    str(AutoSim_dir / 'IP-sim' / f'DRAM-{dram_type}' / 'dram.v')    # 选择使用 DRAM (LUTRAM / BRAM)
+                    str(AutoSim_dir / 'IP-sim' / f'dram_{dram_type}.v')             # 选择使用 DRAM (LUTRAM / BRAM)
     ]
 
     # 编译
-    process = subprocess.Popen(iverilog_cmd)
-    process.wait(timeout=5)
+    try:
+        result = subprocess.run(
+            iverilog_cmd,
+            capture_output=True,  # 捕获输出
+            text=True,            # 以文本模式返回
+            timeout=5
+        )
+        return 'error' not in result.stdout
+    except subprocess.TimeoutExpired:
+        print('!!!Fail, iverilog exec timeout!!!')
+        return False
 
 
 def sim():
@@ -64,5 +73,7 @@ def sim():
 
 def run(prj_name, file_bin, dram_type):
     bin_to_mem(file_bin)
-    compile(prj_name, dram_type)
-    return sim()
+    if(compile(prj_name, dram_type) == True):
+        return sim()
+    else:
+        return False

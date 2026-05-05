@@ -35,7 +35,7 @@ module tb();
         .inst_o         (irom_data)
     );
 
-    dram DRAM(
+    dram_BRAM DRAM(
         .clk            (clk),
         .rst            (rst),
         .dram_addr_i    (dram_addr),
