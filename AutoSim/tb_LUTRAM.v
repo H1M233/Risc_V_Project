@@ -1,5 +1,5 @@
 `timescale 1ns / 1ps
-module tb();
+module tb_LUTRAM();
 
     reg rst, clk;
 
@@ -46,9 +46,9 @@ module tb();
     );
 
     // 测试内容
-    wire x3  = tb.CPU.REGS.regs[3];   // 进行的test序号
-    wire x26 = tb.CPU.REGS.regs[26];  // 测试结束信号
-    wire x27 = tb.CPU.REGS.regs[27];  // 0: fail, 1: pass
+    wire x3  = tb_LUTRAM.CPU.REGS.regs[3];   // 进行的test序号
+    wire x26 = tb_LUTRAM.CPU.REGS.regs[26];  // 测试结束信号
+    wire x27 = tb_LUTRAM.CPU.REGS.regs[27];  // 0: fail, 1: pass
 
     // 初始化时钟信号
     initial clk <= 1'b1;
@@ -60,8 +60,8 @@ module tb();
 
     // rom初始值
     initial begin
-        $readmemh("./generated/inst_data.txt", tb.IROM.rom_mem);
-        $readmemh("./generated/inst_data.txt", tb.DRAM.ram_mem);
+        $readmemh("./generated/inst_data.txt", tb_LUTRAM.IROM.rom_mem);
+        $readmemh("./generated/inst_data.txt", tb_LUTRAM.DRAM.ram_mem);
     end
 
     initial begin

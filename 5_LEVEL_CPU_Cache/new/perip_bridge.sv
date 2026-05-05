@@ -24,8 +24,7 @@ module perip_bridge(
     input  logic         cnt_clk			,
     input  logic         rst                ,
 
-    input  logic         dram_en           ,
-    output logic         dram_ready        ,
+    input  logic         dram_en            ,
     input  logic [31:0]  perip_addr			,
     input  logic [31:0]  perip_wdata		,
     input  logic [3:0]   perip_we			,
@@ -64,9 +63,11 @@ module perip_bridge(
     localparam READ_DELAY = 2'd2;
     perip_t perip_d [0: READ_DELAY - 1];
 
-    assign       dram_ready        = (|{dram_en, perip_d[0].en, perip_d[1].en}) ? 1'b0 : 1'b1;
-    logic [31:0] perip_addr_delay   = perip_d[READ_DELAY - 1].addr;
-    logic [3:0]  perip_wen_delay    = perip_d[READ_DELAY - 1].we;
+    // assign       dram_ready        = (|{dram_en, perip_d[0].en, perip_d[1].en}) ? 1'b0 : 1'b1;
+    logic [31:0] perip_addr_delay;
+    logic [3:0]  perip_wen_delay;
+    assign perip_addr_delay = perip_d[READ_DELAY - 1].addr;
+    assign perip_wen_delay = perip_d[READ_DELAY - 1].we;
     
     always_ff @(posedge clk) begin
         if (rst) begin
@@ -135,12 +136,14 @@ module perip_bridge(
     
 
     // dram rw
+    logic [3:0] dram_we;
+    assign dram_we = (perip_addr >= DRAM_ADDR_START && perip_addr < DRAM_ADDR_END) ? perip_we : 32'b0;
     dram_driver dram_driver_inst (
         .clk				(clk),
         .perip_en           (dram_en),
         .perip_addr			(perip_addr[17:0]),
         .perip_wdata		(perip_wdata),
-        .perip_we 			(perip_wen & (perip_addr >= DRAM_ADDR_START && perip_addr < DRAM_ADDR_END)),
+        .perip_we 			(dram_we),
         .perip_rdata		(dram_rdata)
     );
 

@@ -65,6 +65,7 @@ def sim():
             text=True,            # 以文本模式返回
             timeout=10
         )
+        # print(result.stdout)
         return 'pass!!!' in result.stdout
     except subprocess.TimeoutExpired:
         print('!!!Fail, vvp exec timeout!!!')

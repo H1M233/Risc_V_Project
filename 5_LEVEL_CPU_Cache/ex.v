@@ -60,7 +60,6 @@ module ex(
     // to dcache
     output reg          dcache_req_load,
     output reg          dcache_req_store,
-    output reg          dcache_wen,
     output reg [1:0]    dcache_mask,
     output reg [31:0]   dcache_addr,
     output reg [31:0]   dcache_wdata
@@ -167,7 +166,6 @@ module ex(
         pred_mispredict     = 1'b0;
         dcache_req_load     = (opcode == `TYPE_L);
         dcache_req_store    = (opcode == `TYPE_S);
-        dcache_wen          = (opcode == `TYPE_S);
         dcache_mask         = 2'b0;
         dcache_addr         = add_res;
         dcache_wdata        = rs2_fwd_data;

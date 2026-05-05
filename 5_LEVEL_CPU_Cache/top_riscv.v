@@ -9,9 +9,10 @@ module top_riscv(
     input   [31:0]  irom_data,
 
     // to DROM
+    output          perip_en,
     output  [31:0]  perip_addr,
+    output  [3:0]   perip_we,
     output          perip_wen,
-    output  [1:0]   perip_mask,
     output  [31:0]  perip_wdata,
     input   [31:0]  perip_rdata
 );
@@ -89,7 +90,6 @@ module top_riscv(
     wire [31:0]     dcache_addr_i;
     wire            dcache_req_load_i;
     wire            dcache_req_store_i;
-    wire            dcache_wen_i;
     wire [1:0]      dcache_mask_i;
     wire [31:0]     dcache_wdata_i;
 
@@ -469,7 +469,6 @@ module top_riscv(
 
         .dcache_req_load    (dcache_req_load_i),
         .dcache_req_store   (dcache_req_store_i),
-        .dcache_wen         (dcache_wen_i),
         .dcache_mask        (dcache_mask_i),
         .dcache_addr        (dcache_addr_i),
         .dcache_wdata       (dcache_wdata_i)
@@ -539,16 +538,16 @@ module top_riscv(
 
         .cpu_req_load       (dcache_req_load_i),
         .cpu_req_store      (dcache_req_store_i),
-        .cpu_wen            (dcache_wen_i),
         .cpu_mask           (dcache_mask_i),
         .cpu_addr           (dcache_addr_i),
         .cpu_wdata          (dcache_wdata_i),
         .cpu_rdata          (dcache_rdata),
         .stall              (dcache_stall),
 
+        .mem_en             (perip_en),
         .mem_addr           (perip_addr),
+        .mem_we             (perip_we),
         .mem_wen            (perip_wen),
-        .mem_mask           (perip_mask),
         .mem_wdata          (perip_wdata),
         .mem_rdata          (perip_rdata)
     );
