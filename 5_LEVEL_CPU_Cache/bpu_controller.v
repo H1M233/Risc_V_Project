@@ -64,7 +64,7 @@ module bpu_controller #(
     input                           ras_isfull,
 
     // btb - 查询
-    output reg [31:0]               btb_query_pc,
+    output     [31:0]               btb_query_pc,
     input                           btb_hit,
     input      [31:0]               btb_target_pc,
 
@@ -116,8 +116,8 @@ module bpu_controller #(
             pred_taken  = 1'b1;
             pred_pc     = pred_next_pc;
         end
-        else if(prev_JALR && btb_hit) begin
-            pred_taken  = 1'b1;
+        else if(prev_JALR) begin
+            pred_taken  = btb_hit;
             pred_pc     = btb_target_pc;
         end
         else if(prev_JAL) begin
@@ -131,6 +131,7 @@ module bpu_controller #(
     end
 
     // 查询
+    assign btb_query_pc = pc_addr;  // 提前取址
     always@(posedge clk) begin
         if(!rst | pred_mispredict | pred_taken) begin
             // TYPE_B
@@ -142,7 +143,7 @@ module bpu_controller #(
             prev_JAL            <= 0;
             prev_JALR_ret       <= 0;
             ras_pop_en          <= 0;
-            btb_query_pc        <= 0;
+            // btb_query_pc        <= 0;
 
             // JAL
             prev_JAL            <= 0;
@@ -162,7 +163,7 @@ module bpu_controller #(
             prev_JALR           <= is_JALR;
             prev_JALR_ret       <= is_ras_pop;
             ras_pop_en          <= is_ras_pop;
-            btb_query_pc        <= pc_addr;
+            // btb_query_pc        <= pc_addr;
 
             // JAL
             prev_JAL            <= is_JAL;

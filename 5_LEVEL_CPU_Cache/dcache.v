@@ -244,7 +244,7 @@ module dcache#(
     end
 
     // 函数：
-    // 
+    // 将 mask 转为按位
     function [3:0] unmask;
         input [1:0] mask;
         input [1:0] addr_low;

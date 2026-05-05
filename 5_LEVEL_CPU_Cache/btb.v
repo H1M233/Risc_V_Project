@@ -11,8 +11,8 @@ module btb #(
     
     // 查询
     input      [31:0]   query_pc_i,         // 查询的 pc
-    output              hit_o,              // 返回是否命中
-    output     [31:0]   target_pc_o,        // 返回预测的目标地址
+    output reg          hit_o,              // 返回是否命中
+    output reg [31:0]   target_pc_o,        // 返回预测的目标地址
     
     // 更新
     input               update_en_i,        // ex 阶段返回的BTB更新使能
@@ -50,9 +50,11 @@ module btb #(
     endgenerate
     
     // 输出命中结果和目标地址（优先Way0）
-    assign  hit_o       =   (way_hit[0] || way_hit[1]);
-    assign  target_pc_o =   (way_hit[0]) ? way_target[0] : 
-                            (way_hit[1]) ? way_target[1] : 32'b0;
+    always @(posedge clk) begin
+        hit_o       <=  (way_hit[0] | way_hit[1]);
+        target_pc_o <=  (way_hit[0]) ? way_target[0] : 
+                        (way_hit[1]) ? way_target[1] : 32'b0;
+    end
     
     // 更新
     // 查找是否有空闲路或需要替换的路

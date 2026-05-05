@@ -50,6 +50,9 @@ def compile(prj_name, dram_type):
             text=True,            # 以文本模式返回
             timeout=5
         )
+        if result.stderr:
+            print(f"iverilog stderr: {result.stderr}")
+            return False
         return 'error' not in result.stdout
     except subprocess.TimeoutExpired:
         print('!!!Fail, iverilog exec timeout!!!')
@@ -65,7 +68,6 @@ def sim():
             text=True,            # 以文本模式返回
             timeout=10
         )
-        # print(result.stdout)
         return 'pass!!!' in result.stdout
     except subprocess.TimeoutExpired:
         print('!!!Fail, vvp exec timeout!!!')

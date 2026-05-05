@@ -65,7 +65,11 @@ module top_riscv(
     // if_id to id
     // ============================================================
     wire [31:0]     id_pc_addr_i;
+    wire [31:0]     if_id_inst_raw;
+    wire            if_id_valid_o;
     wire [31:0]     id_inst_i;
+
+    assign id_inst_i = if_id_valid_o ? if_id_inst_raw : `NOP;
 
     // ============================================================
     // id to id_ex
@@ -85,8 +89,9 @@ module top_riscv(
     wire            id_pred_taken_o;
     wire [31:0]     id_pred_pc_o;
 
-    // id to dcache
-
+    // ============================================================
+    // ex to dcache
+    // ============================================================
     wire [31:0]     dcache_addr_i;
     wire            dcache_req_load_i;
     wire            dcache_req_store_i;
@@ -106,8 +111,11 @@ module top_riscv(
     wire [4:0]      ex_rd_addr_i;
     wire [31:0]     ex_rs1_data_i;
     wire [31:0]     ex_rs2_data_i;
+    wire [4:0]      ex_rs1_addr_i;
+    wire [4:0]      ex_rs2_addr_i;
     wire            ex_pred_taken_i;
     wire [31:0]     ex_pred_pc_i;
+    wire            ex_valid_i;
 
     // ============================================================
     // ex to jump
@@ -245,13 +253,8 @@ module top_riscv(
     // ============================================================
     // Jump
     // ============================================================
-    jump JUMP(
-        .jump_addr_i        (ex_jump_addr_o),
-        .jump_en_i          (ex_jump_en_o),
-
-        .jump_addr_o        (jump_jump_addr_o),
-        .jump_en_o          (jump_jump_en_o)
-    );
+    assign jump_jump_addr_o = ex_jump_addr_o;
+    assign jump_jump_en_o   = ex_jump_en_o;
 
     // ============================================================
     // Hazard
@@ -268,14 +271,17 @@ module top_riscv(
         .ex_waddr_i         (ex_rd_addr_o),
         .ex_wdata_i         (ex_rd_data_o),
         .opcode             (ex_hazard_opcode_o),
+        .ex_regs_wen_i      (ex_regs_wen_o),
 
         // from id
+        .id_opcode_i        (id_inst_i[6:0]),
         .id_rs1_raddr_i     (id_rs1_addr_o),
         .id_rs2_raddr_i     (id_rs2_addr_o),
 
         // from mem
         .mem_waddr_i        (mem_rd_addr_i),
         .mem_wdata_i        (mem_rd_data_i),
+        .mem_regs_wen_i     (mem_regs_wen_i),
 
         // to id
         .forward_rs1_data   (hazard_forward_rs1_data),
@@ -334,8 +340,9 @@ module top_riscv(
 
         .jump_en            (jump_jump_en_o),
 
-        .inst_o             (id_inst_i),
+        .inst_o             (if_id_inst_raw),
         .pc_addr_o          (id_pc_addr_i),
+        .valid_o            (if_id_valid_o),
 
         .pred_taken         (bpu_pred_taken)
     );
@@ -395,6 +402,8 @@ module top_riscv(
         .regs_wen_i         (id_reg_wen),
         .rs1_data_i         (id_rs1_data_o),
         .rs2_data_i         (id_rs2_data_o),
+        .rs1_addr_i         (id_rs1_addr_o),
+        .rs2_addr_i         (id_rs2_addr_o),
         .value1_i           (id_value1_o),
         .value2_i           (id_value2_o),
         .pred_taken_i       (id_pred_taken_o),
@@ -410,10 +419,13 @@ module top_riscv(
         .regs_wen_o         (ex_regs_wen_i),
         .rs1_data_o         (ex_rs1_data_i),
         .rs2_data_o         (ex_rs2_data_i),
+        .rs1_addr_o         (ex_rs1_addr_i),
+        .rs2_addr_o         (ex_rs2_addr_i),
         .value1_o           (ex_value1_i),
         .value2_o           (ex_value2_i),
         .pred_taken_o       (ex_pred_taken_i),
-        .pred_pc_o          (ex_pred_pc_i)
+        .pred_pc_o          (ex_pred_pc_i),
+        .valid_o            (ex_valid_i)
     );
 
     // ============================================================
@@ -428,10 +440,13 @@ module top_riscv(
         .regs_wen_i         (ex_regs_wen_i),
         .rs1_data_i         (ex_rs1_data_i),
         .rs2_data_i         (ex_rs2_data_i),
+        .rs1_addr_i         (ex_rs1_addr_i),
+        .rs2_addr_i         (ex_rs2_addr_i),
         .value1_i           (ex_value1_i),
         .value2_i           (ex_value2_i),
         .pred_taken_i       (ex_pred_taken_i),
         .pred_pc_i          (ex_pred_pc_i),
+        .valid_i            (ex_valid_i),
 
         .mem_forward_rd_addr_i  (mem_rd_addr_i),
         .mem_forward_rd_data_i  (mem_rd_data_i),

@@ -10,10 +10,13 @@ module ex(
     input               regs_wen_i,
     input      [31:0]   rs1_data_i,
     input      [31:0]   rs2_data_i,
+    input      [4:0]    rs1_addr_i,
+    input      [4:0]    rs2_addr_i,
     input      [31:0]   value1_i,
     input      [31:0]   value2_i,
     input               pred_taken_i,
     input      [31:0]   pred_pc_i,
+    input               valid_i,
 
     // from mem
     input      [4:0]    mem_forward_rd_addr_i,
@@ -31,10 +34,10 @@ module ex(
 
     // to ex_mem
     output reg [31:0]   inst_o,
-    output reg [31:0]   mem_addr_o,     // 转发 dcache
+    output reg [31:0]   mem_addr_o,
     output reg          mem_req,
-    output reg          mem_wen,        // 转发 dcache
-    output reg [1:0]    mem_mask,       // 转发 dcache
+    output reg          mem_wen,
+    output reg [1:0]    mem_mask,
     output reg          regs_wen_o,
     output reg [31:0]   rs2_data_o,
 
@@ -64,11 +67,10 @@ module ex(
     output reg [31:0]   dcache_addr,
     output reg [31:0]   dcache_wdata
 );
-    wire [6:0] opcode   = inst_i[6:0];
-    wire [2:0] funct3   = inst_i[14:12];
-    wire [6:0] funct7   = inst_i[31:25];
-    wire [4:0] rs1_addr = inst_i[19:15];
-    wire [4:0] rs2_addr = inst_i[24:20];
+    wire [6:0] opcode_raw = inst_i[6:0];
+    wire [6:0] opcode     = valid_i ? opcode_raw : `TYPE_I;
+    wire [2:0] funct3     = inst_i[14:12];
+    wire [6:0] funct7     = inst_i[31:25];
 
     wire mem_can_forward =  (mem_forward_regs_wen_i) &&
                             (mem_forward_rd_addr_i != 5'b0) &&
@@ -78,16 +80,16 @@ module ex(
                             (wb_forward_rd_addr_i != 5'b0);
 
     wire rs1_mem_hit =  (mem_can_forward) &&
-                        (mem_forward_rd_addr_i == rs1_addr);
+                        (mem_forward_rd_addr_i == rs1_addr_i);
 
     wire rs2_mem_hit =  (mem_can_forward) &&
-                        (mem_forward_rd_addr_i == rs2_addr);
+                        (mem_forward_rd_addr_i == rs2_addr_i);
 
     wire rs1_wb_hit  =  (wb_can_forward) &&
-                        (wb_forward_rd_addr_i == rs1_addr);
+                        (wb_forward_rd_addr_i == rs1_addr_i);
 
     wire rs2_wb_hit  =  (wb_can_forward) &&
-                        (wb_forward_rd_addr_i == rs2_addr);
+                        (wb_forward_rd_addr_i == rs2_addr_i);
 
     wire [31:0] rs1_fwd_data =  (rs1_mem_hit) ? mem_forward_rd_data_i :
                                 (rs1_wb_hit)  ? wb_forward_rd_data_i  : 
@@ -96,6 +98,15 @@ module ex(
     wire [31:0] rs2_fwd_data =  (rs2_mem_hit) ? mem_forward_rd_data_i :
                                 (rs2_wb_hit)  ? wb_forward_rd_data_i  :
                                                 rs2_data_i;
+
+    wire is_branch = valid_i && (opcode_raw == `TYPE_B);
+    wire is_jalr   = valid_i && (opcode_raw == `JALR);
+
+    // Branch/JALR 正确性由 hazard 显式 stall 保证。
+    // 不在分支比较链路上再接复杂 EX/MEM/WB 转发，避免关键路径变长。
+    wire [31:0] branch_rs1_data = rs1_data_i;
+    wire [31:0] branch_rs2_data = rs2_data_i;
+    wire [31:0] jalr_rs1_data   = rs1_data_i;
 
     wire uses_rs1_as_value1 =   (opcode == `TYPE_R) ||
                                 (opcode == `TYPE_I) ||
@@ -109,19 +120,24 @@ module ex(
     wire [31:0] value1_eff = (uses_rs1_as_value1) ? rs1_fwd_data : value1_i;
     wire [31:0] value2_eff = (uses_rs2_as_value2) ? rs2_fwd_data : value2_i;
 
-    wire [31:0] jump1_eff  = (opcode == `JALR) ? rs1_fwd_data : jump1_i;
-
     wire [4:0] shamt = value2_eff[4:0];
 
-    wire [31:0] add_res     = value1_eff + value2_eff;
-    wire [31:0] sub_res     = value1_eff - value2_eff;
-    wire [31:0] jump_target = jump1_eff + jump2_i;
-    wire [31:0] pc_plus4    = pc_addr_i + 32'd4;
+    wire [31:0] add_res       = value1_eff + value2_eff;
+    wire [31:0] sub_res       = value1_eff - value2_eff;
+    wire [31:0] mem_addr_calc = rs1_fwd_data + value2_i;
+    wire [31:0] branch_target = jump1_i + jump2_i;
+    wire [31:0] jalr_target   = jalr_rs1_data + jump2_i;
+    wire [31:0] pc_plus4      = pc_addr_i + 32'd4;
 
-    wire        eq_res      = (value1_eff == value2_eff);
-    wire        ltu_res     = (value1_eff < value2_eff);
-    wire        sign_diff   = (value1_eff[31] ^ value2_eff[31]);
-    wire        lts_res     = (sign_diff) ? value1_eff[31] : (value1_eff[30:0] < value2_eff[30:0]);
+    wire        ltu_res       = (value1_eff < value2_eff);
+    wire        sign_diff     = (value1_eff[31] ^ value2_eff[31]);
+    wire        lts_res       = (sign_diff) ? value1_eff[31] : (value1_eff[30:0] < value2_eff[30:0]);
+
+    wire        branch_eq_res    = (branch_rs1_data == branch_rs2_data);
+    wire        branch_ltu_res   = (branch_rs1_data < branch_rs2_data);
+    wire        branch_sign_diff = (branch_rs1_data[31] ^ branch_rs2_data[31]);
+    wire        branch_lts_res   = (branch_sign_diff) ? branch_rs1_data[31] :
+                                                        (branch_rs1_data[30:0] < branch_rs2_data[30:0]);
 
     wire [31:0] xor_res     = value1_eff ^ value2_eff;
     wire [31:0] or_res      = value1_eff | value2_eff;
@@ -134,36 +150,57 @@ module ex(
 
     always @(*) begin
         case (funct3)
-            `BEQ:    branch_taken = eq_res;
-            `BNE:    branch_taken = ~eq_res;
-            `BLT:    branch_taken = lts_res;
-            `BGE:    branch_taken = ~lts_res;
-            `BLTU:   branch_taken = ltu_res;
-            `BGEU:   branch_taken = ~ltu_res;
+            `BEQ:    branch_taken = branch_eq_res;
+            `BNE:    branch_taken = ~branch_eq_res;
+            `BLT:    branch_taken = branch_lts_res;
+            `BGE:    branch_taken = ~branch_lts_res;
+            `BLTU:   branch_taken = branch_ltu_res;
+            `BGEU:   branch_taken = ~branch_ltu_res;
             default: branch_taken = 1'b0;
         endcase
     end
 
+    wire        branch_pred_mispredict = is_branch && (pred_taken_i != branch_taken);
+    wire        jalr_pred_mispredict   = is_jalr && ((!pred_taken_i) || (pred_pc_i != jalr_target));
+
+    wire        branch_jump_en         = branch_pred_mispredict;
+    wire        jalr_jump_en           = jalr_pred_mispredict;
+
+    wire [31:0] branch_jump_addr       = branch_taken ? branch_target : pc_plus4;
+
+    wire [31:0] resolved_jump_addr     = jalr_jump_en   ? jalr_target      :
+                                         branch_jump_en ? branch_jump_addr :
+                                                          32'b0;
+
+    wire        resolved_jump_en       = branch_jump_en | jalr_jump_en;
+
     always @(*) begin
         pc_addr_o           = pc_addr_i;
-        regs_wen_o          = regs_wen_i;
-        mem_wen             = (opcode == `TYPE_S);
-        mem_req             = (opcode == `TYPE_S & opcode == `TYPE_L);
+        regs_wen_o          = valid_i ? regs_wen_i : 1'b0;
+
+        mem_wen             = valid_i && (opcode_raw == `TYPE_S);
+        mem_req             = valid_i && ((opcode_raw == `TYPE_S) || (opcode_raw == `TYPE_L));
         mem_mask            = 2'b0;
-        mem_addr_o          = add_res;
+        mem_addr_o          = mem_addr_calc;
+
         rd_data_o           = 32'b0;
         rd_addr_o           = rd_addr_i;
+
         rs1_data_o          = rs1_fwd_data;
         rs2_data_o          = rs2_fwd_data;
+
         jump_en             = 1'b0;
         jump_addr_o         = 32'b0;
-        hazard_opcode       = opcode;
-        inst_o              = inst_i;
+
+        hazard_opcode       = valid_i ? opcode_raw : `TYPE_I;
+        inst_o              = valid_i ? inst_i : `NOP;
+
         update_btb_en       = 1'b0;
         update_gshare_en    = 1'b0;
         update_target       = 32'b0;
         actual_taken        = 1'b0;
         pred_mispredict     = 1'b0;
+
         dcache_req_load     = (opcode == `TYPE_L);
         dcache_req_store    = (opcode == `TYPE_S);
         dcache_mask         = 2'b0;
@@ -186,27 +223,19 @@ module ex(
 
             `JALR: begin
                 rd_data_o       = add_res;
-                update_btb_en   = 1'b1;
-                update_target   = jump_target;
-
-                pred_mispredict = (!pred_taken_i) || (pred_pc_i != jump_target);
-                jump_en         = pred_mispredict;
-                jump_addr_o     = pred_mispredict ? jump_target : 32'b0;
+                update_btb_en   = valid_i;
+                update_target   = jalr_target;
+                pred_mispredict = jalr_pred_mispredict;
+                jump_en         = resolved_jump_en;
+                jump_addr_o     = resolved_jump_addr;
             end
 
             `TYPE_B: begin
-                update_gshare_en = 1'b1;
+                update_gshare_en = valid_i;
                 actual_taken     = branch_taken;
-
-                pred_mispredict = pred_taken_i != branch_taken;
-                jump_en         = pred_mispredict;
-
-                if (pred_mispredict) begin
-                    jump_addr_o = branch_taken ? jump_target : pc_plus4;
-                end
-                else begin
-                    jump_addr_o = 32'b0;
-                end
+                pred_mispredict  = branch_pred_mispredict;
+                jump_en          = resolved_jump_en;
+                jump_addr_o      = resolved_jump_addr;
             end
 
             `TYPE_L: begin
@@ -214,18 +243,23 @@ module ex(
                     `LB: begin
                         dcache_mask  = 2'b00;
                     end
+
                     `LH: begin
                         dcache_mask  = 2'b01;
                     end
+
                     `LW: begin
                         dcache_mask  = 2'b10;
                     end
+
                     `LBU: begin
                         dcache_mask  = 2'b00;
                     end
+
                     `LHU: begin
                         dcache_mask  = 2'b01;
                     end
+                    
                     default: begin
                         dcache_mask  = 2'b00;
                     end
