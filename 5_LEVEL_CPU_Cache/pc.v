@@ -52,6 +52,6 @@ module pc(
     end
 
     always@(posedge clk) begin
-        icache_flush <= (jump_en || pred_taken) ? 1'b1 : 1'b0;
+        icache_flush <= (jump_en || pred_taken);
     end
 endmodule

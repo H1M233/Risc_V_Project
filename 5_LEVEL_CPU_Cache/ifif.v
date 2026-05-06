@@ -16,5 +16,3 @@ module ifif(
         inst_o      = inst_i;           // 将输入的指令内容传递给输出
     end
 endmodule
-
-

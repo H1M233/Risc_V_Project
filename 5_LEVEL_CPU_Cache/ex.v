@@ -201,8 +201,8 @@ module ex(
         actual_taken        = 1'b0;
         pred_mispredict     = 1'b0;
 
-        dcache_req_load     = (opcode == `TYPE_L);
-        dcache_req_store    = (opcode == `TYPE_S);
+        dcache_req_load     = (opcode_raw == `TYPE_L);
+        dcache_req_store    = (opcode_raw == `TYPE_S);
         dcache_mask         = 2'b0;
         dcache_addr         = add_res;
         dcache_wdata        = rs2_fwd_data;

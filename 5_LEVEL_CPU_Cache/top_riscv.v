@@ -21,11 +21,10 @@ module top_riscv(
     // PC / I-cache
     // ============================================================
     wire [31:0]     pc_pc_addr_o;
-    assign irom_addr = pc_pc_addr_o;
 
     wire [31:0]     icache_inst;
     wire            icache_stall;
-    wire            icache_block = 1'b0;
+    wire            icache_block;
     wire            icache_flush;
 
     // ============================================================
@@ -197,7 +196,7 @@ module top_riscv(
 
     // I-cache 原始 miss 信号不能直接阻塞流水线。
     // jump 或 BPU 预测跳转时，当前 IF 指令会被冲刷，不应被错误路径 I-cache miss 卡住。
-    // assign icache_block = icache_stall & ~bpu_pred_taken & ~jump_jump_en_o;
+    assign icache_block = icache_stall & ~bpu_pred_taken & ~jump_jump_en_o;
 
     // BPU 在真正需要 hold 的时候暂停
     assign bpu_hold_en = dcache_stall | hazard_hazard_en | icache_block;
@@ -237,18 +236,18 @@ module top_riscv(
     // ============================================================
     // I-cache
     // ============================================================
-    // icache ICACHE(
-    //     .clk                (cpu_clk),
-    //     .rst                (cpu_rst),
+    icache ICACHE(
+        .clk                (cpu_clk),
+        .rst                (cpu_rst),
 
-    //     .cpu_addr           (pc_pc_addr_o),
-    //     .cpu_inst           (icache_inst),
-    //     .flush              (icache_flush),
-    //     .stall              (icache_stall),
+        .cpu_addr           (pc_pc_addr_o),
+        .cpu_inst           (icache_inst),
+        .flush              (icache_flush),
+        .stall              (icache_stall),
 
-    //     .mem_addr           (irom_addr),
-    //     .mem_inst           (irom_data)
-    // );
+        .mem_addr           (irom_addr),
+        .mem_inst           (irom_data)
+    );
 
     // ============================================================
     // Jump
@@ -315,8 +314,7 @@ module top_riscv(
     // IF
     // ============================================================
     ifif IFIF(
-        // .inst_i             (icache_inst),
-        .inst_i             (irom_data),
+        .inst_i             (icache_inst),
         .pc_addr_i          (pc_pc_addr_o),
 
         .inst_o             (if_inst_o),

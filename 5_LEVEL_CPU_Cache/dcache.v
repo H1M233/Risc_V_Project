@@ -140,7 +140,7 @@ module dcache#(
         else begin  
             // 传输 DRAM
             mem_en      <= (state == QUERY_AND_LOAD) & cpu_req | state == HIT_BRANCH | state == LOAD_MISS_WAIT_1;
-            mem_addr    <= cpu_addr;
+            mem_addr    <= (cpu_req) ? cpu_addr : 32'b0;
             mem_wdata   <= store_merge(32'b0, cpu_wdata, cpu_addr[1:0], cpu_mask);
             mem_we      <= (cpu_req_store) ? unmask(cpu_mask, cpu_addr[1:0]) : 4'b0;
             mem_wen     <= cpu_req_store & state == QUERY_AND_LOAD;
