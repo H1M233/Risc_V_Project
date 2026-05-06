@@ -27,8 +27,8 @@ def main(prj_name, dram_type):
 
 
 if __name__ == '__main__':
-    prj_name = sys.argv[1] if len(sys.argv) > 1 else '5_LEVEL_CPU_FIRST_CONTEST'
-    dram_type = sys.argv[2] if len(sys.argv) > 2 else "LUTRAM"
+    prj_name = sys.argv[1] if len(sys.argv) > 1 else '5_LEVEL_CPU_Cache'
+    dram_type = sys.argv[2] if len(sys.argv) > 2 else "BRAM"
 
     sys.exit(main(prj_name, dram_type))
 
@@ -37,6 +37,6 @@ if __name__ == '__main__':
 使用方法：
 在终端输入 python test_all.py prj_name dram_type
 
-prj_name 为 rtl 代码所在的文件夹名称，默认为 5_LEVEL_CPU_FIRST_CONTEST
-dram_type 为 DRAM 类型，有 BRAM 和 LUTRAM 两种，默认为 LUTRAM
+prj_name 为 rtl 代码所在的文件夹名称，默认为 5_LEVEL_CPU_Cache
+dram_type 为 DRAM 类型，有 BRAM 和 LUTRAM 两种，默认为 BRAM
 '''

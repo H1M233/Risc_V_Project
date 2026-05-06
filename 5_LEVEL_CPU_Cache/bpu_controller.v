@@ -93,13 +93,12 @@ module bpu_controller #(
     wire            is_ret_JAL  = (is_JAL && rd_addr == 5'b00001);
     wire            is_ras_push = (is_ret_JAL && !ras_isfull);
 
-    // 综合计算以减少资源占用
-    wire    [31:0]  imm         = (is_JAL) ? JAL_imm : (is_B_type) ? B_imm : 32'b0;
     wire    [31:0]  pc_add_4    = pc_addr + 32'h4;
-    wire    [31:0]  pc_add_imm  = pc_addr + imm;
+    wire    [31:0]  pc_add_JAL  = pc_addr + JAL_imm;
+    wire    [31:0]  pc_add_B    = pc_addr + B_imm;
 
     // 存储预测结果至第二个预测周期
-    reg     [31:0]  pred_next_pc;
+    reg     [31:0]  pred_next_pc, JAL_next_pc;
     reg             prev_JAL, prev_JALR, prev_JALR_ret;
 
     // Gshare索引：取PC中间位与BHR异或
@@ -122,7 +121,7 @@ module bpu_controller #(
         end
         else if(prev_JAL) begin
             pred_taken  = 1'b1;
-            pred_pc     = pred_next_pc;
+            pred_pc     = JAL_next_pc;
         end
         else begin
             pred_taken  = 1'b0;
@@ -149,6 +148,7 @@ module bpu_controller #(
             prev_JAL            <= 0;
             ras_push_en         <= 0;
             ras_push_addr       <= 0;
+            JAL_next_pc         <= 0;
         end
         else if(hazard_en | dcache_stall) begin
             // hazard发生时暂停
@@ -156,7 +156,7 @@ module bpu_controller #(
         else begin
             // TYPE_B
             gshare_prev_b       <= is_B_type;
-            pred_next_pc        <= pc_add_imm;
+            pred_next_pc        <= pc_add_B;
             gshare_pht_index    <= pht_index;
 
             // JALR
@@ -169,6 +169,7 @@ module bpu_controller #(
             prev_JAL            <= is_JAL;
             ras_push_en         <= is_ras_push;
             ras_push_addr       <= pc_add_4;
+            JAL_next_pc         <= pc_add_JAL;
         end
     end
 

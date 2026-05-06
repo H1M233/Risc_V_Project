@@ -31,7 +31,7 @@ module mem(
     wire [6:0]  opcode  = inst_i[6:0];
     wire [2:0]  funct3  = inst_i[14:12];
 
-    always@(*) begin
+    always@(*) begin: MEM2
         rd_data_o   = rd_data_i;
         rd_addr_o   = rd_addr_i;
         regs_wen_o  = regs_wen;

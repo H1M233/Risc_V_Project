@@ -1,15 +1,15 @@
 `include "rv32I.vh"
 
-// ÊµÏÖ£º
-// load_miss: ÔİÍ£ 3 ¸öÖÜÆÚ£¬Ïò DRAM ÇëÇóÊı¾İ -> ¸ù¾İ plur Ñ¡ÔñÂ·²¢¸üĞÂ plur -> µÈ´ıÊı¾İ -> ×ª·¢²¢¸üĞÂ DCACHE
-// load_hit: ÔİÍ£ 1 ¸öÖÜÆÚ£¬¼ÆËãÃüÖĞ -> Ö±½Ó´Ó DCACHE ´«³öÊı¾İ
-// store_miss: ÔİÍ£ 1 ¸öÖÜÆÚ£¬Ö±½ÓĞ´Èë DRAM£¨ÔİÍ£ÊÇÎªÁË±ÜÃâstore and use£©
-// store_hit: ÔİÍ£ 1 ¸öÖÜÆÚ£¬Ğ´Èë DRAM -> ¸ù¾İ¼ÆËãµÄÂ·¸üĞÂ DCACHE
+// å®ç°ï¼š
+// load_miss: æš‚åœ 3 ä¸ªå‘¨æœŸï¼Œå‘ DRAM è¯·æ±‚æ•°æ® -> æ ¹æ® plur é€‰æ‹©è·¯å¹¶æ›´æ–° plur -> ç­‰å¾…æ•°æ® -> è½¬å‘å¹¶æ›´æ–° DCACHE
+// load_hit: æš‚åœ 1 ä¸ªå‘¨æœŸï¼Œè®¡ç®—å‘½ä¸­ -> ç›´æ¥ä» DCACHE ä¼ å‡ºæ•°æ®
+// store_miss: æš‚åœ 1 ä¸ªå‘¨æœŸï¼Œç›´æ¥å†™å…¥ DRAMï¼ˆæš‚åœæ˜¯ä¸ºäº†é¿å…store and useï¼‰
+// store_hit: æš‚åœ 1 ä¸ªå‘¨æœŸï¼Œå†™å…¥ DRAM -> æ ¹æ®è®¡ç®—çš„è·¯æ›´æ–° DCACHE
 
 module dcache#(
     parameter INDEX_WIDTH   = 6,
     parameter TAG_WIDTH     = 24,
-    parameter WAYS          = 2     // DCACHE Ê¹ÓÃ 2 Â·×ã¹»
+    parameter WAYS          = 2     // DCACHE ä½¿ç”¨ 2 è·¯è¶³å¤Ÿ
 )(
     input               clk,
     input               rst,
@@ -35,7 +35,7 @@ module dcache#(
 
     // ============================================================
     //
-    // ÃüÖĞ¼ÆÊıÆ÷
+    // å‘½ä¸­è®¡æ•°å™¨
     // reg [31:0] dcache_hit;
     // reg [31:0] dcache_miss;
     // always@(posedge clk) begin
@@ -51,17 +51,22 @@ module dcache#(
     //
     // ============================================================
 
-    // ´æ´¢½á¹¹£º
+    // å­˜å‚¨ç»“æ„ï¼š
     (* ram_style = "block" *) reg [31:0] data_array[0:WAYS - 1][0:LINE_NUM - 1];
     reg [TAG_WIDTH - 1:0] tag_array[0:WAYS - 1][0:LINE_NUM - 1];
     reg valid_array[0:WAYS - 1][0:LINE_NUM - 1];
-    reg plru_state [0:LINE_NUM - 1];                // Ã¿×éµÄ·ÃÎÊÀúÊ·£¨ÓÃÓÚÑ¡ÔñÌæ»»ÄÄÒ»Â·£©
+    reg plru_state [0:LINE_NUM - 1];                // æ¯ç»„çš„è®¿é—®å†å²ï¼ˆç”¨äºé€‰æ‹©æ›¿æ¢å“ªä¸€è·¯ï¼‰
 
-    // ÌáÈ¡Ë÷Òı
-    wire [INDEX_WIDTH - 1:0] index  = cpu_addr[INDEX_WIDTH + 1:2];
-    wire [TAG_WIDTH - 1:0]   tag    = cpu_addr[31:INDEX_WIDTH + 2];
+    // æå–ç´¢å¼•
+    reg [INDEX_WIDTH - 1:0] index;
+    reg [TAG_WIDTH - 1:0]   tag;
 
-    // ÃüÖĞ¼ì²â
+    always @(posedge clk) begin
+        index   <= cpu_addr[INDEX_WIDTH + 1:2];
+        tag     <= cpu_addr[31:INDEX_WIDTH + 2];
+    end
+
+    // å‘½ä¸­æ£€æµ‹
     wire [WAYS - 1:0] hit_way;
     wire hit = |hit_way;
     genvar w0;
@@ -71,74 +76,105 @@ module dcache#(
         end
     endgenerate
     
-    // DCACHE Êä³ö»º´æ
-    reg [31:0] cache_rdata_reg [0:WAYS - 1];
-    genvar w1;
-    generate
-        for(w1 = 0; w1 < WAYS; w1 = w1 + 1) begin : pre_data
-            always @(posedge clk) begin
-                cache_rdata_reg[w1] <= data_array[w1][index];
-            end
-        end
-    endgenerate
+    // DCACHE è¾“å‡ºç¼“å­˜
+    reg [31:0] cache_rdata_reg [0:1];
+    always @(posedge clk) begin
+        cache_rdata_reg[0] <= data_array[0][index];
+        cache_rdata_reg[1] <= data_array[1][index];
+    end
 
-    // ×´Ì¬
+    // çŠ¶æ€
     reg [2:0] state;
     localparam QUERY_AND_LOAD = 3'd0;
-    localparam LOAD_HIT_OUTPUT = 3'd1;
-    localparam LOAD_MISS_WAIT_1 = 3'd2;
-    localparam LOAD_MISS_WAIT_2 = 3'd3;
-    localparam LOAD_MISS_OUTPUT = 3'd4;
-    localparam STORE_HIT = 3'd5;
-    localparam STORE_MISS = 3'd6;
+    localparam HIT_BRANCH = 3'd1;
+    localparam LOAD_HIT_OUTPUT = 3'd2;
+    localparam LOAD_MISS_WAIT_1 = 3'd3;
+    localparam LOAD_MISS_WAIT_2 = 3'd4;
+    localparam LOAD_MISS_OUTPUT = 3'd5;
+    localparam STORE_HIT = 3'd6;
+    localparam STORE_MISS = 3'd7;
 
-    // Êı¾İ´«µİ¼Ä´æÆ÷
+    // æ•°æ®ä¼ é€’å¯„å­˜å™¨
     wire cpu_req = (cpu_req_load | cpu_req_store);
+    reg cpu_req_load_reg;
+    reg cpu_req_store_reg;
     reg finished;
-    reg [31:0] cpu_wdata_reg;
-    reg [31:0] cpu_addr_reg;
-    reg [1:0]  cpu_mask_reg;
+    reg [31:0] cpu_wdata_reg, cpu_wdata_reg_reg;
+    reg [31:0] cpu_addr_reg, cpu_addr_reg_reg;
+    reg [1:0]  cpu_mask_reg, cpu_mask_reg_reg;
     reg [INDEX_WIDTH - 1:0] index_reg;
     reg [TAG_WIDTH - 1:0]   tag_reg;
     reg hit_way_idx;
     
-    // load_miss ¼Ä´æÆ÷
+    // load_miss å¯„å­˜å™¨
     reg miss_way;
     reg [INDEX_WIDTH - 1:0]  miss_index;
     reg [TAG_WIDTH - 1:0] miss_tag;
     reg [31:0] miss_addr;
     reg [1:0] miss_mask;
 
-    // ¶³½áÁ÷Ë®ÏßÌõ¼ş
+    // å†»ç»“æµæ°´çº¿æ¡ä»¶
     assign stall = cpu_req & !finished;
 
+    integer i, w;
     always @(posedge clk) begin
         if(!rst) begin
             state       <= QUERY_AND_LOAD;
             cpu_rdata   <= 32'b0;
             finished    <= 1'b0;
+
+            mem_en      <= 1'b0;
             mem_addr    <= 32'b0;
             mem_wdata   <= 32'b0;
             mem_we      <= 4'b0;
             mem_wen     <= 1'b0;
+
+            // é‡ç½®å¯„å­˜å™¨
+            for (w = 0; w < WAYS; w = w + 1) begin
+                for (i = 0; i < LINE_NUM; i = i + 1) begin
+                    valid_array[w][i] <= 1'b0;
+                end
+            end
+            for (i = 0; i < LINE_NUM; i = i + 1) plru_state[i] <= 1'b0;
         end
-        else begin
-            // ´«Êä DRAM
-            mem_en      <= (state == QUERY_AND_LOAD) & cpu_req | state == LOAD_MISS_WAIT_1 | state == LOAD_MISS_WAIT_2;
+        else begin  
+            // ä¼ è¾“ DRAM
+            mem_en      <= (state == QUERY_AND_LOAD) & cpu_req | state == HIT_BRANCH | state == LOAD_MISS_WAIT_1;
             mem_addr    <= cpu_addr;
-            mem_wdata   <= store_merge(
-                32'b0,
-                cpu_wdata,
-                cpu_addr[1:0],
-                cpu_mask
-            );
+            mem_wdata   <= store_merge(32'b0, cpu_wdata, cpu_addr[1:0], cpu_mask);
             mem_we      <= (cpu_req_store) ? unmask(cpu_mask, cpu_addr[1:0]) : 4'b0;
-            mem_wen     <= cpu_req_store;
+            mem_wen     <= cpu_req_store & state == QUERY_AND_LOAD;
+
+            // çŠ¶æ€ä¼ é€’
+            cpu_req_load_reg    <= cpu_req_load;
+            cpu_req_store_reg   <= cpu_req_store;
+            cpu_wdata_reg       <= cpu_wdata;
+            cpu_addr_reg        <= cpu_addr;
+            cpu_mask_reg        <= cpu_mask;
+            cpu_wdata_reg_reg   <= cpu_wdata_reg;
+            cpu_addr_reg_reg    <= cpu_addr_reg;
+            cpu_mask_reg_reg    <= cpu_mask_reg;
+            index_reg           <= index;
+            tag_reg             <= tag;
+
+            // casez (hit_way)
+            //     2'b?1: hit_way_idx <= 1'b0;
+            //     2'b10: hit_way_idx <= 1'b1;
+            //     default: hit_way_idx <= 1'b0;
+            // endcase 
+            hit_way_idx <= ~hit_way[0];     // ç”±äºåªæœ‰ä¸¤è·¯ç›´æ¥ä¼˜åŒ–åˆ¤æ–­ way0 æ˜¯å¦å‘½ä¸­ï¼Œå·²æœ‰ hit åœ¨å¤–å±‚åšåˆ¤æ–­
 
             case(state)
                 QUERY_AND_LOAD: begin
-                    // ×´Ì¬ÅĞ¶Ï
-                    if (cpu_req_load) begin
+                    // çŠ¶æ€åˆ¤æ–­
+                    if (cpu_req_load | cpu_req_store) begin
+                        state <= HIT_BRANCH;
+                        finished <= 1'b0;
+                    end
+                end
+
+                HIT_BRANCH: begin
+                    if (cpu_req_load_reg) begin
                         if (hit) begin
                             state <= LOAD_HIT_OUTPUT;
                             finished <= 1'b1;
@@ -148,7 +184,7 @@ module dcache#(
                             finished <= 1'b0;
                         end
                     end
-                    else if (cpu_req_store) begin
+                    else if (cpu_req_store_reg) begin
                         if (hit) begin
                             state <= STORE_HIT;
                             finished <= 1'b1;
@@ -158,40 +194,28 @@ module dcache#(
                             finished <= 1'b1;
                         end
                     end
-
-                    cpu_wdata_reg   <= cpu_wdata;
-                    cpu_addr_reg    <= cpu_addr;
-                    cpu_mask_reg    <= cpu_mask;
-                    index_reg       <= index;
-                    tag_reg         <= tag;
-
-                    // casez (hit_way)
-                    //     2'b?1: hit_way_idx <= 1'b0;
-                    //     2'b10: hit_way_idx <= 1'b1;
-                    //     default: hit_way_idx <= 1'b0;
-                    // endcase 
-                    hit_way_idx <= ~hit_way[0];     // ÓÉÓÚÖ»ÓĞÁ½Â·Ö±½ÓÓÅ»¯ÅĞ¶Ï way0 ÊÇ·ñÃüÖĞ£¬ÒÑÓĞ hit ÔÚÍâ²ã×öÅĞ¶Ï
                 end
 
                 LOAD_HIT_OUTPUT: begin
-                    cpu_rdata <= load_shift(cache_rdata_reg[hit_way_idx], cpu_addr_reg[1:0], cpu_mask_reg);
+                    cpu_rdata <= load_shift(cache_rdata_reg[hit_way_idx], cpu_addr_reg_reg[1:0], cpu_mask_reg_reg);
                     finished <= 1'b0;
                     state <= QUERY_AND_LOAD;
                 end
 
                 LOAD_MISS_WAIT_1: begin
-                    miss_way            <= plru_state[index];
-                    miss_index          <= index_reg;   
-                    miss_tag            <= tag_reg;
-                    miss_addr           <= cpu_addr_reg;
-                    miss_mask           <= cpu_mask_reg;
+                    miss_way                <= plru_state[index_reg];
+                    miss_index              <= index_reg;   
+                    miss_tag                <= tag_reg;
+                    miss_addr               <= cpu_addr_reg_reg;
+                    miss_mask               <= cpu_mask_reg_reg;
 
-                    plru_state[index]   <= ~plru_state[index];
-                    state               <= LOAD_MISS_WAIT_2;
+                    plru_state[index_reg]   <= ~plru_state[index_reg];
+                    state                   <= LOAD_MISS_OUTPUT;
+                    finished                <= 1'b1;
                 end
 
                 LOAD_MISS_WAIT_2: begin
-                    // µÈ´ı½ÓÊÕÊı¾İ
+                    // ç­‰å¾…æ¥æ”¶æ•°æ®
                     state       <= LOAD_MISS_OUTPUT;
                     finished    <= 1'b1;
                 end
@@ -208,16 +232,16 @@ module dcache#(
                 STORE_HIT: begin
                     data_array[hit_way_idx][index_reg] <= store_merge(
                         cache_rdata_reg[hit_way_idx],
-                        cpu_wdata_reg,
-                        cpu_addr_reg[1:0],
-                        cpu_mask_reg
+                        cpu_wdata_reg_reg,
+                        cpu_addr_reg_reg[1:0],
+                        cpu_mask_reg_reg
                     );
                     state <= QUERY_AND_LOAD;
                     finished <= 1'b0;
                 end
 
                 STORE_MISS: begin
-                    // BRAM ´æ´¢Ò²ĞèÒªÍ£¶Ù ¿ÉÒıÈë store_buffer ½â¾ö
+                    // BRAM å­˜å‚¨ä¹Ÿéœ€è¦åœé¡¿ å¯å¼•å…¥ store_buffer è§£å†³
                     state <= QUERY_AND_LOAD;
                     finished <= 1'b0;
                 end
@@ -230,21 +254,8 @@ module dcache#(
         end
     end
 
-    // ÖØÖÃ¼Ä´æÆ÷
-    integer i, w;
-    always @(posedge clk) begin
-        if (!rst) begin
-            for (w = 0; w < WAYS; w = w + 1) begin
-                for (i = 0; i < LINE_NUM; i = i + 1) begin
-                    valid_array[w][i] <= 1'b0;
-                end
-            end
-            for (i = 0; i < LINE_NUM; i = i + 1) plru_state[i] <= 1'b0;
-        end
-    end
-
-    // º¯Êı£º
-    // ½« mask ×ªÎª°´Î»
+    // å‡½æ•°ï¼š
+    // å°† mask è½¬ä¸ºæŒ‰ä½
     function [3:0] unmask;
         input [1:0] mask;
         input [1:0] addr_low;
@@ -270,7 +281,7 @@ module dcache#(
     endfunction
 
 
-    // °ÑÍêÕû word ¸ù¾İ addr[1:0] ºÍ mask ÒÆµ½µÍÎ»
+    // æŠŠå®Œæ•´ word æ ¹æ® addr[1:0] å’Œ mask ç§»åˆ°ä½ä½
     function [31:0] load_shift;
         input [31:0] word;
         input [1:0]  addr_low;
@@ -307,7 +318,7 @@ module dcache#(
         end
     endfunction
 
-    // store hit Ê±¸üĞÂ cache ÀïµÄ¾É word
+    // store hit æ—¶æ›´æ–° cache é‡Œçš„æ—§ word
     function [31:0] store_merge;
         input [31:0] old_word;
         input [31:0] wdata;
