@@ -26,8 +26,8 @@ module perip_bridge(
 
     input  logic [31:0]  perip_addr			,
     input  logic [31:0]  perip_wdata		,
-    input  logic [3:0]   perip_we			,
-    input  logic         perip_wen          ,
+    input  logic         perip_wen			,
+	input  logic [1:0]	 perip_mask			,
     output logic [31:0]  perip_rdata		,
 
     input  logic [63:0]  virtual_sw_input	,
@@ -51,36 +51,7 @@ module perip_bridge(
     logic [31:0] seg_wdata, cnt_rdata, mmio_rdata, dram_rdata;
     logic [39:0] seg_output;
     logic cnt_enable_cfg;
-    
-    // delay
-    localparam READ_DELAY = 2'd2;
-    logic [31:0] perip_d_addr [0: READ_DELAY - 1];
-    logic        perip_d_wen  [0: READ_DELAY - 1];
 
-    // assign       dram_ready        = (|{dram_en, perip_d[0].en, perip_d[1].en}) ? 1'b0 : 1'b1;
-    logic [31:0] perip_addr_delay;
-    logic [3:0]  perip_wen_delay;
-    assign perip_addr_delay = perip_d_addr[READ_DELAY - 1];
-    assign perip_wen_delay = perip_d_wen[READ_DELAY - 1];
-    
-    always_ff @(posedge clk) begin
-        if (rst) begin
-            for (int i = 0; i < READ_DELAY; i++) begin
-                perip_d_addr[i] <= 0;
-                perip_d_wen[i]  <= 0;  
-            end
-        end
-        else begin
-            perip_d_addr[0] <= perip_addr;
-            perip_d_wen[0]  <= perip_wen;
-
-            for (int i = 1; i < READ_DELAY; i++) begin
-                perip_d_addr[i] <= perip_d_addr[i-1];
-                perip_d_wen[i]  <= perip_d_wen[i-1];
-            end
-        end
-    end
-    
     // we don't care perip_mask in LED, SEG, SW & KEY, only care in DRAM
     // write process
     always_ff @(posedge clk) begin
@@ -105,8 +76,8 @@ module perip_bridge(
 
     // read process: in one cycle
     always_comb begin
-        if (~perip_wen_delay) begin
-            case (perip_addr_delay)
+        if (~perip_wen) begin
+            case (perip_addr)
                 SW0_ADDR:  mmio_rdata = virtual_sw_input[31:0];
                 SW1_ADDR:  mmio_rdata = virtual_sw_input[63:32];
                 KEY_ADDR:  mmio_rdata = {24'd0, virtual_key_input};
@@ -129,7 +100,7 @@ module perip_bridge(
         .seg4   (seg_output[36:30]),
         .ans    ({seg_output[39:38], seg_output[29:28], seg_output[19:18], seg_output[9:8]})
     ); 
-    
+   
     assign seg_output[7]  = 0;
     assign seg_output[17] = 0;
     assign seg_output[27] = 0;
@@ -137,13 +108,12 @@ module perip_bridge(
     
 
     // dram rw
-    logic [3:0] dram_we;
-    assign dram_we = (perip_addr >= DRAM_ADDR_START && perip_addr < DRAM_ADDR_END) ? perip_we : 32'b0;
     dram_driver dram_driver_inst (
         .clk				(clk),
         .perip_addr			(perip_addr[17:0]),
         .perip_wdata		(perip_wdata),
-        .perip_we 			(dram_we),
+        .perip_mask			(perip_mask),
+        .dram_wen 			(perip_wen & (perip_addr >= DRAM_ADDR_START && perip_addr < DRAM_ADDR_END)),
         .perip_rdata		(dram_rdata)
     );
 
@@ -156,12 +126,12 @@ module perip_bridge(
         .perip_rdata		(cnt_rdata)
     );
 
-    assign perip_rdata = {32{perip_addr_delay == SW0_ADDR}} & mmio_rdata |
-                        {32{perip_addr_delay == SW1_ADDR}} & mmio_rdata |
-                        {32{perip_addr_delay == KEY_ADDR}} & mmio_rdata |
-                        {32{perip_addr_delay == SEG_ADDR}} & mmio_rdata |
-                        {32{perip_addr_delay >= DRAM_ADDR_START && perip_addr_delay < DRAM_ADDR_END}} & dram_rdata |
-                        {32{perip_addr_delay == CNT_ADDR}} & cnt_rdata;
+    assign perip_rdata = {32{perip_addr == SW0_ADDR}} & mmio_rdata |
+                        {32{perip_addr == SW1_ADDR}} & mmio_rdata |
+                        {32{perip_addr == KEY_ADDR}} & mmio_rdata |
+                        {32{perip_addr == SEG_ADDR}} & mmio_rdata |
+                        {32{perip_addr >= DRAM_ADDR_START && perip_addr < DRAM_ADDR_END}} & dram_rdata |
+                        {32{perip_addr == CNT_ADDR}} & cnt_rdata;
     
     assign virtual_led_output = LED;
     assign virtual_seg_output = seg_output;

@@ -58,5 +58,4 @@ module dram_LUTRAM(
             endcase
         end
     end
-
 endmodule

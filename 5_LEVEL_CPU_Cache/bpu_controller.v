@@ -13,6 +13,9 @@ module bpu_controller #(
     parameter BHR_WIDTH = 10,
     parameter PHT_SIZE  = 1024,
 
+    // BTB
+    parameter BTB_INDEX_WIDTH = 4,
+
     // RAS
     parameter RAS_DEPTH = 8,
     parameter PTR_WIDTH = $clog2(RAS_DEPTH)
@@ -64,14 +67,16 @@ module bpu_controller #(
     input                           ras_isfull,
 
     // btb - 查询
-    output     [31:0]               btb_query_pc,
-    input                           btb_hit,
-    input      [31:0]               btb_target_pc,
+    output reg [BTB_INDEX_WIDTH - 1:0]          btb_query_index,
+    output reg [31 - BTB_INDEX_WIDTH - 2:0]     btb_query_tag,
+    input                                       btb_hit,
+    input      [31:0]                           btb_target_pc,
 
     // btb - 更新
-    output reg                      btb_update_en,
-    output reg [31:0]               btb_update_pc,
-    output reg [31:0]               btb_update_target
+    output reg                                  btb_update_en,
+    output reg [BTB_INDEX_WIDTH - 1:0]          btb_update_index,
+    output reg [31 - BTB_INDEX_WIDTH - 2:0]     btb_update_tag,
+    output reg [31:0]                           btb_update_target
 );
     // 取出 rd 和 rs1 的地址
     wire    [4:0]   rd_addr     = pc_inst[11:7];
@@ -105,6 +110,12 @@ module bpu_controller #(
     wire [BHR_WIDTH - 1:0]  pht_index           = pc_addr[BHR_WIDTH + 1:2] ^ gshare_ghr;
     wire [BHR_WIDTH - 1:0]  update_pht_index    = update_pc[BHR_WIDTH + 1:2] ^ gshare_ghr_d2;
 
+    // BTB索引和tag（tag取pc高位，用于区分映射到同一索引的不同地址）
+    wire [BTB_INDEX_WIDTH - 1:0]        btb_query_index_w   = pc_addr[BTB_INDEX_WIDTH + 1:2];
+    wire [31 - BTB_INDEX_WIDTH - 2:0]   btb_query_tag_w     = pc_addr[31:BTB_INDEX_WIDTH + 2];
+    wire [BTB_INDEX_WIDTH - 1:0]        btb_update_index_w  = update_pc[BTB_INDEX_WIDTH + 1:2];
+    wire [31 - BTB_INDEX_WIDTH - 2:0]   btb_update_tag_w    = update_pc[31:BTB_INDEX_WIDTH + 2];
+
     // 预测结果
     always@(*) begin
         if(prev_JALR_ret) begin
@@ -130,7 +141,6 @@ module bpu_controller #(
     end
 
     // 查询
-    assign btb_query_pc = pc_addr;  // 提前取址
     always@(posedge clk) begin
         if(!rst | pred_mispredict | pred_taken) begin
             // TYPE_B
@@ -139,10 +149,11 @@ module bpu_controller #(
             gshare_pht_index    <= 0;
 
             // JALR
-            prev_JAL            <= 0;
+            prev_JALR           <= 0;
             prev_JALR_ret       <= 0;
             ras_pop_en          <= 0;
-            // btb_query_pc        <= 0;
+            btb_query_index     <= 0;
+            btb_query_tag       <= 0;
 
             // JAL
             prev_JAL            <= 0;
@@ -163,7 +174,8 @@ module bpu_controller #(
             prev_JALR           <= is_JALR;
             prev_JALR_ret       <= is_ras_pop;
             ras_pop_en          <= is_ras_pop;
-            // btb_query_pc        <= pc_addr;
+            btb_query_index     <= btb_query_index_w;
+            btb_query_tag       <= btb_query_tag_w;
 
             // JAL
             prev_JAL            <= is_JAL;
@@ -178,7 +190,8 @@ module bpu_controller #(
         if(!rst) begin
             // BTB更新
             btb_update_en               <= 0;
-            btb_update_pc               <= 0;
+            btb_update_index            <= 0;
+            btb_update_tag              <= 0;
             btb_update_target           <= 0;
 
             // Gshare更新
@@ -189,15 +202,20 @@ module bpu_controller #(
         end
         else begin
             // BTB更新
-            btb_update_en               <= update_btb_en;
-            btb_update_pc               <= update_pc;
-            btb_update_target           <= update_target;
+            btb_update_en <= update_btb_en;
+            if (update_btb_en) begin
+                btb_update_index            <= btb_update_index_w;
+                btb_update_tag              <= btb_update_tag_w;
+                btb_update_target           <= update_target;
+            end
             
             // Gshare更新
-            gshare_update_en            <= update_gshare_en;
-            gshare_update_pht_index     <= update_pht_index;
-            gshare_actual_taken         <= actual_taken;
-            gshare_pred_mispredict      <= pred_mispredict;
+            gshare_update_en <= update_gshare_en;
+            if (update_gshare_en) begin
+                gshare_update_pht_index     <= update_pht_index;
+                gshare_actual_taken         <= actual_taken;
+                gshare_pred_mispredict      <= pred_mispredict;
+            end
         end
     end
 endmodule

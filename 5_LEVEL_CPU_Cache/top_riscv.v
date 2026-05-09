@@ -9,7 +9,6 @@ module top_riscv(
     input   [31:0]  irom_data,
 
     // to DROM
-    output          perip_en,
     output  [31:0]  perip_addr,
     output  [3:0]   perip_we,
     output          perip_wen,
@@ -127,11 +126,6 @@ module top_riscv(
     // ============================================================
     wire            ex_regs_wen_o;
     wire [31:0]     ex_inst_o;
-    wire            ex_mem_wen;
-    wire [1:0]      ex_mem_mask;
-    wire            ex_mem_req;
-    wire [31:0]     ex_mem_addr_o;
-    wire [31:0]     ex_rs2_data_o;
 
     // ============================================================
     // ex to hazard
@@ -149,13 +143,9 @@ module top_riscv(
     // ex_mem to mem
     // ============================================================
     wire [31:0]     mem_inst_i;
-    wire            mem_mem_wen_i;
-    wire            mem_mem_req_i;
-    wire [31:0]     mem_mem_addr_i;
     wire            mem_regs_wen_i;
     wire [31:0]     mem_rd_data_i;
     wire [4:0]      mem_rd_addr_i;
-    wire [31:0]     mem_rs2_data_i;
 
     // ============================================================
     // mem to mem_wb
@@ -167,12 +157,8 @@ module top_riscv(
     // ============================================================
     // mem to D-cache
     // ============================================================
-    wire            mem_perip_req;
-    wire [31:0]     mem_perip_addr;
-    wire            mem_perip_wen;
-    wire [1:0]      mem_perip_mask;
-    wire [31:0]     mem_perip_wdata;
     wire [31:0]     dcache_rdata;
+    wire            dcache_ack_mem;
 
     // ============================================================
     // mem_wb to wb
@@ -268,7 +254,6 @@ module top_riscv(
     hazard HAZARD(
         // from ex
         .ex_waddr_i         (ex_rd_addr_o),
-        .ex_wdata_i         (ex_rd_data_o),
         .opcode             (ex_hazard_opcode_o),
         .ex_regs_wen_i      (ex_regs_wen_o),
 
@@ -279,7 +264,6 @@ module top_riscv(
 
         // from mem
         .mem_waddr_i        (mem_rd_addr_i),
-        .mem_wdata_i        (mem_rd_data_i),
         .mem_regs_wen_i     (mem_regs_wen_i),
 
         // to id
@@ -458,12 +442,7 @@ module top_riscv(
         .hazard_opcode      (ex_hazard_opcode_o),
 
         .inst_o             (ex_inst_o),
-        .mem_addr_o         (ex_mem_addr_o),
-        .mem_req            (ex_mem_req),
-        .mem_wen            (ex_mem_wen),
-        .mem_mask           (ex_mem_mask),
         .regs_wen_o         (ex_regs_wen_o),
-        .rs2_data_o         (ex_rs2_data_o),
 
         .rd_addr_o          (ex_rd_addr_o),
         .rd_data_o          (ex_rd_data_o),
@@ -497,22 +476,14 @@ module top_riscv(
         .dcache_stall       (dcache_stall),
 
         .inst_i             (ex_inst_o),
-        .mem_addr_i         (ex_mem_addr_o),
-        .mem_req_i          (ex_mem_req),
-        .mem_wen_i          (ex_mem_wen),
         .rd_addr_i          (ex_rd_addr_o),
         .rd_data_i          (ex_rd_data_o),
         .regs_wen_i         (ex_regs_wen_o),
-        .rs2_data_i         (ex_rs2_data_o),
 
         .inst_o             (mem_inst_i),
-        .mem_addr_o         (mem_mem_addr_i),
-        .mem_req_o          (mem_mem_req_i),
-        .mem_wen_o          (mem_mem_wen_i),
         .rd_addr_o          (mem_rd_addr_i),
         .rd_data_o          (mem_rd_data_i),
-        .regs_wen_o         (mem_regs_wen_i),
-        .rs2_data_o         (mem_rs2_data_i)
+        .regs_wen_o         (mem_regs_wen_i)
     );
 
     // ============================================================
@@ -520,26 +491,18 @@ module top_riscv(
     // ============================================================
     mem MEM(
         .inst_i             (mem_inst_i),
-        .mem_addr_i         (mem_mem_addr_i),
-        .mem_req            (mem_mem_req_i),
-        .mem_wen            (mem_mem_wen_i),
         .rd_addr_i          (mem_rd_addr_i),
         .rd_data_i          (mem_rd_data_i),
         .regs_wen           (mem_regs_wen_i),
-        .rs2_data_i         (mem_rs2_data_i),
 
         .perip_rdata        (dcache_rdata),
-
-        .perip_req          (mem_perip_req),
-        .perip_addr         (mem_perip_addr),
-        .perip_mask         (mem_perip_mask),
-        .perip_wdata        (mem_perip_wdata),
-        .perip_wen          (mem_perip_wen),
 
         .rd_data_o          (mem_rd_data_o),
         .regs_wen_o         (mem_regs_wen_o),
 
-        .rd_addr_o          (mem_rd_addr_o)
+        .rd_addr_o          (mem_rd_addr_o),
+
+        .dcache_ack         (dcache_ack_mem)
     );
 
     // ============================================================
@@ -557,12 +520,13 @@ module top_riscv(
         .cpu_rdata          (dcache_rdata),
         .stall              (dcache_stall),
 
-        .mem_en             (perip_en),
         .mem_addr           (perip_addr),
         .mem_we             (perip_we),
         .mem_wen            (perip_wen),
         .mem_wdata          (perip_wdata),
-        .mem_rdata          (perip_rdata)
+        .mem_rdata          (perip_rdata),
+
+        .mem_ack            (dcache_ack_mem)
     );
 
     // ============================================================

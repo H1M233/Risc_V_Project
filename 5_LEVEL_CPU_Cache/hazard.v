@@ -2,7 +2,6 @@
 
 module hazard(
     input      [4:0]    ex_waddr_i,
-    input      [31:0]   ex_wdata_i,
     input      [6:0]    opcode,
     input               ex_regs_wen_i,
 
@@ -11,7 +10,6 @@ module hazard(
     input      [4:0]    id_rs2_raddr_i,
 
     input      [4:0]    mem_waddr_i,
-    input      [31:0]   mem_wdata_i,
     input               mem_regs_wen_i,
     
     output reg [31:0]   forward_rs1_data,

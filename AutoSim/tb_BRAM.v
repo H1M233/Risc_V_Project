@@ -39,7 +39,6 @@ module tb_BRAM();
 
     dram_BRAM DRAM(
         .clk            (clk),
-        .rst            (rst),
         .dram_en_i      (dram_en),
         .dram_addr_i    (dram_addr),
         .dram_we_i      (dram_we),

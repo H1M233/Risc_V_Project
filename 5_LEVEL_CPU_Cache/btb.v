@@ -6,27 +6,22 @@
 module btb #(
     parameter INDEX_WIDTH = 4               // 截取地址长度
 )(
-    input               clk,
-    input               rst,
+    input   clk,
+    input   rst,
     
     // 查询
-    input      [31:0]   query_pc_i,         // 查询的 pc
-    output reg          hit_o,              // 返回是否命中
-    output reg [31:0]   target_pc_o,        // 返回预测的目标地址
+    input      [INDEX_WIDTH - 1:0]          query_index_i,
+    input      [31 - INDEX_WIDTH - 2:0]     query_tag_i,
+    output                                  hit_o,              // 返回是否命中
+    output     [31:0]                       target_pc_o,        // 返回预测的目标地址
     
     // 更新
-    input               update_en_i,        // ex 阶段返回的BTB更新使能
-    input      [31:0]   update_pc_i,        // ex 阶段返回更新的指令地址
-    input      [31:0]   update_target_i     // ex 阶段返回的实际目标地址
+    input                                   update_en_i,        // ex 阶段返回的BTB更新使能
+    input      [INDEX_WIDTH - 1:0]          update_index_i,
+    input      [31 - INDEX_WIDTH - 2:0]     update_tag_i,
+    input      [31:0]                       update_target_i     // ex 阶段返回的实际目标地址
 );
     localparam SETS = 2 ** INDEX_WIDTH;     // 组数：最多记录多少历史
-
-    // 提取索引和tag（tag取pc高位，用于区分映射到同一索引的不同地址）
-    wire [INDEX_WIDTH - 1:0]        query_index     = query_pc_i[INDEX_WIDTH + 1:2];
-    wire [31 - INDEX_WIDTH - 2:0]   query_tag       = query_pc_i[31:INDEX_WIDTH + 2];
-    
-    wire [INDEX_WIDTH - 1:0]        update_index    = update_pc_i[INDEX_WIDTH + 1:2];
-    wire [31 - INDEX_WIDTH - 2:0]   update_tag      = update_pc_i[31:INDEX_WIDTH + 2];
     
     // 存储结构：
     reg                             valid   [0:SETS - 1][0:1];      // 标记BTB是否有效（即非初始化状态）
@@ -42,19 +37,17 @@ module btb #(
     genvar  w;
     generate
         for(w = 0; w < 2; w = w + 1) begin
-            assign way_valid[w]     = valid[query_index][w];
-            assign way_tag[w]       = tag[query_index][w];
-            assign way_target[w]    = target[query_index][w];
-            assign way_hit[w]       = (way_valid[w] && way_tag[w] == query_tag);
+            assign way_valid[w]     = valid[query_index_i][w];
+            assign way_tag[w]       = tag[query_index_i][w];
+            assign way_target[w]    = target[query_index_i][w];
+            assign way_hit[w]       = (way_valid[w] && way_tag[w] == query_tag_i);
         end
     endgenerate
     
     // 输出命中结果和目标地址（优先Way0）
-    always @(posedge clk) begin
-        hit_o       <=  (way_hit[0] | way_hit[1]);
-        target_pc_o <=  (way_hit[0]) ? way_target[0] : 
-                        (way_hit[1]) ? way_target[1] : 32'b0;
-    end
+    assign hit_o       =    (way_hit[0] | way_hit[1]);
+    assign target_pc_o =    (way_hit[0]) ? way_target[0] : 
+                            (way_hit[1]) ? way_target[1] : 32'b0;
     
     // 更新
     // 查找是否有空闲路或需要替换的路
@@ -62,8 +55,8 @@ module btb #(
     wire    update_way_hit      [0:1];
     generate
         for(w = 0; w < 2; w = w + 1) begin
-            assign update_way_valid[w]  = valid[update_index][w];
-            assign update_way_hit[w]    = update_way_valid[w] && (tag[update_index][w] == update_tag);
+            assign update_way_valid[w]  = valid[update_index_i][w];
+            assign update_way_hit[w]    = update_way_valid[w] && (tag[update_index_i][w] == update_tag_i);
         end
     endgenerate
     
@@ -74,7 +67,7 @@ module btb #(
     // 3. 否则根据 LRU 替换
     wire replace_way    =   (update_way_hit[0] || !update_way_valid[0]) ? 1'b0 :
                             (update_way_hit[1] || !update_way_valid[1]) ? 1'b1 :
-                            lru[update_index];  // 替换最近最少使用的路
+                            lru[update_index_i];  // 替换最近最少使用的路
     
     integer i, j;
     always @(posedge clk) begin
@@ -84,19 +77,19 @@ module btb #(
                 lru[i] <= 1'b0;
                 for (j = 0; j < 2; j = j + 1) begin
                     valid[i][j]  <= 1'b0;
-                    tag[i][j]    <= 0;
-                    target[i][j] <= 32'b0;
+                    // tag[i][j]    <= 0;
+                    // target[i][j] <= 32'b0;
                 end
             end
         end 
         else if (update_en_i) begin
             // 更新目标地址
-            valid[update_index][replace_way]    <= 1'b1;
-            tag[update_index][replace_way]      <= update_tag;
-            target[update_index][replace_way]   <= update_target_i;
+            valid[update_index_i][replace_way]    <= 1'b1;
+            tag[update_index_i][replace_way]      <= update_tag_i;
+            target[update_index_i][replace_way]   <= update_target_i;
 
             // 更新 LRU
-            lru[update_index]                   <= ~replace_way;
+            lru[update_index_i]                   <= ~replace_way;
         end
     end
 endmodule

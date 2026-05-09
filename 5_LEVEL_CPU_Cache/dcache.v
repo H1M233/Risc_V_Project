@@ -24,12 +24,13 @@ module dcache#(
     output              stall,
 
     // external DROM side
-    output reg          mem_en,
     output reg [31:0]   mem_addr,
     output reg [3:0]    mem_we,
     output reg          mem_wen,
     output reg [31:0]   mem_wdata,
-    input      [31:0]   mem_rdata
+    input      [31:0]   mem_rdata,
+
+    output reg          mem_ack
 );
     localparam LINE_NUM = 2 ** INDEX_WIDTH;
 
@@ -88,11 +89,10 @@ module dcache#(
     localparam QUERY_AND_LOAD = 3'd0;
     localparam HIT_BRANCH = 3'd1;
     localparam LOAD_HIT_OUTPUT = 3'd2;
-    localparam LOAD_MISS_WAIT_1 = 3'd3;
-    localparam LOAD_MISS_WAIT_2 = 3'd4;
-    localparam LOAD_MISS_OUTPUT = 3'd5;
-    localparam STORE_HIT = 3'd6;
-    localparam STORE_MISS = 3'd7;
+    localparam LOAD_MISS_WAIT = 3'd3;
+    localparam LOAD_MISS_OUTPUT = 3'd4;
+    localparam STORE_HIT = 3'd5;
+    localparam STORE_MISS = 3'd6;
 
     // 数据传递寄存器
     wire cpu_req = (cpu_req_load | cpu_req_store);
@@ -114,7 +114,7 @@ module dcache#(
     reg [1:0] miss_mask;
 
     // 冻结流水线条件
-    assign stall = cpu_req & !finished;
+    assign stall = cpu_req & (state == QUERY_AND_LOAD | state == HIT_BRANCH | state == LOAD_MISS_WAIT);
 
     integer i, w;
     always @(posedge clk) begin
@@ -123,11 +123,11 @@ module dcache#(
             cpu_rdata   <= 32'b0;
             finished    <= 1'b0;
 
-            mem_en      <= 1'b0;
             mem_addr    <= 32'b0;
             mem_wdata   <= 32'b0;
             mem_we      <= 4'b0;
             mem_wen     <= 1'b0;
+            mem_ack     <= 1'b0;
 
             // 重置寄存器
             for (w = 0; w < WAYS; w = w + 1) begin
@@ -139,10 +139,9 @@ module dcache#(
         end
         else begin  
             // 传输 DRAM
-            mem_en      <= (state == QUERY_AND_LOAD) & cpu_req | state == HIT_BRANCH | state == LOAD_MISS_WAIT_1;
             mem_addr    <= (cpu_req) ? cpu_addr : 32'b0;
             mem_wdata   <= store_merge(32'b0, cpu_wdata, cpu_addr[1:0], cpu_mask);
-            mem_we      <= (cpu_req_store) ? unmask(cpu_mask, cpu_addr[1:0]) : 4'b0;
+            mem_we      <= (cpu_req_store & state == QUERY_AND_LOAD) ? unmask(cpu_mask, cpu_addr[1:0]) : 4'b0;
             mem_wen     <= cpu_req_store & state == QUERY_AND_LOAD;
 
             // 状态传递
@@ -156,6 +155,8 @@ module dcache#(
             cpu_mask_reg_reg    <= cpu_mask_reg;
             index_reg           <= index;
             tag_reg             <= tag;
+
+            mem_ack             <= finished;
 
             // casez (hit_way)
             //     2'b?1: hit_way_idx <= 1'b0;
@@ -180,7 +181,7 @@ module dcache#(
                             finished <= 1'b1;
                         end
                         else begin
-                            state <= LOAD_MISS_WAIT_1;
+                            state <= LOAD_MISS_WAIT;
                             finished <= 1'b0;
                         end
                     end
@@ -202,7 +203,7 @@ module dcache#(
                     state <= QUERY_AND_LOAD;
                 end
 
-                LOAD_MISS_WAIT_1: begin
+                LOAD_MISS_WAIT: begin
                     miss_way                <= plru_state[index_reg];
                     miss_index              <= index_reg;   
                     miss_tag                <= tag_reg;
@@ -212,12 +213,6 @@ module dcache#(
                     plru_state[index_reg]   <= ~plru_state[index_reg];
                     state                   <= LOAD_MISS_OUTPUT;
                     finished                <= 1'b1;
-                end
-
-                LOAD_MISS_WAIT_2: begin
-                    // 等待接收数据
-                    state       <= LOAD_MISS_OUTPUT;
-                    finished    <= 1'b1;
                 end
 
                 LOAD_MISS_OUTPUT: begin

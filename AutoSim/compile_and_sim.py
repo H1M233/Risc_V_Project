@@ -8,7 +8,7 @@ AutoSim_dir = Path.cwd()    # 当前文件夹
 
 def list_binfiles():
     '''列出 generated 下所有 .bin 文件'''
-    return [str(p) for p in Path(str(AutoSim_dir / 'generated')).rglob('*.bin')]
+    return [str(p) for p in Path(AutoSim_dir / 'generated').rglob('*.bin')]
 
 
 def bin_to_mem(infile):
@@ -30,16 +30,21 @@ def bin_to_mem(infile):
 def compile(prj_name, dram_type):
     '''编译 rtl 代码并输出到 out.vvp'''
     # 获取目标工程路径
-    rtl_dir = AutoSim_dir.parent / f'{prj_name}'
+    rtl_dir = AutoSim_dir.parent / prj_name
+    IP_dir = AutoSim_dir / 'IP-sim'
+
+    source_file = []
+    source_file.extend(rtl_dir.glob('*.v'))
+    source_file.extend(IP_dir.glob('*.v'))
+    source_file.append(AutoSim_dir / f'tb_{dram_type}.v')
 
     # iverilog 程序
     iverilog_cmd = ['iverilog',
                     '-o', 'out.vvp',                                                # 编译生成文件
                     '-y', str(rtl_dir),                                             # 添加 test_rtl 下的所有 .v 文件
+                    '-y', str(AutoSim_dir / 'IP-sim'),                              # 添加 IP 核行为文件
                     '-I', str(rtl_dir),                                             # 添加头文件
-                    str(AutoSim_dir / f'tb_{dram_type}.v'),                         # 测试平台 testbench 代码
-                    str(AutoSim_dir / 'IP-sim' / 'irom.v'),                         # IROM
-                    str(AutoSim_dir / 'IP-sim' / f'dram_{dram_type}.v')             # 选择使用 DRAM (LUTRAM / BRAM)
+                    str(AutoSim_dir / f'tb_{dram_type}.v')                          # 测试平台 testbench 代码
     ]
 
     # 编译

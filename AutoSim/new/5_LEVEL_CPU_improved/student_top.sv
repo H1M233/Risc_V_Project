@@ -44,7 +44,7 @@ module student_top#(
     // perip
     logic [31:0] perip_addr, perip_wdata, perip_rdata;
     logic perip_wen;
-    logic [3:0] perip_we;
+    logic [1:0] perip_mask;
 
     // 16KB = 2^12 * 32bit
     assign inst_addr = pc[13:2];
@@ -59,8 +59,8 @@ module student_top#(
 
         // Interface to DRAM & periphera
         .perip_addr         (perip_addr),     
-        .perip_we           (perip_we),
-        .perip_wen          (perip_wen),
+        .perip_wen          (perip_wen),     
+        .perip_mask         (perip_mask),   
         .perip_wdata        (perip_wdata),    
         .perip_rdata        (perip_rdata)     
     );
@@ -74,11 +74,11 @@ module student_top#(
         .clk				(w_cpu_clk),
         .cnt_clk            (w_clk_50Mhz),
         .rst                (w_clk_rst),
-        .perip_addr         (perip_addr),     
-        .perip_we           (perip_we),   
-        .perip_wen          (perip_wen),    
-        .perip_wdata        (perip_wdata),    
-        .perip_rdata        (perip_rdata),
+        .perip_addr			(perip_addr),
+        .perip_wdata		(perip_wdata),
+        .perip_wen			(perip_wen),
+        .perip_mask			(perip_mask),
+        .perip_rdata		(perip_rdata),
         .virtual_sw_input	(virtual_sw),
         .virtual_key_input	(virtual_key),	
         .virtual_seg_output	(virtual_seg),

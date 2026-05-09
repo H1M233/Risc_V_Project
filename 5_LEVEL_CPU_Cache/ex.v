@@ -34,12 +34,7 @@ module ex(
 
     // to ex_mem
     output reg [31:0]   inst_o,
-    output reg [31:0]   mem_addr_o,
-    output reg          mem_req,
-    output reg          mem_wen,
-    output reg [1:0]    mem_mask,
     output reg          regs_wen_o,
-    output reg [31:0]   rs2_data_o,
 
     // to ex_mem & hazard
     output reg [4:0]    rd_addr_o,
@@ -178,16 +173,10 @@ module ex(
         pc_addr_o           = pc_addr_i;
         regs_wen_o          = valid_i ? regs_wen_i : 1'b0;
 
-        mem_wen             = valid_i && (opcode_raw == `TYPE_S);
-        mem_req             = valid_i && ((opcode_raw == `TYPE_S) || (opcode_raw == `TYPE_L));
-        mem_mask            = 2'b0;
-        mem_addr_o          = mem_addr_calc;
-
         rd_data_o           = 32'b0;
         rd_addr_o           = rd_addr_i;
 
         rs1_data_o          = rs1_fwd_data;
-        rs2_data_o          = rs2_fwd_data;
 
         jump_en             = 1'b0;
         jump_addr_o         = 32'b0;
@@ -201,10 +190,10 @@ module ex(
         actual_taken        = 1'b0;
         pred_mispredict     = 1'b0;
 
-        dcache_req_load     = (opcode_raw == `TYPE_L);
-        dcache_req_store    = (opcode_raw == `TYPE_S);
+        dcache_req_load     = valid_i && (opcode_raw == `TYPE_L);
+        dcache_req_store    = valid_i && (opcode_raw == `TYPE_S);
         dcache_mask         = 2'b0;
-        dcache_addr         = add_res;
+        dcache_addr         = mem_addr_calc;
         dcache_wdata        = rs2_fwd_data;
 
         case (opcode)
@@ -269,19 +258,15 @@ module ex(
             `TYPE_S: begin
                 case (funct3)
                     `SB: begin
-                        mem_mask  = 2'b00;
                         dcache_mask = 2'b00;
                     end
                     `SH: begin
-                        mem_mask  = 2'b01;
                         dcache_mask = 2'b01;
                     end
                     `SW: begin
-                        mem_mask  = 2'b10;
                         dcache_mask = 2'b10;
                     end
                     default: begin
-                        mem_mask  = 2'b00;
                         dcache_mask = 2'b00;
                     end
                 endcase

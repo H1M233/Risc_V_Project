@@ -13,6 +13,9 @@ MODELSIM/
 AutoSim/__pycache__
 AutoSim/out.vvp
 AutoSim/generated/inst_data.txt
+AutoSim/obj_dir
+AutoSim/mem_init/irom.txt
+AutoSim/mem_init/dram.txt
 
 twin/
 

@@ -1,6 +1,5 @@
 module dram_BRAM(
     input               clk,
-    input               rst,
 
     input               dram_en_i,
     input      [31:0]   dram_addr_i,
@@ -34,4 +33,23 @@ module dram_BRAM(
     always @(posedge clk) begin
         if(dram_en_i && dram_wen_i) ram_mem[dram_word_addr] <= pre_wdata;
     end
+endmodule
+
+
+module blk_mem_gen_0(
+    input      [15:0]   addra,
+    input               clka,
+    input      [31:0]   dina,
+    output reg [31:0]   douta,
+    input      [3:0]    wea
+);
+    dram_BRAM dram_inst(
+        .clk            (clka),
+        .dram_en_i      (1'b1),
+        .dram_addr_i    ({14'b0, addra, 2'b0}),
+        .dram_we_i      (wea),
+        .dram_wen_i     (wea != 4'b0),
+        .dram_wdata_i   (dina),
+        .dram_rdata_o   (douta)
+    );
 endmodule

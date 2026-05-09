@@ -12,6 +12,9 @@ module bpu_top #(
     parameter BHR_WIDTH = 10,               // BHR宽度：PHT索引根据
     parameter PHT_SIZE  = 1024,             // PHT深度
 
+    // BTB
+    parameter BTB_INDEX_WIDTH = 4,
+
     // RAS
     parameter RAS_DEPTH = 8
 )(
@@ -61,19 +64,23 @@ module bpu_top #(
     wire                    ras_isfull_o;
 
     // connect btb with bpu_controller
-    wire [31:0]             btb_query_pc_i;
-    wire                    btb_hit_o;
-    wire [31:0]             btb_target_pc_o;
+    wire [BTB_INDEX_WIDTH - 1:0]        btb_query_index_i;
+    wire [31 - BTB_INDEX_WIDTH - 2:0]   btb_query_tag_i;
+    wire                                btb_hit_o;
+    wire [31:0]                         btb_target_pc_o;
 
-    wire                    btb_update_en_i;
-    wire [31:0]             btb_update_pc_i;
-    wire [31:0]             btb_update_target_i;
+    wire                                btb_update_en_i;
+    wire [BTB_INDEX_WIDTH - 1:0]        btb_update_index_i;
+    wire [31 - BTB_INDEX_WIDTH - 2:0]   btb_update_tag_i;
+    wire [31:0]                         btb_update_target_i;
 
     bpu_controller #(
-        .BHR_WIDTH  (BHR_WIDTH),
-        .PHT_SIZE   (PHT_SIZE),
+        .BHR_WIDTH          (BHR_WIDTH),
+        .PHT_SIZE           (PHT_SIZE),
 
-        .RAS_DEPTH  (RAS_DEPTH)
+        .BTB_INDEX_WIDTH    (BTB_INDEX_WIDTH),
+
+        .RAS_DEPTH          (RAS_DEPTH)
     ) BPU_CTRL(
         .clk                        (clk),
         .rst                        (rst),
@@ -122,13 +129,15 @@ module bpu_top #(
         .ras_isfull                 (ras_isfull_o),
 
         // btb - 查询
-        .btb_query_pc               (btb_query_pc_i),
+        .btb_query_index            (btb_query_index_i),
+        .btb_query_tag              (btb_query_tag_i),
         .btb_hit                    (btb_hit_o),
         .btb_target_pc              (btb_target_pc_o),
 
         // btb - 更新
         .btb_update_en              (btb_update_en_i),
-        .btb_update_pc              (btb_update_pc_i),
+        .btb_update_index           (btb_update_index_i),
+        .btb_update_tag             (btb_update_tag_i),
         .btb_update_target          (btb_update_target_i)
     );
 
@@ -171,19 +180,21 @@ module bpu_top #(
     );
 
     btb #(
-        .INDEX_WIDTH (4)
+        .INDEX_WIDTH (BTB_INDEX_WIDTH)
     ) BTB(
         .clk                        (clk),
         .rst                        (rst),
     
         // 查询
-        .query_pc_i                 (btb_query_pc_i),
+        .query_index_i              (btb_query_index_i),
+        .query_tag_i                (btb_query_tag_i),
         .hit_o                      (btb_hit_o),
         .target_pc_o                (btb_target_pc_o),
     
         // 更新
         .update_en_i                (btb_update_en_i),
-        .update_pc_i                (btb_update_pc_i),
+        .update_index_i             (btb_update_index_i),
+        .update_tag_i               (btb_update_tag_i),
         .update_target_i            (btb_update_target_i)
     );
 

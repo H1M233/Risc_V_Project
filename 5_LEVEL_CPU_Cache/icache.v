@@ -150,13 +150,13 @@ module icache #(
                     miss_way   <= replace_way;  // 选择替换的路
                     state      <= S_REFILL;
                 end
+            end
             else if (state == S_REFILL)begin
                 // 写入选中的路
                 valid_array[miss_way][miss_index] <= 1'b1;
                 tag_array[miss_way][miss_index]   <= miss_tag;
                 data_array[miss_way][miss_index]  <= mem_inst;
                 state <= S_QUERY;
-            end
             end
             else begin
                 state <= S_QUERY;
