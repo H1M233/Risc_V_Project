@@ -1,26 +1,6 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 04/16/2025 06:28:41 PM
-// Design Name: 
-// Module Name: tb_verilator
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
 
-
-module tb_verilator(
+module tb_verilator_software(
     input clk_50MHz,
     input clk_cpu,
     input rst,
@@ -35,7 +15,6 @@ module tb_verilator(
     output reg [31:0] func_block_addr,
     output [31:0] LED
 );
-    
     top uut (
         .w_clk_50Mhz    (clk_50MHz),
         .cpu_clk        (clk_cpu),
@@ -47,31 +26,95 @@ module tb_verilator(
     );
 
     initial begin
-        $readmemh("./mem_init/irom.txt", tb_verilator.uut.student_top_inst.Mem_IROM.rom_mem);
-        $readmemh("./mem_init/dram.txt", tb_verilator.uut.student_top_inst.bridge_inst.dram_driver_inst.Mem_DRAM.dram_inst.ram_mem);
+        $readmemh("./mem_init/irom.txt", tb_verilator_software.uut.student_top_inst.Mem_IROM.rom_mem);
+        $readmemh("./mem_init/dram.txt", tb_verilator_software.uut.student_top_inst.bridge_inst.dram_driver_inst.Mem_DRAM.dram_inst.ram_mem);
     end
 
-    assign seg = tb_verilator.uut.student_top_inst.bridge_inst.seg_driver.s;
-    assign mem_inst = tb_verilator.uut.student_top_inst.Core_cpu.MEM.inst_i;
-    
+    assign seg = tb_verilator_software.uut.student_top_inst.bridge_inst.seg_driver.s;
+    assign mem_inst = tb_verilator_software.uut.student_top_inst.Core_cpu.MEM.inst_i;
+    assign pc = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.pc_addr_i;
 
-    assign pc = tb_verilator.uut.student_top_inst.Core_cpu.EX.pc_addr_i;
+    `ifdef PROJECT_5_LEVEL_CPU_CACHE
+        assign icache_req = (tb_verilator_software.uut.student_top_inst.Core_cpu.ICACHE.state == 1'd0);
+        assign icache_hit = tb_verilator_software.uut.student_top_inst.Core_cpu.ICACHE.hit;
+        assign dcache_req = (tb_verilator_software.uut.student_top_inst.Core_cpu.DCACHE.state == 3'd1);
+        assign dcache_hit = tb_verilator_software.uut.student_top_inst.Core_cpu.DCACHE.hit;
+        wire [6:0] ex_opcode = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.opcode;
+        always @(posedge clk_cpu) begin
+            if (ex_opcode == `JAL)
+                func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.add_res;
+            else if (ex_opcode == `JALR)
+                func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.jalr_target;
+            else if (ex_opcode == `TYPE_B & tb_verilator_software.uut.student_top_inst.Core_cpu.EX.branch_taken == 1'b1)
+                func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.branch_jump_addr;
+        end
+    `elsif PROJECT_5_LEVEL_CPU_IMPROVED
+        assign icache_req = 1'b1;
+        assign icache_hit = 1'b0;
+        assign dcache_req = 1'b1;
+        assign dcache_hit = 1'b0;
+        always @(posedge clk_cpu) begin
+            if (tb_verilator_software.uut.student_top_inst.Core_cpu.EX.jump_en)
+                func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.jump_addr_o;
+        end
+    `endif
+endmodule
 
-    assign icache_req = (tb_verilator.uut.student_top_inst.Core_cpu.ICACHE.state == 1'd0);
-    assign icache_hit = tb_verilator.uut.student_top_inst.Core_cpu.ICACHE.hit;
-    assign dcache_req = (tb_verilator.uut.student_top_inst.Core_cpu.DCACHE.state == 3'd1);
-    assign dcache_hit = tb_verilator.uut.student_top_inst.Core_cpu.DCACHE.hit;
-    wire [6:0] ex_opcode = tb_verilator.uut.student_top_inst.Core_cpu.EX.opcode;
-    always @(posedge clk_cpu) begin
-        if (ex_opcode == `JAL)          func_block_addr <= tb_verilator.uut.student_top_inst.Core_cpu.EX.add_res;
-        else if (ex_opcode == `JALR)    func_block_addr <= tb_verilator.uut.student_top_inst.Core_cpu.EX.jalr_target;
-        else if (ex_opcode == `TYPE_B & tb_verilator.uut.student_top_inst.Core_cpu.EX.branch_taken == 1'b1)  func_block_addr <= tb_verilator.uut.student_top_inst.Core_cpu.EX.branch_jump_addr;
+
+module tb_verilator_inst(
+    input clk_cpu,
+    input rst,
+
+    output x3,
+    output x26,
+    output x27
+);
+    `ifdef PROJECT_5_LEVEL_CPU_CACHE
+        wire [31:0] pc, instruction;
+        wire [31:0] perip_addr, perip_wdata, perip_rdata;
+        wire [3:0] perip_we;
+        top_riscv Core_cpu (
+            .cpu_rst            (rst),
+            .cpu_clk            (clk_cpu),
+            .irom_addr          (pc),             
+            .irom_data          (instruction),   
+            .perip_addr         (perip_addr),     
+            .perip_we           (perip_we),
+            .perip_wen          (),
+            .perip_wdata        (perip_wdata),    
+            .perip_rdata        (perip_rdata)     
+        );
+
+        IROM Mem_IROM (.a(pc[13:2]), .spo(instruction));
+        dram_driver dram_driver_inst (.clk(clk_cpu), .perip_addr(perip_addr[17:0]), .perip_wdata(perip_wdata), .perip_we(perip_we), .perip_rdata(perip_rdata));
+
+    `elsif PROJECT_5_LEVEL_CPU_IMPROVED
+        wire [31:0] pc, instruction;
+        wire [31:0] perip_addr, perip_wdata, perip_rdata;
+        wire [1:0] perip_mask;
+        wire perip_wen;
+        top_riscv Core_cpu (
+            .cpu_rst            (rst),
+            .cpu_clk            (clk_cpu),
+            .irom_addr          (pc),             
+            .irom_data          (instruction),   
+            .perip_addr         (perip_addr),
+            .perip_wen          (perip_wen),
+            .perip_mask         (perip_mask),
+            .perip_wdata        (perip_wdata),    
+            .perip_rdata        (perip_rdata)     
+        );
+
+        IROM Mem_IROM (.a(pc[13:2]), .spo(instruction));
+        dram_driver dram_driver_inst (.clk(clk_cpu), .perip_addr(perip_addr[17:0]), .perip_wdata(perip_wdata), .perip_mask(perip_mask), .dram_wen(perip_wen), .perip_rdata(perip_rdata));
+    `endif
+
+    initial begin
+        $readmemh("./mem_init/inst_test.txt", tb_verilator_inst.Mem_IROM.rom_mem);
+        $readmemh("./mem_init/inst_test.txt", tb_verilator_inst.dram_driver_inst.Mem_DRAM.dram_inst.ram_mem);
     end
 
-    // assign icache_req = 1'b1;
-    // assign icache_hit = 1'b0;
-    // assign dcache_req = 1'b1;
-    // assign dcache_hit = 1'b0;
-    // assign func_block_addr = 32'b0;
-
+    assign x3  = tb_verilator_inst.Core_cpu.REGS.regs[3];   // 进行的test序号
+    assign x26 = tb_verilator_inst.Core_cpu.REGS.regs[26];  // 测试结束信号
+    assign x27 = tb_verilator_inst.Core_cpu.REGS.regs[27];  // 0: fail, 1: pass
 endmodule

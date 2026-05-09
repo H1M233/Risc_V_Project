@@ -1,12 +1,13 @@
 #include <verilated.h>
 #include <verilated_vcd_c.h>
-#include "Vtb_verilator.h"
+#include "Vtb_verilator_software.h"
 #include <iostream>
 #include <iomanip>
 #include <cfloat>
 #include <cstdio>
 #include <cmath>
 #include <chrono>
+#include <fstream>
 
 int main(int argc, char** argv) {
     // 初始化
@@ -18,7 +19,7 @@ int main(int argc, char** argv) {
     contextp->timeprecision(-12);   // ps
 
     // 创建顶层模块
-    Vtb_verilator* top = new Vtb_verilator{contextp, "TOP"};
+    Vtb_verilator_software* top = new Vtb_verilator_software{contextp, "TOP"};
 
     // // 记录波形
     // Verilated::traceEverOn(true);
@@ -27,16 +28,16 @@ int main(int argc, char** argv) {
     // tfp->open("wave_verilator.vcd");        // 打开波形文件
 
     // 仿真配置
-    const double CLK_CPU = 250.0;
+    const double CLK_CPU = std::stoi(std::getenv("CLK_FREQ"));
     const double CLK_CPU_HALF_PERIOD = 500.0 / CLK_CPU;
     const double CLK_50MHz_HALF_PERIOD = 10.0;          // 50 MHz
     const double NS2MS = 1000000.0;
-    const double SIM_TIME = 300.0 * 1000.0 * NS2MS;
+    const double SIM_TIME = 30.0 * 1000.0 * NS2MS;
     double sim_time_ns = 0.0;                           // 定义 sim_time_ns
     double time_ms = 0.0;
     double next_clk_50MHz_edge = 0.0;
     double next_clk_CPU_edge = 0.0;
-    bool SEG_getTime = false;
+    int SEG_getTime = 0;
 
     // 计算 IPC
     double totalCycle = 0.0;
@@ -60,6 +61,7 @@ int main(int argc, char** argv) {
 
     // 计时器
     std::chrono::steady_clock::time_point start_time;
+    double current_time;
     start_time = std::chrono::steady_clock::now();
     auto get_elapsed_ms = [&]() -> double {
         auto now = std::chrono::steady_clock::now();
@@ -123,31 +125,32 @@ int main(int argc, char** argv) {
         
         // 每 1s 打印一次
         static double last_print_time = 0;
-        double current_time = get_elapsed_ms();
+        current_time = get_elapsed_ms();
         if (current_time - last_print_time >= 100) {
             last_print_time = current_time;
             if (top->seg != 0x3700'0000 || top->seg != 0x0000'0000) SEG_getTime = top->seg & 0x000F'FFFF;
-            std::cout << "\r" << "\033[4A"
-                      << "Runtime:"
-                      << std::right << std::setw(10) << std::fixed << std::setprecision(1) << current_time / 1000.0
+            std::cout << "\r" << "\033[4A" << "\033[2K"
+                      << "RUN TIME:"
+                      << std::right << std::setw(9) << std::fixed << std::setprecision(1) << current_time / 1000.0
                       << std::left << std::setw(10) << " s"
-                      << "Simtime:"
-                      << std::right << std::setw(14) << std::fixed << std::setprecision(2) << sim_time_ns / NS2MS
+                      << "SIM TIME:"
+                      << std::right << std::setw(13) << std::fixed << std::setprecision(2) << sim_time_ns / NS2MS
                       << std::left << std::setw(11) << " ms"
                       << "SEG:"
                       << std::right << std::setw(19) << std::hex << top->seg << std::dec
-                      << std::left << std::setw(10) << " " << std::endl << std::endl
+                      << std::left << std::setw(13) << " " << std::endl << std::endl << "\033[2K"
                       << "IPC:" 
-                      << std::right << std::setw(14) << std::fixed << std::setprecision(4) << commitCycle / totalCycle
-                      << std::left << std::setw(10) << " %"
+                      << std::right << std::setw(16) << std::fixed << std::setprecision(4) << commitCycle / totalCycle
+                      << std::left << std::setw(8) << " "
                       << "ICACHE HIT:" 
                       << std::right << std::setw(12) << std::fixed << std::setprecision(4) << icacheHit / icacheReq
                       << std::left << std::setw(10) << " %"
                       << "DCACHE HIT:" 
                       << std::right << std::setw(10) << std::fixed << std::setprecision(4) << dcacheHit / dcacheReq
-                      << std::left << std::setw(10) << " %" << std::endl << std::endl
+                      << std::left << std::setw(10) << " %" << std::endl << std::endl << "\033[2K"
                       << "PC:" 
-                      << std::right << std::setw(10) << std::hex << top->func_block_addr << " -> " << top->pc
+                      << std::right << std::setw(10) << std::hex << top->func_block_addr << " -> " 
+                      << std::right << std::setw(8) << top->pc
 
                       << std::dec 
                       << std::flush;
@@ -159,7 +162,7 @@ int main(int argc, char** argv) {
     for (int row = 0; row < 4; ++row){
         uint8_t byte = (top->LED >> (24 - 8 * row)) & 0xFF;
         std::cout << std::endl;
-        std::cout << std::setw(20);
+        std::cout << std::setw(10);
 
         for(int col = 0; col < 8; ++col){
             bool lit;
@@ -172,7 +175,18 @@ int main(int argc, char** argv) {
             }
         }
     }
-    std::cout << "        " << (isTick ? "\033[92mPASS!!!\033[0m" : "FAIL...") << "\n\n";
+    std::cout << std::setw(16) << (isTick ? "\033[92mPASS!!!" : "\033[91mFAIL!!!") 
+              << std::setw(12) << "Run time: " << std::hex << SEG_getTime << std::dec << " ms\033[0m\n\n";
+
+    // 写回文件 传输给python
+    std::ofstream f("software_results.txt");
+    f << "IPC=" << commitCycle / totalCycle << std::endl
+      << "REAL TIME=" << current_time / 1000.0 << std::endl
+      << "ICACHE HIT=" << icacheHit / icacheReq << std::endl
+      << "DCACHE HIT=" << dcacheHit / dcacheReq << std::endl
+      << "RUN TIME=" << std::hex << SEG_getTime << std::dec << std::endl
+      << "LED=" << (isTick ? "PASS √" : "FAIL x");
+    f.close();
 
     // tfp->close();
     delete top;

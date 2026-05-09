@@ -1,0 +1,68 @@
+{
+  "5_LEVEL_CPU_Cache": {
+    "37 INST TEST": "PASS √",
+    "SOFTWARE TEST": {
+      "init": {
+        "IPC": "0.576902",
+        "REAL TIME": "8.50006",
+        "ICACHE HIT": "0.93596",
+        "DCACHE HIT": "0.999916",
+        "RUN TIME": "213",
+        "LED": "PASS √"
+      },
+      "src0": {
+        "IPC": "0.479411",
+        "REAL TIME": "470.505",
+        "ICACHE HIT": "0.948827",
+        "DCACHE HIT": "0.872273",
+        "RUN TIME": "11829",
+        "LED": "PASS √"
+      },
+      "src1": {
+        "IPC": "0.388326",
+        "REAL TIME": "534.406",
+        "ICACHE HIT": "0.945298",
+        "DCACHE HIT": "0.903858",
+        "RUN TIME": "13432",
+        "LED": "PASS √"
+      },
+      "src2": {
+        "IPC": "0.481054",
+        "REAL TIME": "612.007",
+        "ICACHE HIT": "0.948681",
+        "DCACHE HIT": "0.906892",
+        "RUN TIME": "15374",
+        "LED": "PASS √"
+      }
+    }
+  },
+  "5_LEVEL_CPU_improved": {
+    "37 INST TEST": "PASS √",
+    "SOFTWARE TEST": {
+      "init": {
+        "IPC": "0.749749",
+        "REAL TIME": "6.90025",
+        "RUN TIME": "270",
+        "LED": "PASS √"
+      },
+      "src0": {
+        "IPC": "0.742455",
+        "REAL TIME": "314.805",
+        "RUN TIME": "12727",
+        "LED": "PASS √"
+      },
+      "src1": {
+        "IPC": "0.662601",
+        "REAL TIME": "324.403",
+        "RUN TIME": "13118",
+        "LED": "PASS √"
+      },
+      "src2": {
+        "IPC": "0.739524",
+        "REAL TIME": "415.703",
+        "RUN TIME": "16668",
+        "LED": "PASS √"
+      }
+    }
+  }
+}
