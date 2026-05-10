@@ -52,10 +52,10 @@ module lsu_ooo (
     input               dcache_stall,
     input               dcache_ack,
 
-    output reg          load_wb_en,
-    output reg [4:0]    load_wb_tag,
-    output reg [31:0]   load_wb_value,
-    input               load_wb_accepted,
+    output              load_wb_valid,
+    output [4:0]        load_wb_tag,
+    output [31:0]       load_wb_value,
+    input               load_wb_grant,
 
     input               store_commit_req,
     input  [4:0]        store_commit_rob_tag,
@@ -95,11 +95,9 @@ module lsu_ooo (
     reg [4:0]  load_wb_tag_p;
     reg [31:0] load_wb_val_p;
 
-    always @(*) begin
-        load_wb_en = load_wb_pending;
-        load_wb_tag = load_wb_tag_p;
-        load_wb_value = load_wb_val_p;
-    end
+    assign load_wb_valid = load_wb_pending;
+    assign load_wb_tag = load_wb_tag_p;
+    assign load_wb_value = load_wb_val_p;
 
     localparam S_IDLE  = 2'd0;
     localparam S_LOAD  = 2'd1;
@@ -187,7 +185,7 @@ module lsu_ooo (
         end else begin
             store_done <= 1'b0;
 
-            if (load_wb_pending && load_wb_accepted)
+            if (load_wb_pending && load_wb_grant)
                 load_wb_pending <= 1'b0;
 
             for (i = 0; i < DEPTH; i = i + 1) begin

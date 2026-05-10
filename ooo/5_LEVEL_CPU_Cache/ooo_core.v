@@ -468,25 +468,36 @@ module ooo_core #(
     // ========================================================================
     // CDB Arbitration: ALU0 > ALU1 > LSU (with pending buffer)
     // ========================================================================
-    wire        lsu_wb_en;
+    wire        lsu_wb_valid;
     wire [4:0]  lsu_wb_tag;
     wire [31:0] lsu_wb_val;
-    wire        lsu_wb_accepted;
+    wire        lsu_wb_grant;
 
-    assign cdb_valid_0 = alu0_valid || alu1_valid || lsu_wb_en;
-    assign cdb_tag_0   = alu0_valid ? alu0_tag :
-                         alu1_valid ? alu1_tag : lsu_wb_tag;
-    assign cdb_value_0 = alu0_valid ? alu0_val :
-                         alu1_valid ? alu1_val : lsu_wb_val;
+    wire take_alu0_p0 = alu0_valid;
+    wire take_alu1_p0 = !take_alu0_p0 && alu1_valid;
+    wire take_lsu_p0  = !take_alu0_p0 && !take_alu1_p0 && lsu_wb_valid;
 
-    assign cdb_valid_1 = (alu0_valid && (alu1_valid || lsu_wb_en)) ||
-                         (!alu0_valid && alu1_valid && lsu_wb_en);
-    assign cdb_tag_1   = alu0_valid ? (alu1_valid ? alu1_tag : lsu_wb_tag) :
-                         (alu1_valid ? lsu_wb_tag : 5'b0);
-    assign cdb_value_1 = alu0_valid ? (alu1_valid ? alu1_val : lsu_wb_val) :
-                         (alu1_valid ? lsu_wb_val : 32'b0);
+    wire used_alu1 = take_alu1_p0;
+    wire used_lsu  = take_lsu_p0;
 
-    assign lsu_wb_accepted = lsu_wb_en && !(alu0_valid && alu1_valid);
+    wire take_alu1_p1 = !used_alu1 && alu1_valid;
+    wire take_lsu_p1  = !used_lsu && lsu_wb_valid && !take_alu1_p1;
+
+    assign cdb_valid_0 = take_alu0_p0 || take_alu1_p0 || take_lsu_p0;
+    assign cdb_tag_0   = take_alu0_p0 ? alu0_tag :
+                         take_alu1_p0 ? alu1_tag :
+                         take_lsu_p0  ? lsu_wb_tag : 5'b0;
+    assign cdb_value_0 = take_alu0_p0 ? alu0_val :
+                         take_alu1_p0 ? alu1_val :
+                         take_lsu_p0  ? lsu_wb_val : 32'b0;
+
+    assign cdb_valid_1 = take_alu1_p1 || take_lsu_p1;
+    assign cdb_tag_1   = take_alu1_p1 ? alu1_tag :
+                         take_lsu_p1  ? lsu_wb_tag : 5'b0;
+    assign cdb_value_1 = take_alu1_p1 ? alu1_val :
+                         take_lsu_p1  ? lsu_wb_val : 32'b0;
+
+    assign lsu_wb_grant = take_lsu_p0 || take_lsu_p1;
 
     // ========================================================================
     // LSU
@@ -516,8 +527,8 @@ module ooo_core #(
         .dcache_req_load(dc_req_load), .dcache_req_store(dc_req_store),
         .dcache_mask(dc_mask), .dcache_addr(dc_addr), .dcache_wdata(dc_wdata),
         .dcache_rdata(dc_rdata), .dcache_stall(dc_stall), .dcache_ack(dc_ack),
-        .load_wb_en(lsu_wb_en), .load_wb_tag(lsu_wb_tag), .load_wb_value(lsu_wb_val),
-        .load_wb_accepted(lsu_wb_accepted),
+        .load_wb_valid(lsu_wb_valid), .load_wb_tag(lsu_wb_tag), .load_wb_value(lsu_wb_val),
+        .load_wb_grant(lsu_wb_grant),
         .store_commit_req(store_commit_req), .store_commit_rob_tag(store_commit_tag),
         .store_done(lsu_store_done), .store_done_tag(lsu_store_done_tag),
         .free_count(lsq_free_count),

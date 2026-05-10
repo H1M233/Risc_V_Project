@@ -1,20 +1,13 @@
 `include "rv32I.vh"
 
-// 实现：
-// load_miss: 暂停 3 个周期，向 DRAM 请求数据 -> 根据 plur 选择路并更新 plur -> 等待数据 -> 转发并更新 DCACHE
-// load_hit: 暂停 1 个周期，计算命中 -> 直接从 DCACHE 传出数据
-// store_miss: 暂停 1 个周期，直接写入 DRAM（暂停是为了避免store and use）
-// store_hit: 暂停 1 个周期，写入 DRAM -> 根据计算的路更新 DCACHE
-
 module dcache#(
     parameter INDEX_WIDTH   = 6,
     parameter TAG_WIDTH     = 24,
-    parameter WAYS          = 2     // DCACHE 使用 2 路足够
+    parameter WAYS          = 2
 )(
     input               clk,
     input               rst,
 
-    // CPU/MEM side
     input               cpu_req_load,
     input               cpu_req_store,
     input      [1:0]    cpu_mask,
@@ -23,7 +16,6 @@ module dcache#(
     output reg [31:0]   cpu_rdata,
     output              stall,
 
-    // external DROM side
     output reg [31:0]   mem_addr,
     output reg [3:0]    mem_we,
     output reg          mem_wen,
@@ -34,253 +26,170 @@ module dcache#(
 );
     localparam LINE_NUM = 2 ** INDEX_WIDTH;
 
-    // ============================================================
-    //
-    // 命中计数器
-    // reg [31:0] dcache_hit;
-    // reg [31:0] dcache_miss;
-    // always@(posedge clk) begin
-    //     if(!rst) begin
-    //         dcache_hit  <= 32'b0;
-    //         dcache_miss <= 32'b0;
-    //     end
-    //     else begin
-    //         dcache_hit  <= (state == LOAD_HIT_OUTPUT & state == STORE_HIT) ? dcache_hit + 1'b1 : dcache_hit;
-    //         dcache_miss <= (state == LOAD_MISS_OUTPUT && state == STORE_MISS) ? dcache_miss + 1'b1 : dcache_miss;
-    //     end
-    // end
-    //
-    // ============================================================
-
-    // 存储结构：
     (* ram_style = "block" *) reg [31:0] data_array[0:WAYS - 1][0:LINE_NUM - 1];
     reg [TAG_WIDTH - 1:0] tag_array[0:WAYS - 1][0:LINE_NUM - 1];
     reg valid_array[0:WAYS - 1][0:LINE_NUM - 1];
-    reg plru_state [0:LINE_NUM - 1];                // 每组的访问历史（用于选择替换哪一路）
+    reg plru_state [0:LINE_NUM - 1];
 
-    // 提取索引
-    reg [INDEX_WIDTH - 1:0] index;
-    reg [TAG_WIDTH - 1:0]   tag;
-
-    always @(posedge clk) begin
-        index   <= cpu_addr[INDEX_WIDTH + 1:2];
-        tag     <= cpu_addr[31:INDEX_WIDTH + 2];
-    end
-
-    // 命中检测
-    wire [WAYS - 1:0] hit_way;
-    wire hit = |hit_way;
-    genvar w0;
-    generate
-        for(w0 = 0; w0 < WAYS; w0 = w0 + 1) begin : hit_gen
-            assign hit_way[w0] = valid_array[w0][index] && (tag_array[w0][index] == tag);
-        end
-    endgenerate
-    
-    // DCACHE 输出缓存
-    reg [31:0] cache_rdata_reg [0:1];
-    always @(posedge clk) begin
-        cache_rdata_reg[0] <= data_array[0][index];
-        cache_rdata_reg[1] <= data_array[1][index];
-    end
-
-    // 状态
-    reg [2:0] state;
-    localparam QUERY_AND_LOAD = 3'd0;
-    localparam HIT_BRANCH = 3'd1;
-    localparam LOAD_HIT_OUTPUT = 3'd2;
-    localparam LOAD_MISS_WAIT = 3'd3;
-    localparam LOAD_MISS_OUTPUT = 3'd4;
-    localparam STORE_HIT = 3'd5;
-    localparam STORE_MISS = 3'd6;
-
-    // 数据传递寄存器
-    wire cpu_req = (cpu_req_load | cpu_req_store);
+    reg        req_valid_q;
     reg        req_load_q;
     reg        req_store_q;
     reg [31:0] req_addr_q;
     reg [31:0] req_wdata_q;
     reg [1:0]  req_mask_q;
-    reg cpu_req_load_reg;
-    reg cpu_req_store_reg;
-    reg finished;
-    reg [31:0] cpu_wdata_reg, cpu_wdata_reg_reg;
-    reg [31:0] cpu_addr_reg, cpu_addr_reg_reg;
-    reg [1:0]  cpu_mask_reg, cpu_mask_reg_reg;
-    reg [INDEX_WIDTH - 1:0] index_reg;
-    reg [TAG_WIDTH - 1:0]   tag_reg;
-    reg hit_way_idx;
-    
-    // load_miss 寄存器
-    reg miss_way;
-    reg [INDEX_WIDTH - 1:0]  miss_index;
-    reg [TAG_WIDTH - 1:0] miss_tag;
-    reg [31:0] miss_addr;
-    reg [1:0] miss_mask;
+    reg [INDEX_WIDTH - 1:0] req_index_q;
+    reg [TAG_WIDTH - 1:0]   req_tag_q;
 
-    // 冻结流水线条件
-    assign stall = cpu_req &&
-                   ((state == QUERY_AND_LOAD) ||
-                    (state == HIT_BRANCH) ||
-                    (state == LOAD_MISS_WAIT));
+    localparam IDLE       = 3'd0;
+    localparam LOOKUP     = 3'd1;
+    localparam LOAD_MISS  = 3'd2;
+    localparam LOAD_WAIT  = 3'd3;
+    localparam LOAD_RESP  = 3'd4;
+    localparam STORE_RESP = 3'd5;
+
+    reg [2:0] state;
+
+    assign stall = (state != IDLE);
+
+    wire [WAYS - 1:0] hit_way;
+    genvar w0;
+    generate
+        for (w0 = 0; w0 < WAYS; w0 = w0 + 1) begin : hit_gen
+            assign hit_way[w0] = req_valid_q &&
+                                 valid_array[w0][req_index_q] &&
+                                 (tag_array[w0][req_index_q] == req_tag_q);
+        end
+    endgenerate
+
+    wire hit = |hit_way;
+    wire hit_way_idx = hit_way[0] ? 1'b0 :
+                       hit_way[1] ? 1'b1 : 1'b0;
+    wire miss_way_idx = plru_state[req_index_q];
+    wire [31:0] hit_word = data_array[hit_way_idx][req_index_q];
 
     integer i, w;
     always @(posedge clk) begin
-        if(!rst) begin
-            state       <= QUERY_AND_LOAD;
-            cpu_rdata   <= 32'b0;
-            finished    <= 1'b0;
-
-            mem_addr    <= 32'b0;
-            mem_wdata   <= 32'b0;
-            mem_we      <= 4'b0;
-            mem_wen     <= 1'b0;
-            mem_ack     <= 1'b0;
+        if (!rst) begin
+            state       <= IDLE;
+            req_valid_q <= 1'b0;
             req_load_q  <= 1'b0;
             req_store_q <= 1'b0;
             req_addr_q  <= 32'b0;
             req_wdata_q <= 32'b0;
             req_mask_q  <= 2'b0;
+            req_index_q <= {INDEX_WIDTH{1'b0}};
+            req_tag_q   <= {TAG_WIDTH{1'b0}};
+            cpu_rdata   <= 32'b0;
+            mem_addr    <= 32'b0;
+            mem_we      <= 4'b0;
+            mem_wen     <= 1'b0;
+            mem_wdata   <= 32'b0;
+            mem_ack     <= 1'b0;
 
-            // 重置寄存器
             for (w = 0; w < WAYS; w = w + 1) begin
                 for (i = 0; i < LINE_NUM; i = i + 1) begin
+                    data_array[w][i] <= 32'b0;
+                    tag_array[w][i] <= {TAG_WIDTH{1'b0}};
                     valid_array[w][i] <= 1'b0;
                 end
             end
-            for (i = 0; i < LINE_NUM; i = i + 1) plru_state[i] <= 1'b0;
-        end
-        else begin  
-            mem_addr    <= 32'b0;
-            mem_wdata   <= 32'b0;
-            mem_we      <= 4'b0;
-            mem_wen     <= 1'b0;
+            for (i = 0; i < LINE_NUM; i = i + 1)
+                plru_state[i] <= 1'b0;
+        end else begin
+            mem_ack <= 1'b0;
+            mem_we  <= 4'b0;
+            mem_wen <= 1'b0;
 
-            // 状态传递
-            cpu_req_load_reg    <= cpu_req_load;
-            cpu_req_store_reg   <= cpu_req_store;
-            cpu_wdata_reg       <= cpu_wdata;
-            cpu_addr_reg        <= cpu_addr;
-            cpu_mask_reg        <= cpu_mask;
-            cpu_wdata_reg_reg   <= cpu_wdata_reg;
-            cpu_addr_reg_reg    <= cpu_addr_reg;
-            cpu_mask_reg_reg    <= cpu_mask_reg;
-            index_reg           <= index;
-            tag_reg             <= tag;
-
-            mem_ack             <= finished;
-
-            // casez (hit_way)
-            //     2'b?1: hit_way_idx <= 1'b0;
-            //     2'b10: hit_way_idx <= 1'b1;
-            //     default: hit_way_idx <= 1'b0;
-            // endcase 
-            hit_way_idx <= ~hit_way[0];     // 由于只有两路直接优化判断 way0 是否命中，已有 hit 在外层做判断
-
-            case(state)
-                QUERY_AND_LOAD: begin
-                    // 状态判断
-                    if (cpu_req_load | cpu_req_store) begin
+            case (state)
+                IDLE: begin
+                    mem_addr  <= 32'b0;
+                    mem_wdata <= 32'b0;
+                    if (cpu_req_load || cpu_req_store) begin
+                        req_valid_q <= 1'b1;
                         req_load_q  <= cpu_req_load;
                         req_store_q <= cpu_req_store;
                         req_addr_q  <= cpu_addr;
                         req_wdata_q <= cpu_wdata;
                         req_mask_q  <= cpu_mask;
-                        state <= HIT_BRANCH;
-                        finished <= 1'b0;
+                        req_index_q <= cpu_addr[INDEX_WIDTH + 1:2];
+                        req_tag_q   <= cpu_addr[31:INDEX_WIDTH + 2];
+                        state <= LOOKUP;
                     end
                 end
 
-                HIT_BRANCH: begin
-                    if (cpu_req_load_reg) begin
+                LOOKUP: begin
+                    if (req_load_q) begin
                         if (hit) begin
-                            state <= LOAD_HIT_OUTPUT;
-                            finished <= 1'b1;
-                        end
-                        else begin
+                            cpu_rdata <= load_shift(hit_word, req_addr_q[1:0], req_mask_q);
+                            mem_ack <= 1'b1;
+                            req_valid_q <= 1'b0;
+                            plru_state[req_index_q] <= ~hit_way_idx;
+                            state <= IDLE;
+                        end else begin
                             mem_addr <= req_addr_q;
-                            state <= LOAD_MISS_WAIT;
-                            finished <= 1'b0;
+                            state <= LOAD_MISS;
                         end
-                    end
-                    else if (cpu_req_store_reg) begin
+                    end else if (req_store_q) begin
+                        mem_addr  <= req_addr_q;
+                        mem_wdata <= store_merge(32'b0, req_wdata_q, req_addr_q[1:0], req_mask_q);
+                        mem_we    <= unmask(req_mask_q, req_addr_q[1:0]);
+                        mem_wen   <= 1'b1;
                         if (hit) begin
-                            state <= STORE_HIT;
-                            finished <= 1'b1;
+                            data_array[hit_way_idx][req_index_q] <= store_merge(
+                                hit_word,
+                                req_wdata_q,
+                                req_addr_q[1:0],
+                                req_mask_q
+                            );
+                            plru_state[req_index_q] <= ~hit_way_idx;
                         end
-                        else begin
-                            state <= STORE_MISS;
-                            finished <= 1'b1;
-                        end
+                        state <= STORE_RESP;
+                    end else begin
+                        req_valid_q <= 1'b0;
+                        state <= IDLE;
                     end
                 end
 
-                LOAD_HIT_OUTPUT: begin
-                    cpu_rdata <= load_shift(cache_rdata_reg[hit_way_idx], req_addr_q[1:0], req_mask_q);
-                    finished <= 1'b0;
-                    state <= QUERY_AND_LOAD;
+                LOAD_MISS: begin
+                    mem_addr <= req_addr_q;
+                    state <= LOAD_WAIT;
                 end
 
-                LOAD_MISS_WAIT: begin
-                    mem_addr                <= req_addr_q;
-                    miss_way                <= plru_state[index_reg];
-                    miss_index              <= index_reg;   
-                    miss_tag                <= tag_reg;
-                    miss_addr               <= req_addr_q;
-                    miss_mask               <= req_mask_q;
-
-                    plru_state[index_reg]   <= ~plru_state[index_reg];
-                    state                   <= LOAD_MISS_OUTPUT;
-                    finished                <= 1'b1;
+                LOAD_WAIT: begin
+                    mem_addr <= req_addr_q;
+                    state <= LOAD_RESP;
                 end
 
-                LOAD_MISS_OUTPUT: begin
-                    mem_addr <= miss_addr;
-                    cpu_rdata <= load_shift(mem_rdata, miss_addr[1:0], miss_mask);
-                    valid_array[miss_way][miss_index] <= 1'b1;
-                    tag_array[miss_way][miss_index]   <= miss_tag;
-                    data_array[miss_way][miss_index]  <= mem_rdata;
-                    state <= QUERY_AND_LOAD;
-                    finished <= 1'b0;
+                LOAD_RESP: begin
+                    mem_addr <= req_addr_q;
+                    cpu_rdata <= load_shift(mem_rdata, req_addr_q[1:0], req_mask_q);
+                    valid_array[miss_way_idx][req_index_q] <= 1'b1;
+                    tag_array[miss_way_idx][req_index_q] <= req_tag_q;
+                    data_array[miss_way_idx][req_index_q] <= mem_rdata;
+                    plru_state[req_index_q] <= ~miss_way_idx;
+                    mem_ack <= 1'b1;
+                    req_valid_q <= 1'b0;
+                    state <= IDLE;
                 end
 
-                STORE_HIT: begin
+                STORE_RESP: begin
                     mem_addr  <= req_addr_q;
                     mem_wdata <= store_merge(32'b0, req_wdata_q, req_addr_q[1:0], req_mask_q);
-                    mem_we    <= req_store_q ? unmask(req_mask_q, req_addr_q[1:0]) : 4'b0;
-                    mem_wen   <= req_store_q;
-
-                    data_array[hit_way_idx][index_reg] <= store_merge(
-                        cache_rdata_reg[hit_way_idx],
-                        req_wdata_q,
-                        req_addr_q[1:0],
-                        req_mask_q
-                    );
-                    state <= QUERY_AND_LOAD;
-                    finished <= 1'b0;
+                    mem_ack   <= 1'b1;
+                    req_valid_q <= 1'b0;
+                    state <= IDLE;
                 end
 
-                STORE_MISS: begin
-                    mem_addr  <= req_addr_q;
-                    mem_wdata <= store_merge(32'b0, req_wdata_q, req_addr_q[1:0], req_mask_q);
-                    mem_we    <= req_store_q ? unmask(req_mask_q, req_addr_q[1:0]) : 4'b0;
-                    mem_wen   <= req_store_q;
-
-                    // BRAM 存储也需要停顿 可引入 store_buffer 解决
-                    state <= QUERY_AND_LOAD;
-                    finished <= 1'b0;
+                default: begin
+                    req_valid_q <= 1'b0;
+                    mem_addr <= 32'b0;
+                    mem_wdata <= 32'b0;
+                    state <= IDLE;
                 end
-
-            default: begin
-                state <= QUERY_AND_LOAD;
-                finished <= 1'b0;
-            end
             endcase
         end
     end
 
-    // 函数：
-    // 将 mask 转为按位
     function [3:0] unmask;
         input [1:0] mask;
         input [1:0] addr_low;
@@ -308,17 +217,14 @@ module dcache#(
         end
     endfunction
 
-
-    // 把完整 word 根据 addr[1:0] 和 mask 移到低位
     function [31:0] load_shift;
         input [31:0] word;
         input [1:0]  addr_low;
         input [1:0]  mask;
         begin
-            case(mask)
-                // byte
+            case (mask)
                 2'b00: begin
-                    case(addr_low)
+                    case (addr_low)
                         2'b00: load_shift = {24'b0, word[7:0]};
                         2'b01: load_shift = {24'b0, word[15:8]};
                         2'b10: load_shift = {24'b0, word[23:16]};
@@ -326,28 +232,19 @@ module dcache#(
                         default: load_shift = 32'b0;
                     endcase
                 end
-
-                // half word
                 2'b01: begin
-                    if(addr_low[1])
-                        load_shift = {16'b0, word[31:16]};
-                    else
-                        load_shift = {16'b0, word[15:0]};
+                    case (addr_low[1])
+                        1'b0: load_shift = {16'b0, word[15:0]};
+                        1'b1: load_shift = {16'b0, word[31:16]};
+                        default: load_shift = 32'b0;
+                    endcase
                 end
-
-                // word
-                2'b10: begin
-                    load_shift = word;
-                end
-
-                default: begin
-                    load_shift = word;
-                end
+                2'b10: load_shift = word;
+                default: load_shift = word;
             endcase
         end
     endfunction
 
-    // store hit 时更新 cache 里的旧 word
     function [31:0] store_merge;
         input [31:0] old_word;
         input [31:0] wdata;
@@ -355,11 +252,9 @@ module dcache#(
         input [1:0]  mask;
         begin
             store_merge = old_word;
-
-            case(mask)
-                // SB
+            case (mask)
                 2'b00: begin
-                    case(addr_low)
+                    case (addr_low)
                         2'b00: store_merge[7:0]   = wdata[7:0];
                         2'b01: store_merge[15:8]  = wdata[7:0];
                         2'b10: store_merge[23:16] = wdata[7:0];
@@ -367,23 +262,15 @@ module dcache#(
                         default: store_merge = old_word;
                     endcase
                 end
-
-                // SH
                 2'b01: begin
-                    if(addr_low[1])
-                        store_merge[31:16] = wdata[15:0];
-                    else
-                        store_merge[15:0]  = wdata[15:0];
+                    case (addr_low[1])
+                        1'b0: store_merge[15:0]  = wdata[15:0];
+                        1'b1: store_merge[31:16] = wdata[15:0];
+                        default: store_merge = old_word;
+                    endcase
                 end
-
-                // SW
-                2'b10: begin
-                    store_merge = wdata;
-                end
-
-                default: begin
-                    store_merge = old_word;
-                end
+                2'b10: store_merge = wdata;
+                default: store_merge = old_word;
             endcase
         end
     endfunction
