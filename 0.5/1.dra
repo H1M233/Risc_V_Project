@@ -1,0 +1,276 @@
+<mxfile host="app.diagrams.net" modified="2026-05-04T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="rv32i-partitioned-clean-architecture" name="RV32I CPU Architecture">
+    <mxGraphModel dx="1500" dy="960" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="980" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="RV32I 五级流水线 CPU 整体架构图" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Microsoft YaHei;fontSize=28;fontStyle=1;fontColor=#172033;" vertex="1" parent="1">
+          <mxGeometry x="335" y="10" width="830" height="42" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="基于 top_riscv 模块连接关系整理" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Microsoft YaHei;fontSize=14;fontColor=#667085;" vertex="1" parent="1">
+          <mxGeometry x="540" y="50" width="420" height="24" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="outer" value="top_riscv" style="rounded=1;whiteSpace=wrap;html=1;arcSize=5;dashed=1;dashPattern=10 10;strokeWidth=2;strokeColor=#9aa3af;fillColor=#ffffff;fontFamily=Microsoft YaHei;fontSize=14;fontStyle=1;fontColor=#667085;align=left;verticalAlign=top;spacingLeft=14;spacingTop=10;" vertex="1" parent="1">
+          <mxGeometry x="25" y="84" width="1450" height="750" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="if_stage" value="IF 取指阶段" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#2f86c6;fillColor=#eaf5ff;fontFamily=Microsoft YaHei;fontSize=18;fontStyle=1;fontColor=#236ba5;verticalAlign=top;align=center;spacingTop=18;" vertex="1" parent="1">
+          <mxGeometry x="45" y="125" width="255" height="470" as="geometry"/>
+        </mxCell>
+        <mxCell id="id_stage" value="ID 译码阶段" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#4b9951;fillColor=#edf8ef;fontFamily=Microsoft YaHei;fontSize=18;fontStyle=1;fontColor=#347b3a;verticalAlign=top;align=center;spacingTop=18;" vertex="1" parent="1">
+          <mxGeometry x="325" y="125" width="280" height="470" as="geometry"/>
+        </mxCell>
+        <mxCell id="ex_stage" value="EX 执行阶段" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#e88b10;fillColor=#fff4e2;fontFamily=Microsoft YaHei;fontSize=18;fontStyle=1;fontColor=#b96100;verticalAlign=top;align=center;spacingTop=18;" vertex="1" parent="1">
+          <mxGeometry x="630" y="125" width="280" height="470" as="geometry"/>
+        </mxCell>
+        <mxCell id="mem_stage" value="MEM 访存阶段" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#c93c48;fillColor=#fff0f2;fontFamily=Microsoft YaHei;fontSize=18;fontStyle=1;fontColor=#ad2935;verticalAlign=top;align=center;spacingTop=18;" vertex="1" parent="1">
+          <mxGeometry x="935" y="125" width="280" height="470" as="geometry"/>
+        </mxCell>
+        <mxCell id="wb_stage" value="WB 写回阶段" style="rounded=0;whiteSpace=wrap;html=1;strokeWidth=2;strokeColor=#8b43b5;fillColor=#f7efff;fontFamily=Microsoft YaHei;fontSize=18;fontStyle=1;fontColor=#71339a;verticalAlign=top;align=center;spacingTop=18;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="125" width="210" height="470" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="pc" value="pc" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;shadow=1;strokeWidth=2;strokeColor=#1769b5;fillColor=#2e83d6;fontFamily=Microsoft YaHei;fontSize=17;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="90" y="185" width="86" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="irom" value="IROM" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;shadow=1;strokeWidth=2;strokeColor=#8b97a3;fillColor=#eef2f5;fontFamily=Microsoft YaHei;fontSize=15;fontStyle=1;fontColor=#344054;" vertex="1" parent="1">
+          <mxGeometry x="70" y="318" width="92" height="54" as="geometry"/>
+        </mxCell>
+        <mxCell id="ifif" value="ifif" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;shadow=1;strokeWidth=2;strokeColor=#2c78bc;fillColor=#dcefff;fontFamily=Microsoft YaHei;fontSize=16;fontStyle=1;fontColor=#1f2937;" vertex="1" parent="1">
+          <mxGeometry x="205" y="318" width="72" height="54" as="geometry"/>
+        </mxCell>
+        <mxCell id="if_id" value="if_id" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;shadow=1;strokeWidth=2;strokeColor=#e88b10;fillColor=#ffbf69;fontFamily=Microsoft YaHei;fontSize=13;fontStyle=1;fontColor=#7a4505;" vertex="1" parent="1">
+          <mxGeometry x="295" y="278" width="62" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="id" value="id" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;shadow=1;strokeWidth=2;strokeColor=#3b8944;fillColor=#3d9847;fontFamily=Microsoft YaHei;fontSize=17;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="390" y="220" width="88" height="54" as="geometry"/>
+        </mxCell>
+        <mxCell id="regs" value="regs" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;shadow=1;strokeWidth=2;strokeColor=#2f7935;fillColor=#237f31;fontFamily=Microsoft YaHei;fontSize=16;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="500" y="335" width="88" height="54" as="geometry"/>
+        </mxCell>
+        <mxCell id="id_ex" value="id_ex" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;shadow=1;strokeWidth=2;strokeColor=#e88b10;fillColor=#ffbf69;fontFamily=Microsoft YaHei;fontSize=13;fontStyle=1;fontColor=#7a4505;" vertex="1" parent="1">
+          <mxGeometry x="602" y="278" width="62" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="ex" value="ex" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;shadow=1;strokeWidth=2;strokeColor=#df7b00;fillColor=#ff7f0e;fontFamily=Microsoft YaHei;fontSize=17;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="725" y="220" width="88" height="54" as="geometry"/>
+        </mxCell>
+        <mxCell id="jump" value="jump" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;shadow=1;strokeWidth=2;strokeColor=#df7b00;fillColor=#ff981f;fontFamily=Microsoft YaHei;fontSize=16;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="725" y="335" width="88" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="ex_mem" value="ex_mem" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;shadow=1;strokeWidth=2;strokeColor=#e88b10;fillColor=#ffbf69;fontFamily=Microsoft YaHei;fontSize=13;fontStyle=1;fontColor=#7a4505;" vertex="1" parent="1">
+          <mxGeometry x="907" y="278" width="68" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="mem" value="mem" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;shadow=1;strokeWidth=2;strokeColor=#ba2630;fillColor=#cc2632;fontFamily=Microsoft YaHei;fontSize=17;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="1035" y="220" width="88" height="54" as="geometry"/>
+        </mxCell>
+        <mxCell id="perip" value="DRAM" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;shadow=1;strokeWidth=2;strokeColor=#8b97a3;fillColor=#eef2f5;fontFamily=Microsoft YaHei;fontSize=15;fontStyle=1;fontColor=#344054;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="455" width="98" height="54" as="geometry"/>
+        </mxCell>
+        <mxCell id="mem_wb" value="mem_wb" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;shadow=1;strokeWidth=2;strokeColor=#e88b10;fillColor=#ffbf69;fontFamily=Microsoft YaHei;fontSize=13;fontStyle=1;fontColor=#7a4505;" vertex="1" parent="1">
+          <mxGeometry x="1215" y="278" width="72" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="wb" value="wb" style="rounded=1;whiteSpace=wrap;html=1;arcSize=10;shadow=1;strokeWidth=2;strokeColor=#7626a4;fillColor=#7d279f;fontFamily=Microsoft YaHei;fontSize=17;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="1350" y="335" width="78" height="54" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="hazard" value="hazard" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;shadow=1;strokeWidth=2;strokeColor=#c06a00;fillColor=#ff9f1f;fontFamily=Microsoft YaHei;fontSize=16;fontStyle=1;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="85" y="675" width="130" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="bpu" value="bpu_top" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;shadow=1;strokeWidth=2;strokeColor=#3976bd;fillColor=#dcecff;fontFamily=Microsoft YaHei;fontSize=17;fontStyle=1;fontColor=#1d4f86;" vertex="1" parent="1">
+          <mxGeometry x="315" y="675" width="150" height="58" as="geometry"/>
+        </mxCell>
+        <mxCell id="bpu_note" value="分支预测单元" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=12;fontColor=#4b5f7c;" vertex="1" parent="1">
+          <mxGeometry x="315" y="735" width="150" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="pc_note" value="程序计数器" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=11;fontColor=#4b5563;" vertex="1" parent="1">
+          <mxGeometry x="78" y="238" width="110" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="irom_note" value="指令存储器" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=11;fontColor=#4b5563;" vertex="1" parent="1">
+          <mxGeometry x="52" y="376" width="128" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="ifif_note" value="取指缓冲" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=11;fontColor=#4b5563;" vertex="1" parent="1">
+          <mxGeometry x="181" y="376" width="120" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="if_id_note" value="IF/ID寄存器" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=11;fontColor=#6b4b16;" vertex="1" parent="1">
+          <mxGeometry x="274" y="402" width="105" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="id_note" value="指令译码单元" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=11;fontColor=#4b5563;" vertex="1" parent="1">
+          <mxGeometry x="374" y="278" width="120" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="regs_note" value="通用寄存器堆" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=11;fontColor=#4b5563;" vertex="1" parent="1">
+          <mxGeometry x="472" y="393" width="145" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="id_ex_note" value="ID/EX寄存器" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=11;fontColor=#6b4b16;" vertex="1" parent="1">
+          <mxGeometry x="581" y="402" width="105" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="ex_note" value="执行运算单元" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=11;fontColor=#4b5563;" vertex="1" parent="1">
+          <mxGeometry x="707" y="278" width="125" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="jump_note" value="跳转控制单元" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=11;fontColor=#4b5563;" vertex="1" parent="1">
+          <mxGeometry x="694" y="389" width="150" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="ex_mem_note" value="EX/MEM寄存器" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=11;fontColor=#6b4b16;" vertex="1" parent="1">
+          <mxGeometry x="881" y="402" width="120" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="mem_note" value="访存控制单元" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=11;fontColor=#4b5563;" vertex="1" parent="1">
+          <mxGeometry x="1017" y="278" width="125" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="dram_note" value="数据存储器" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=11;fontColor=#4b5563;" vertex="1" parent="1">
+          <mxGeometry x="1002" y="513" width="155" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="mem_wb_note" value="MEM/WB寄存器" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=11;fontColor=#6b4b16;" vertex="1" parent="1">
+          <mxGeometry x="1186" y="402" width="130" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="wb_note" value="写回控制单元" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=11;fontColor=#4b5563;" vertex="1" parent="1">
+          <mxGeometry x="1324" y="393" width="130" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="hazard_note" value="冒险检测单元" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=11;fontColor=#7a4a00;" vertex="1" parent="1">
+          <mxGeometry x="75" y="737" width="150" height="18" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="legend" value="&lt;b&gt;图例&lt;/b&gt;&lt;br&gt;黑色实线：主数据通路&lt;br&gt;紫色虚线：分支预测查询、预测 PC 与更新&lt;br&gt;红色虚线：跳转重定向与流水线冲刷&lt;br&gt;橙色虚线：冒险暂停与插泡&lt;br&gt;橙色竖块：流水线寄存器" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;shadow=1;strokeWidth=1.2;strokeColor=#d0d5dd;fillColor=#ffffff;fontFamily=Microsoft YaHei;fontSize=12;fontColor=#475467;align=left;verticalAlign=middle;spacingLeft=16;spacingRight=16;" vertex="1" parent="1">
+          <mxGeometry x="420" y="850" width="660" height="105" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_pc_irom" value="取指地址" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1f2937;strokeWidth=2.2;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="pc" target="irom">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_irom_ifif" value="指令" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1f2937;strokeWidth=2.2;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="irom" target="ifif">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_pc_ifif" value="PC" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1f2937;strokeWidth=2.2;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="pc" target="ifif">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="241" y="210"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_ifif_ifid" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1f2937;strokeWidth=2.2;endArrow=block;endFill=1;" edge="1" parent="1" source="ifif" target="if_id">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_ifid_id" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1f2937;strokeWidth=2.2;endArrow=block;endFill=1;" edge="1" parent="1" source="if_id" target="id">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_id_regs" value="读寄存器" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1f2937;strokeWidth=2.2;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="id" target="regs">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_regs_id" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1f2937;strokeWidth=2.2;endArrow=block;endFill=1;" edge="1" parent="1" source="regs" target="id">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="545" y="300"/>
+              <mxPoint x="434" y="300"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_id_idex" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1f2937;strokeWidth=2.2;endArrow=block;endFill=1;" edge="1" parent="1" source="id" target="id_ex">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_idex_ex" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1f2937;strokeWidth=2.2;endArrow=block;endFill=1;" edge="1" parent="1" source="id_ex" target="ex">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_ex_exmem" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1f2937;strokeWidth=2.2;endArrow=block;endFill=1;" edge="1" parent="1" source="ex" target="ex_mem">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_exmem_mem" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1f2937;strokeWidth=2.2;endArrow=block;endFill=1;" edge="1" parent="1" source="ex_mem" target="mem">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_mem_perip" value="访存" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1f2937;strokeWidth=2.2;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="mem" target="perip">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_perip_mem" value="读数据" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1f2937;strokeWidth=2.2;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="perip" target="mem">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1128" y="482"/>
+              <mxPoint x="1128" y="247"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_mem_memwb" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1f2937;strokeWidth=2.2;endArrow=block;endFill=1;" edge="1" parent="1" source="mem" target="mem_wb">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_memwb_wb" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1f2937;strokeWidth=2.2;endArrow=block;endFill=1;" edge="1" parent="1" source="mem_wb" target="wb">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_wb_regs" value="写回" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7d279f;strokeWidth=2.2;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="wb" target="regs">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1389" y="160"/>
+              <mxPoint x="544" y="160"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e_ex_jump" value="分支结果" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d68011;strokeWidth=2.2;dashed=1;dashPattern=6 6;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="ex" target="jump">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_jump_pc" value="重定向" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#cf3d3d;strokeWidth=2.2;dashed=1;dashPattern=6 6;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="jump" target="pc">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="769" y="555"/>
+              <mxPoint x="133" y="555"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_jump_flush" value="冲刷" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#cf3d3d;strokeWidth=2.1;dashed=1;dashPattern=6 6;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="jump" target="if_id">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="769" y="525"/>
+              <mxPoint x="326" y="525"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_jump_flush_idex" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#cf3d3d;strokeWidth=2.1;dashed=1;dashPattern=6 6;endArrow=block;endFill=1;" edge="1" parent="1" source="jump" target="id_ex">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e_hazard_pc" value="暂停" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d68011;strokeWidth=2.1;dashed=1;dashPattern=6 6;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="hazard" target="pc">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="105" y="704"/>
+              <mxPoint x="105" y="210"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_hazard_pipe" value="插泡" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d68011;strokeWidth=2.1;dashed=1;dashPattern=6 6;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="hazard" target="id_ex">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="633" y="704"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_bpu_query" value="查询" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6f49b6;strokeWidth=2.1;dashed=1;dashPattern=3 5;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="ifif" target="bpu">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="241" y="630"/>
+              <mxPoint x="390" y="630"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_bpu_pred" value="预测" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6f49b6;strokeWidth=2.1;dashed=1;dashPattern=3 5;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="bpu" target="pc">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="390" y="790"/>
+              <mxPoint x="133" y="790"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_ex_bpu" value="更新" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6f49b6;strokeWidth=2.1;dashed=1;dashPattern=3 5;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="ex" target="bpu">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="769" y="640"/>
+              <mxPoint x="390" y="640"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

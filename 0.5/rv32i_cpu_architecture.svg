@@ -1,0 +1,214 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1120" viewBox="0 0 1800 1120">
+  <defs>
+    <style>
+      .title { font: 700 34px 'Segoe UI', Arial, sans-serif; fill: #223; }
+      .subtitle { font: 500 16px 'Segoe UI', Arial, sans-serif; fill: #556; }
+      .stage-title { font: 700 20px 'Segoe UI', Arial, sans-serif; fill: #233; }
+      .label { font: 700 17px 'Segoe UI', Arial, sans-serif; fill: #fff; }
+      .small { font: 600 13px 'Segoe UI', Arial, sans-serif; fill: #334; }
+      .tiny { font: 500 12px 'Segoe UI', Arial, sans-serif; fill: #556; }
+      .legend { font: 600 14px 'Segoe UI', Arial, sans-serif; fill: #334; }
+      .stage { opacity: 0.9; }
+      .module { filter: drop-shadow(0 6px 8px rgba(0,0,0,0.15)); }
+      .pipe { fill: #ffb14d; stroke: #d4841c; stroke-width: 2; }
+      .outer { fill: #fcfcfe; stroke: #b9b3c7; stroke-width: 2.5; stroke-dasharray: 10 10; }
+      .zone { stroke-width: 2.5; rx: 26; ry: 26; }
+      .signal { fill: none; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+      .signal-thin { fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+      .dashed { stroke-dasharray: 8 7; }
+    </style>
+    <marker id="arrow-dark" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#30353a" />
+    </marker>
+    <marker id="arrow-purple" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7d3fb5" />
+    </marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#d88a14" />
+    </marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c54848" />
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2b8d4d" />
+    </marker>
+  </defs>
+
+  <rect x="20" y="70" width="1760" height="900" rx="38" ry="38" class="outer"/>
+
+  <text x="900" y="42" text-anchor="middle" class="title">RV32I CPU Architecture (top_riscv)</text>
+  <text x="900" y="66" text-anchor="middle" class="subtitle">5-stage pipeline with EX-stage branch resolution and frontend BPU</text>
+
+  <rect x="45" y="120" width="305" height="760" fill="#d9ebfb" stroke="#4a8fd6" class="zone stage"/>
+  <rect x="375" y="120" width="320" height="760" fill="#e4f3e4" stroke="#5ca45c" class="zone stage"/>
+  <rect x="720" y="120" width="320" height="760" fill="#fbefdb" stroke="#f0a11f" class="zone stage"/>
+  <rect x="1065" y="120" width="320" height="760" fill="#f8e1e5" stroke="#d65b60" class="zone stage"/>
+  <rect x="1410" y="120" width="345" height="760" fill="#f0e3f7" stroke="#9354d1" class="zone stage"/>
+
+  <rect x="125" y="132" width="145" height="36" rx="10" fill="#b8d8f2" stroke="#4a8fd6"/>
+  <rect x="470" y="132" width="145" height="36" rx="10" fill="#cfe9cf" stroke="#5ca45c"/>
+  <rect x="815" y="132" width="145" height="36" rx="10" fill="#ffe0ab" stroke="#f0a11f"/>
+  <rect x="1160" y="132" width="145" height="36" rx="10" fill="#f6bfc7" stroke="#d65b60"/>
+  <rect x="1510" y="132" width="145" height="36" rx="10" fill="#ddbff4" stroke="#9354d1"/>
+
+  <text x="197" y="156" text-anchor="middle" class="stage-title">IF Fetch</text>
+  <text x="542" y="156" text-anchor="middle" class="stage-title">ID Decode</text>
+  <text x="887" y="156" text-anchor="middle" class="stage-title">EX Execute</text>
+  <text x="1232" y="156" text-anchor="middle" class="stage-title">MEM Access</text>
+  <text x="1582" y="156" text-anchor="middle" class="stage-title">WB Writeback</text>
+
+  <g class="module">
+    <rect x="88" y="205" width="110" height="62" rx="12" fill="#2d7fd8"/>
+    <text x="143" y="244" text-anchor="middle" class="label">PC</text>
+  </g>
+
+  <g class="module">
+    <rect x="234" y="260" width="94" height="58" rx="12" fill="#3890e5"/>
+    <text x="281" y="296" text-anchor="middle" class="label">IFIF</text>
+  </g>
+
+  <g class="module">
+    <rect x="55" y="565" width="88" height="62" rx="10" fill="#9daab2"/>
+    <text x="99" y="602" text-anchor="middle" class="label">IROM</text>
+    <text x="99" y="642" text-anchor="middle" class="tiny">irom_data</text>
+  </g>
+
+  <g class="module">
+    <rect x="85" y="680" width="225" height="155" rx="18" fill="#eef4ff" stroke="#6a8ed3" stroke-width="2"/>
+    <text x="197" y="708" text-anchor="middle" class="stage-title">BPU</text>
+    <rect x="105" y="723" width="80" height="42" rx="8" fill="#7d3fb5"/>
+    <rect x="205" y="723" width="80" height="42" rx="8" fill="#7d3fb5"/>
+    <rect x="105" y="780" width="80" height="42" rx="8" fill="#7d3fb5"/>
+    <rect x="205" y="780" width="80" height="42" rx="8" fill="#7d3fb5"/>
+    <text x="145" y="749" text-anchor="middle" class="label">CTRL</text>
+    <text x="245" y="749" text-anchor="middle" class="label">BTB</text>
+    <text x="145" y="806" text-anchor="middle" class="label">GShare</text>
+    <text x="245" y="806" text-anchor="middle" class="label">RAS</text>
+    <text x="197" y="848" text-anchor="middle" class="tiny">PredCnt inside bpu_top</text>
+  </g>
+
+  <g class="module">
+    <rect x="432" y="260" width="94" height="58" rx="12" fill="#49a34a"/>
+    <text x="479" y="296" text-anchor="middle" class="label">ID</text>
+  </g>
+
+  <g class="module">
+    <rect x="535" y="398" width="108" height="62" rx="12" fill="#2d8f3b"/>
+    <text x="589" y="436" text-anchor="middle" class="label">REGS</text>
+  </g>
+
+  <g class="module">
+    <rect x="806" y="260" width="94" height="58" rx="12" fill="#f28a11"/>
+    <text x="853" y="296" text-anchor="middle" class="label">EX</text>
+  </g>
+
+  <g class="module">
+    <rect x="806" y="405" width="94" height="58" rx="12" fill="#ffab31"/>
+    <text x="853" y="441" text-anchor="middle" class="label">JUMP</text>
+  </g>
+
+  <g class="module">
+    <rect x="1160" y="260" width="98" height="58" rx="12" fill="#cf3535"/>
+    <text x="1209" y="296" text-anchor="middle" class="label">MEM</text>
+  </g>
+
+  <g class="module">
+    <rect x="1168" y="540" width="115" height="76" rx="12" fill="#a5b0b6"/>
+    <text x="1226" y="575" text-anchor="middle" class="label">PERIP</text>
+    <text x="1226" y="597" text-anchor="middle" class="label">I/F</text>
+    <text x="1226" y="632" text-anchor="middle" class="tiny">perip_addr/data</text>
+  </g>
+
+  <g class="module">
+    <rect x="1525" y="395" width="94" height="58" rx="12" fill="#7d2fb3"/>
+    <text x="1572" y="431" text-anchor="middle" class="label">WB</text>
+  </g>
+
+  <g class="module">
+    <rect x="314" y="492" width="92" height="48" rx="10" class="pipe"/>
+    <text x="360" y="522" text-anchor="middle" class="small">IF_ID</text>
+  </g>
+
+  <g class="module">
+    <rect x="660" y="492" width="92" height="48" rx="10" class="pipe"/>
+    <text x="706" y="522" text-anchor="middle" class="small">ID_EX</text>
+  </g>
+
+  <g class="module">
+    <rect x="1005" y="492" width="92" height="48" rx="10" class="pipe"/>
+    <text x="1051" y="522" text-anchor="middle" class="small">EX_MEM</text>
+  </g>
+
+  <g class="module">
+    <rect x="1350" y="492" width="92" height="48" rx="10" class="pipe"/>
+    <text x="1396" y="522" text-anchor="middle" class="small">MEM_WB</text>
+  </g>
+
+  <g class="module">
+    <rect x="82" y="875" width="170" height="68" rx="14" fill="#ffad32" stroke="#d88a14" stroke-width="2"/>
+    <text x="167" y="913" text-anchor="middle" class="label">HAZARD</text>
+    <text x="167" y="933" text-anchor="middle" class="tiny">load-use stall</text>
+  </g>
+
+  <path d="M 198 236 C 224 236, 230 236, 230 278" class="signal" stroke="#30353a" marker-end="url(#arrow-dark)"/>
+  <path d="M 143 267 L 143 565" class="signal-thin" stroke="#30353a" marker-end="url(#arrow-dark)"/>
+  <path d="M 143 236 L 88 236 L 88 565" class="signal-thin" stroke="#d88a14" marker-end="url(#arrow-orange)"/>
+  <path d="M 143 236 L 143 184 L 281 184 L 281 260" class="signal" stroke="#30353a" marker-end="url(#arrow-dark)"/>
+  <path d="M 143 596 L 234 596 L 234 289" class="signal" stroke="#30353a" marker-end="url(#arrow-dark)"/>
+  <path d="M 328 289 L 328 492" class="signal" stroke="#30353a" marker-end="url(#arrow-dark)"/>
+  <path d="M 406 516 L 432 516 L 432 289" class="signal" stroke="#30353a" marker-end="url(#arrow-dark)"/>
+  <path d="M 526 289 L 589 289 L 589 398" class="signal" stroke="#30353a" marker-end="url(#arrow-dark)"/>
+  <path d="M 589 398 L 589 333 L 526 333" class="signal-thin" stroke="#30353a" marker-end="url(#arrow-dark)"/>
+  <path d="M 526 289 L 660 289 L 660 516" class="signal" stroke="#30353a" marker-end="url(#arrow-dark)"/>
+  <path d="M 752 516 L 806 516 L 806 289" class="signal" stroke="#30353a" marker-end="url(#arrow-dark)"/>
+  <path d="M 900 289 L 1005 289 L 1005 516" class="signal" stroke="#30353a" marker-end="url(#arrow-dark)"/>
+  <path d="M 1097 516 L 1160 516 L 1160 289" class="signal" stroke="#30353a" marker-end="url(#arrow-dark)"/>
+  <path d="M 1258 289 L 1350 289 L 1350 516" class="signal" stroke="#30353a" marker-end="url(#arrow-dark)"/>
+  <path d="M 1442 516 L 1525 516 L 1525 424" class="signal" stroke="#30353a" marker-end="url(#arrow-dark)"/>
+  <path d="M 1525 424 L 1525 370 L 643 370" class="signal" stroke="#7d3fb5" marker-end="url(#arrow-purple)"/>
+  <path d="M 1160 289 L 1160 578 L 1283 578" class="signal" stroke="#30353a" marker-end="url(#arrow-dark)"/>
+  <path d="M 1168 578 L 1258 578" class="signal-thin dashed" stroke="#30353a"/>
+
+  <path d="M 1090 512 C 940 512, 960 230, 900 230" class="signal-thin" stroke="#2b8d4d" marker-end="url(#arrow-green)"/>
+  <path d="M 1396 492 C 1260 428, 1018 228, 900 260" class="signal-thin" stroke="#2b8d4d" marker-end="url(#arrow-green)"/>
+
+  <path d="M 900 434 L 900 434" class="signal" stroke="#c54848"/>
+  <path d="M 853 318 L 853 405" class="signal-thin" stroke="#d88a14" marker-end="url(#arrow-orange)"/>
+  <path d="M 806 434 C 700 434, 700 236, 198 236" class="signal" stroke="#c54848" marker-end="url(#arrow-red)"/>
+  <path d="M 853 434 C 853 565, 360 565, 360 540" class="signal-thin dashed" stroke="#c54848" marker-end="url(#arrow-red)"/>
+  <path d="M 853 434 C 853 580, 706 580, 706 540" class="signal-thin dashed" stroke="#c54848" marker-end="url(#arrow-red)"/>
+
+  <path d="M 281 318 C 281 620, 120 620, 120 680" class="signal-thin" stroke="#7d3fb5" marker-end="url(#arrow-purple)"/>
+  <path d="M 281 318 C 281 650, 240 650, 240 680" class="signal-thin" stroke="#7d3fb5" marker-end="url(#arrow-purple)"/>
+  <path d="M 310 758 C 610 758, 610 205, 198 205" class="signal" stroke="#7d3fb5" marker-end="url(#arrow-purple)"/>
+  <path d="M 310 735 C 710 735, 710 492, 360 492" class="signal-thin dashed" stroke="#7d3fb5" marker-end="url(#arrow-purple)"/>
+  <path d="M 900 289 C 1010 289, 1010 760, 310 760" class="signal-thin" stroke="#7d3fb5" marker-end="url(#arrow-purple)"/>
+
+  <path d="M 252 909 L 1525 909 L 1525 454" class="signal" stroke="#d88a14" marker-end="url(#arrow-orange)"/>
+  <path d="M 167 875 L 167 236 L 88 236" class="signal" stroke="#d88a14" marker-end="url(#arrow-orange)"/>
+  <path d="M 167 875 L 167 516 L 314 516" class="signal" stroke="#d88a14" marker-end="url(#arrow-orange)"/>
+  <path d="M 167 875 L 167 540 L 660 540" class="signal" stroke="#d88a14" marker-end="url(#arrow-orange)"/>
+  <path d="M 167 875 L 167 735 L 85 735" class="signal-thin dashed" stroke="#d88a14" marker-end="url(#arrow-orange)"/>
+
+  <text x="210" y="194" class="small">pc_addr_o -&gt; irom_addr</text>
+  <text x="232" y="340" class="small">pc + inst pass-through</text>
+  <text x="433" y="352" class="small">decode, imm, reg addr</text>
+  <text x="531" y="480" class="small">rs1/rs2 read</text>
+  <text x="774" y="352" class="small">ALU, branch, load/store</text>
+  <text x="810" y="481" class="small">redirect on mispredict</text>
+  <text x="1120" y="352" class="small">load data align / store mask</text>
+  <text x="1477" y="478" class="small">commit to regs</text>
+
+  <rect x="515" y="995" width="770" height="82" rx="20" fill="#ffffff" stroke="#ccd1d7" stroke-width="2" filter="drop-shadow(0 5px 10px rgba(0,0,0,0.08))"/>
+  <text x="560" y="1026" class="legend">Legend</text>
+  <line x1="648" y1="1021" x2="716" y2="1021" class="signal" stroke="#30353a" marker-end="url(#arrow-dark)"/>
+  <text x="730" y="1026" class="legend">main datapath</text>
+  <line x1="648" y1="1052" x2="716" y2="1052" class="signal-thin" stroke="#7d3fb5" marker-end="url(#arrow-purple)"/>
+  <text x="730" y="1057" class="legend">prediction query/update</text>
+  <line x1="945" y1="1021" x2="1013" y2="1021" class="signal-thin dashed" stroke="#c54848" marker-end="url(#arrow-red)"/>
+  <text x="1027" y="1026" class="legend">flush / redirect</text>
+  <line x1="945" y1="1052" x2="1013" y2="1052" class="signal-thin" stroke="#d88a14" marker-end="url(#arrow-orange)"/>
+  <text x="1027" y="1057" class="legend">stall control</text>
+  <line x1="1185" y1="1021" x2="1253" y2="1021" class="signal-thin" stroke="#2b8d4d" marker-end="url(#arrow-green)"/>
+  <text x="1267" y="1026" class="legend">MEM/WB forwarding to EX</text>
+</svg>

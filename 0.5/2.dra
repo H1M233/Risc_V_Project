@@ -1,0 +1,100 @@
+<mxfile host="app.diagrams.net" modified="2026-05-04T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="bpu-code-consistent-simple" name="BPU Hybrid Predictor">
+    <mxGraphModel dx="1500" dy="850" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="分支预测单元 BPU 结构" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=30;fontStyle=1;fontColor=#111111;" vertex="1" parent="1">
+          <mxGeometry x="450" y="35" width="600" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="基于 bpu_top.v：bpu_controller 统一查询、选择预测结果并分发更新" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontFamily=Microsoft YaHei;fontSize=14;fontColor=#667085;" vertex="1" parent="1">
+          <mxGeometry x="430" y="78" width="640" height="24" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="if_stage" value="IF阶段&lt;br&gt;pc_addr&lt;br&gt;pc_inst" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;shadow=0;strokeWidth=2.2;strokeColor=#34495e;fillColor=#f2f8fc;fontFamily=Microsoft YaHei;fontSize=20;fontColor=#111111;" vertex="1" parent="1">
+          <mxGeometry x="85" y="185" width="220" height="105" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="controller" value="bpu_controller&lt;br&gt;两拍查询/更新控制&lt;br&gt;预测结果选择" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;shadow=0;strokeWidth=2.2;strokeColor=#34495e;fillColor=#fffdf4;fontFamily=Microsoft YaHei;fontSize=20;fontColor=#111111;" vertex="1" parent="1">
+          <mxGeometry x="445" y="150" width="300" height="175" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="gshare" value="Gshare&lt;br&gt;10-bit GHR&lt;br&gt;1024 PHT" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;shadow=0;strokeWidth=2.2;strokeColor=#34495e;fillColor=#f0fbf1;fontFamily=Microsoft YaHei;fontSize=20;fontColor=#111111;" vertex="1" parent="1">
+          <mxGeometry x="890" y="145" width="235" height="100" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="btb" value="BTB&lt;br&gt;16组2路&lt;br&gt;LRU" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;shadow=0;strokeWidth=2.2;strokeColor=#34495e;fillColor=#f0fbf1;fontFamily=Microsoft YaHei;fontSize=20;fontColor=#111111;" vertex="1" parent="1">
+          <mxGeometry x="890" y="330" width="235" height="100" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="ras" value="RAS&lt;br&gt;深度8" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;shadow=0;strokeWidth=2.2;strokeColor=#34495e;fillColor=#f0fbf1;fontFamily=Microsoft YaHei;fontSize=20;fontColor=#111111;" vertex="1" parent="1">
+          <mxGeometry x="890" y="515" width="235" height="95" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="pc_out" value="PC / IF_ID&lt;br&gt;pred_pc&lt;br&gt;pred_taken" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;shadow=0;strokeWidth=2.2;strokeColor=#34495e;fillColor=#f2f8fc;fontFamily=Microsoft YaHei;fontSize=20;fontColor=#111111;" vertex="1" parent="1">
+          <mxGeometry x="1245" y="230" width="210" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="ex_feedback" value="EX阶段反馈&lt;br&gt;update_pc / target&lt;br&gt;actual_taken / mispredict" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;shadow=0;strokeWidth=2.2;strokeColor=#34495e;fillColor=#fff1f1;fontFamily=Microsoft YaHei;fontSize=19;fontColor=#111111;" vertex="1" parent="1">
+          <mxGeometry x="445" y="610" width="300" height="115" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="pred_cnt" value="pred_cnt&lt;br&gt;预测统计" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;shadow=0;strokeWidth=2.2;strokeColor=#34495e;fillColor=#f7f1ff;fontFamily=Microsoft YaHei;fontSize=20;fontColor=#111111;" vertex="1" parent="1">
+          <mxGeometry x="1245" y="610" width="210" height="105" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="hazard" value="hazard_en" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;shadow=0;strokeWidth=2.2;strokeColor=#b65c00;fillColor=#fff1dc;fontFamily=Microsoft YaHei;fontSize=18;fontColor=#8a4600;" vertex="1" parent="1">
+          <mxGeometry x="115" y="610" width="145" height="58" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="edge_if_ctrl" value="查询" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#333333;strokeWidth=2.2;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=14;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="if_stage" target="controller">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="edge_ctrl_gshare" value="B型查询/结果/更新" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#333333;strokeWidth=2.2;startArrow=block;startFill=1;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=14;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="controller" target="gshare">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="edge_ctrl_btb" value="JALR查询/命中/更新" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#333333;strokeWidth=2.2;startArrow=block;startFill=1;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=14;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="controller" target="btb">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="edge_ctrl_ras" value="call/ret压栈/弹栈" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#333333;strokeWidth=2.2;startArrow=block;startFill=1;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=14;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="controller" target="ras">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="edge_ctrl_out" value="预测结果" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#333333;strokeWidth=2.4;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=14;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="controller" target="pc_out">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="790" y="290"/>
+              <mxPoint x="1195" y="290"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="edge_ex_ctrl" value="预测更新/错误回退" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#333333;strokeWidth=2.2;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=14;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="ex_feedback" target="controller">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="edge_ex_cnt" value="统计" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#333333;strokeWidth=2.2;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=14;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="ex_feedback" target="pred_cnt">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="edge_hazard_ctrl" value="暂停" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d68011;strokeWidth=2.2;dashed=1;dashPattern=6 6;endArrow=block;endFill=1;fontFamily=Microsoft YaHei;fontSize=14;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="hazard" target="controller">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="190" y="500"/>
+              <mxPoint x="595" y="500"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="legend" value="说明：controller 接收 IF 查询和 EX 反馈，统一访问 GShare / BTB / RAS，并最终输出 pred_pc 与 pred_taken。" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;shadow=0;strokeWidth=1.2;strokeColor=#d0d5dd;fillColor=#ffffff;fontFamily=Microsoft YaHei;fontSize=13;fontColor=#475467;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="460" y="785" width="580" height="40" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
