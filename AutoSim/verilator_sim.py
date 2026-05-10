@@ -26,7 +26,7 @@ def bin_to_mem(infile, mem_type):
             datafile.write(chunk[::-1].hex() + '\n')
 
 
-def compile(prj_name, sim_type):
+def compile(prj_name, sim_type, enableTrace=False):
     '''编译 rtl 代码并输出到 obj_dir'''
     # 获取目标工程路径
     rtl_dir = AutoSim_dir.parent / prj_name
@@ -41,10 +41,8 @@ def compile(prj_name, sim_type):
 
     # Verilator 程序
     verilator_cmd = ['verilator',
-                    # f'-DCLK_FREQ={clkFreq[prj_name]}',
                     f'-DPROJECT_{prj_name.upper()}',    # 传递宏给.v
                     '-cc', '-exe', '-build',
-                    # '-trace',
                     '-j', '0',
                     '-CFLAGS', '-O3 -march=native', 
                     '-top-module', f'tb_verilator_{sim_type}',
@@ -54,6 +52,9 @@ def compile(prj_name, sim_type):
                     '-Wno-CASEINCOMPLETE',   # 忽略case不完全警告
                     '-Wno-UNOPTFLAT'         # 忽略组合逻辑环警告
     ]
+
+    if enableTrace:
+        verilator_cmd.append('-trace')
 
     # 添加代码文件
     for file in source_file:
@@ -80,11 +81,7 @@ def compile(prj_name, sim_type):
         return False, 'iverilog exec timeout!'
 
 
-def sim(clk_freq, sim_type, stdout=True):
-    # 添加环境变量
-    env = os.environ.copy()
-    env['CLK_FREQ'] = str(clk_freq)
-
+def sim(sim_type, stdout=True, env=os.environ.copy()):
     if (stdout):
         result = subprocess.run(f"./obj_dir/Vtb_verilator_{sim_type}", env=env)
     else:
@@ -100,12 +97,17 @@ def sim(clk_freq, sim_type, stdout=True):
 def prj_ch():
     ch = None
     while(ch == None):
-        print("\r[1] 5_LEVEL_CPU_Cache  [2] 5_LEVEL_CPU_improved: ", end='', flush=True)
+        print("\r[1] 5_LEVEL_CPU_Cache  [2] 5_LEVEL_CPU_improved:  [3] 5_LEVEL_CPU_ooo ", end='', flush=True)
         prj_name_ask = getch()
         if prj_name_ask == '1':
             ch = '5_LEVEL_CPU_Cache'
         elif prj_name_ask == '2':
             ch = '5_LEVEL_CPU_improved'
+        elif prj_name_ask == '3':
+            ch = '5_LEVEL_CPU_ooo'
+        elif prj_name_ask == 'ESC':
+            print("\033[96mESC\033[0m\r")
+            sys.exit()
     print(f"\033[96m{ch}\033[0m")
     return ch
 
@@ -114,7 +116,8 @@ def mem_ch():
     ch = []
     isAll = False
     isInst = False
-    while not ch and not isAll and not isInst:
+    ret = False
+    while not ch and not isAll and not isInst and not ret:
         print("\r[i] 37 inst  [1] init  [2] src0  [3] src1  [4] src2  [a] ALL: ", end='', flush=True)
         mem_name_ask = getch()
         if mem_name_ask.lower() == 'i':
@@ -130,15 +133,19 @@ def mem_ch():
         elif mem_name_ask.lower() == 'a':
             ch = ['init', 'src0', 'src1', 'src2']
             isAll = True
+        elif mem_name_ask == 'ESC':
+            ret = True
     print('\033[96m', end='')
     if isInst:
         print('37 inst', end='')
     elif isAll:
         print('ALL', end='')
+    elif ret:
+        print('ESC', end='')
     else:
         print(ch[0], end='')
     print('\033[0m')
-    return ch, isAll, isInst
+    return ch, isAll, isInst, ret
 
 
 def getch():
@@ -148,8 +155,7 @@ def getch():
         import msvcrt
         key = msvcrt.getch()
         if key == b'\x1b':  # ESC 键
-            print("\033[96mESC\033[0m\r")
-            sys.exit()
+            return 'ESC'
         else:
             return key.decode('utf-8')
     else:
@@ -163,14 +169,13 @@ def getch():
             tty.setraw(fd)
             ch = sys.stdin.read(1)
             if ord(ch) == 27:
-                print("\033[96mESC\033[0m\r")
-                sys.exit()
+                return 'ESC'
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         return ch
 
 
-def update_json(prj_name, sim_type, inst_result=False, mem_name='init'):
+def updateJson(prj_name, sim_type, inst_result=False, mem_name='init'):
     json_filename = 'verilatorRunData.json'
 
     if Path(AutoSim_dir / json_filename).exists():
@@ -182,8 +187,10 @@ def update_json(prj_name, sim_type, inst_result=False, mem_name='init'):
     json_file.setdefault(prj_name, {})
 
     if sim_type == 'software':
-        with open('software_results.txt', 'r', encoding='utf-8') as f:
+        result_file = 'software_results.txt'
+        with open(result_file, 'r', encoding='utf-8') as f:
             results = dict(line.strip().split('=') for line in f if '=' in line)
+        os.remove(result_file)
 
         if prj_name == '5_LEVEL_CPU_improved':
             del results['DCACHE HIT']
@@ -199,6 +206,17 @@ def update_json(prj_name, sim_type, inst_result=False, mem_name='init'):
         json.dump(json_file, f, indent=2, ensure_ascii=False)
 
 
+def getPrevTimeJson(prj_name, mem_name):
+    json_filename = 'verilatorRunData.json'
+
+    try:
+        with open(json_filename, 'r', encoding='utf-8') as f:
+            json_file = json.load(f)
+        return float(json_file[prj_name]['SOFTWARE TEST'][mem_name]['RUN TIME'])
+    except:
+        return 0
+
+
 def softwareTest(prj_name, mem_list):
     for mem_name in mem_list:
         irom_bin_dir = AutoSim_dir / 'mem_init' / f'irom_{mem_name}.bin'
@@ -210,8 +228,14 @@ def softwareTest(prj_name, mem_list):
         success, error_msg = compile(prj_name, 'software')
         if(success):
             print(f'编译成功...')
-            sim(clkFreqList[prj_name], 'software', stdout=True)
-            update_json(prj_name, sim_type='software', mem_name=mem_name)
+
+            # 添加环境变量
+            env = os.environ.copy()
+            env['CLK_FREQ'] = str(clkFreqList[prj_name])
+            env['PREV_TIME'] = str(getPrevTimeJson(prj_name, mem_name))
+            sim('software', stdout=True, env=env)
+
+            updateJson(prj_name, sim_type='software', mem_name=mem_name)
         else:
             print('\n')
             print('=' * 40)
@@ -221,9 +245,18 @@ def softwareTest(prj_name, mem_list):
 
 
 def instTest(prj_name):
+    while True:
+        print('\r\033[2KINST Name (Press Enter or ALL): ', end='')
+        inst_name = input().lower()
+        # 获取路径下所有bin文件
+        if inst_name == 'all':
+            all_bin_files = [str(p) for p in Path(AutoSim_dir / 'generated').rglob('*.bin')]
+        else:
+            all_bin_files = [str(p) for p in Path(AutoSim_dir / 'generated').rglob(f'*{inst_name}.bin')]
+            if all_bin_files:
+                break
+
     print("\n编译中...", end='\r')
-    # 获取路径下所有bin文件
-    all_bin_files = [str(p) for p in Path(AutoSim_dir / 'generated').rglob('*.bin')]
 
     # 成功失败计数器
     passCnt, failCnt = 0, 0
@@ -235,9 +268,13 @@ def instTest(prj_name):
 
         bin_to_mem(file_bin, 'inst_test')
 
-        success, error_msg = compile(prj_name, 'inst')
+        success, error_msg = compile(prj_name, 'inst', enableTrace=True)
         if(success):
-            sim_stdout = sim(50, 'inst', stdout=False)
+            # 添加环境变量
+            env = os.environ.copy()
+            env['CLK_FREQ'] = str(clkFreqList[prj_name])
+            sim_stdout = sim('inst', stdout=False, env=env)
+
             findPass, findFail = "PASS!!!" in sim_stdout, "FAIL!!!" in sim_stdout
             if (findFail):
                 print('\033[2K指令  ' + print_name.ljust(10, ' ') + '    !!!FAIL!!!')
@@ -254,22 +291,32 @@ def instTest(prj_name):
             print(error_msg)
             print('=' * 40)
     
-    update_json(prj_name, 'inst', inst_result=(passCnt == 37 and failCnt == 0))
+    updateJson(prj_name, 'inst', inst_result=(passCnt == 37 and failCnt == 0))
     print(f"\033[2K指令集测试共 \033[92m{passCnt}个成功 \033[91m{failCnt}个失败\033[0m")
 
 
 if __name__ == '__main__':
     clkFreqList['5_LEVEL_CPU_Cache'] = 250
     clkFreqList['5_LEVEL_CPU_improved'] = 150
+    clkFreqList['5_LEVEL_CPU_ooo'] = 250
 
-    prj_name = prj_ch()
-    print(f"时钟频率: {clkFreqList[prj_name]} MHz")
-    mem_list, isAll, isInst = mem_ch()
+    while True:
+        prj_name = prj_ch()
+        print(f"当前时钟频率: {clkFreqList[prj_name]} MHz")
 
-    if isInst:
-        instTest(prj_name)
-    elif isAll:
-        instTest(prj_name)
-        softwareTest(prj_name, mem_list)
-    else:
-        softwareTest(prj_name, mem_list)
+        while True:
+            mem_list, isAll, isInst, ret = mem_ch()
+
+            if ret:
+                print('\033[2J\033[H', end='')
+                break
+
+            if isInst:
+                instTest(prj_name)
+            elif isAll:
+                instTest(prj_name)
+                softwareTest(prj_name, mem_list)
+            else:
+                softwareTest(prj_name, mem_list)
+            
+            sys.exit()

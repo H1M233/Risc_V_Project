@@ -22,9 +22,6 @@ module top_riscv(
     wire [31:0]     pc_pc_addr_o;
 
     wire [31:0]     icache_inst;
-    wire            icache_stall;
-    wire            icache_block;
-    wire            icache_flush;
 
     // ============================================================
     // jump
@@ -37,15 +34,6 @@ module top_riscv(
     // ============================================================
     wire            hazard_hazard_en;
     wire            dcache_stall;
-    wire            bpu_hold_en;
-
-    // ============================================================
-    // hazard to id
-    // ============================================================
-    wire            hazard_forward_rs1_en;
-    wire            hazard_forward_rs2_en;
-    wire [31:0]     hazard_forward_rs1_data;
-    wire [31:0]     hazard_forward_rs2_data;
 
     // ============================================================
     // regs to id
@@ -56,18 +44,17 @@ module top_riscv(
     // ============================================================
     // if to if_id & bpu
     // ============================================================
-    wire [31:0]     if_pc_addr_o;
-    wire [31:0]     if_inst_o;
+    wire [31:0]     if1_pc_o;
+    wire [31:0]     if2_pc_i;
+    wire            if2_valid_i;
+    wire [31:0]     if2_inst_o;
+    wire [31:0]     if2_pc_o;
 
     // ============================================================
     // if_id to id
     // ============================================================
-    wire [31:0]     id_pc_addr_i;
-    wire [31:0]     if_id_inst_raw;
-    wire            if_id_valid_o;
     wire [31:0]     id_inst_i;
-
-    assign id_inst_i = if_id_valid_o ? if_id_inst_raw : `NOP;
+    wire [31:0]     id_pc_i;
 
     // ============================================================
     // id to id_ex
@@ -180,12 +167,9 @@ module top_riscv(
     wire [31:0]     bpu_pred_pc;
     wire            bpu_pred_taken;
 
-    // I-cache 原始 miss 信号不能直接阻塞流水线。
-    // jump 或 BPU 预测跳转时，当前 IF 指令会被冲刷，不应被错误路径 I-cache miss 卡住。
-    assign icache_block = icache_stall & ~bpu_pred_taken & ~jump_jump_en_o;
-
-    // BPU 在真正需要 hold 的时候暂停
-    assign bpu_hold_en = dcache_stall | hazard_hazard_en | icache_block;
+    // 流水线暂停条件
+    wire pipe_hold = dcache_stall | hazard_hazard_en;
+    wire pipe_flush = jump_jump_en_o | bpu_pred_taken;
 
     // ============================================================
     // ex to bpu
@@ -205,7 +189,6 @@ module top_riscv(
         .rst                (cpu_rst),
 
         .dcache_stall       (dcache_stall),
-        .icache_block       (icache_block),
 
         .hazard_en          (hazard_hazard_en),
 
@@ -215,8 +198,7 @@ module top_riscv(
         .pc_addr_o          (pc_pc_addr_o),
 
         .pred_pc            (bpu_pred_pc),
-        .pred_taken         (bpu_pred_taken),
-        .icache_flush       (icache_flush)
+        .pred_taken         (bpu_pred_taken)
     );
 
     // ============================================================
@@ -226,10 +208,9 @@ module top_riscv(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
 
-        .cpu_addr           (pc_pc_addr_o),
+        .cpu_pc             (if1_pc_o),
         .cpu_inst           (icache_inst),
-        .flush              (icache_flush),
-        .stall              (icache_stall),
+        .pipe_hold          (pipe_hold),
 
         .mem_addr           (irom_addr),
         .mem_inst           (irom_data)
@@ -266,12 +247,6 @@ module top_riscv(
         .mem_waddr_i        (mem_rd_addr_i),
         .mem_regs_wen_i     (mem_regs_wen_i),
 
-        // to id
-        .forward_rs1_data   (hazard_forward_rs1_data),
-        .forward_rs1_en     (hazard_forward_rs1_en),
-        .forward_rs2_data   (hazard_forward_rs2_data),
-        .forward_rs2_en     (hazard_forward_rs2_en),
-
         // to if_id, id_ex, pc
         .hazard_en          (hazard_hazard_en)
     );
@@ -297,49 +272,59 @@ module top_riscv(
     // ============================================================
     // IF
     // ============================================================
-    ifif IFIF(
-        .inst_i             (icache_inst),
-        .pc_addr_i          (pc_pc_addr_o),
+    if1 IF1(
+        .pc_i               (pc_pc_addr_o),
 
-        .inst_o             (if_inst_o),
-        .pc_addr_o          (if_pc_addr_o)
+        .pc_o               (if1_pc_o)
+    );
+
+    if1_if2 IF1_IF2(
+        .clk                (cpu_clk),
+        .rst                (cpu_rst),
+
+        .pipe_flush         (pipe_flush),
+        .pipe_hold          (pipe_hold),
+
+        .pc_i               (if1_pc_o),
+
+        .if2_valid_o        (if2_valid_i),
+        .pc_o               (if2_pc_i)
+    );
+
+    if2 IF2(
+        .inst_i             (icache_inst),
+
+        .if2_valid_i        (if2_valid_i),
+        .pc_i               (if2_pc_i),
+
+        .inst_o             (if2_inst_o),
+        .pc_o               (if2_pc_o)
     );
 
     // ============================================================
     // IF/ID
     // ============================================================
-    if_id IF_ID(
+    if2_id IF2_ID(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
 
-        .dcache_stall       (dcache_stall),
-        .icache_block       (icache_block),
+        .pipe_hold          (pipe_hold),
 
-        .hazard_en          (hazard_hazard_en),
+        .inst_i             (if2_inst_o),
+        .pc_addr_i          (if2_pc_o),
 
-        .inst_i             (if_inst_o),
-        .pc_addr_i          (if_pc_addr_o),
+        .pipe_flush         (pipe_flush),
 
-        .jump_en            (jump_jump_en_o),
-
-        .inst_o             (if_id_inst_raw),
-        .pc_addr_o          (id_pc_addr_i),
-        .valid_o            (if_id_valid_o),
-
-        .pred_taken         (bpu_pred_taken)
+        .inst_o             (id_inst_i),
+        .pc_addr_o          (id_pc_i)
     );
 
     // ============================================================
     // ID
     // ============================================================
     id ID(
-        .forward_rs1_data   (hazard_forward_rs1_data),
-        .forward_rs1_en     (hazard_forward_rs1_en),
-        .forward_rs2_data   (hazard_forward_rs2_data),
-        .forward_rs2_en     (hazard_forward_rs2_en),
-
         .inst_i             (id_inst_i),
-        .pc_addr_i          (id_pc_addr_i),
+        .pc_addr_i          (id_pc_i),
 
         .pred_taken_i       (bpu_pred_taken),
         .pred_pc_i          (bpu_pred_pc),
@@ -372,8 +357,8 @@ module top_riscv(
         .rst                (cpu_rst),
 
         .dcache_stall       (dcache_stall),
-        .icache_block       (icache_block),
 
+        .jump_en            (jump_jump_en_o),
         .hazard_en          (hazard_hazard_en),
 
         .pc_addr_i          (id_pc_addr_o),
@@ -390,8 +375,6 @@ module top_riscv(
         .value2_i           (id_value2_o),
         .pred_taken_i       (id_pred_taken_o),
         .pred_pc_i          (id_pred_pc_o),
-
-        .jump_en            (jump_jump_en_o),
 
         .pc_addr_o          (ex_pc_addr_i),
         .inst_o             (ex_inst_i),
@@ -472,8 +455,6 @@ module top_riscv(
     ex_mem EX_MEM(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
-
-        .dcache_stall       (dcache_stall),
 
         .inst_i             (ex_inst_o),
         .rd_addr_i          (ex_rd_addr_o),
@@ -569,8 +550,8 @@ module top_riscv(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
 
-        .pc_addr            (if_pc_addr_o),
-        .pc_inst            (if_inst_o),
+        .pc_addr            (if1_pc_o),
+        .pc_inst            (if2_inst_o),
 
         .pred_pc            (bpu_pred_pc),
         .pred_taken         (bpu_pred_taken),
@@ -582,8 +563,8 @@ module top_riscv(
         .actual_taken       (ex_actual_taken),
         .pred_mispredict    (ex_pred_mispredict),
 
-        .hazard_en          (bpu_hold_en),
-        .dcache_stall       (dcache_stall)
+        .pipe_flush         (pipe_flush),
+        .pipe_hold          (pipe_hold)
     );
 
 endmodule

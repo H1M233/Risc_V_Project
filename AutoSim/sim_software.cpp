@@ -57,12 +57,12 @@ int main(int argc, char** argv) {
         sim_time_ns += delta_time_ns;
     };
     
-    std::cout << "======================================= Simulation Started =======================================\n\n\n\n\n\n";
+    std::cout << "=================================== Simulation Started ===================================\n\n\n\n\n\n";
 
     // 计时器
-    std::chrono::steady_clock::time_point start_time;
+    const double PREV_TIME = std::stoi(std::getenv("PREV_TIME"));
+    std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();;
     double current_time;
-    start_time = std::chrono::steady_clock::now();
     auto get_elapsed_ms = [&]() -> double {
         auto now = std::chrono::steady_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now - start_time);
@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
     top->rst = 0;
     top->clk_50MHz = 0;
     top->clk_cpu = 0;
-    step_and_advance(NS2MS / 2.0);
+    step_and_advance(20.0);
 
     top->clk_50MHz = 1;
     top->clk_cpu = 1;
@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
     step_and_advance(CLK_50MHz_HALF_PERIOD - CLK_CPU_HALF_PERIOD);
 
     top->clk_cpu = 0;
-    step_and_advance(NS2MS / 2.0 - CLK_CPU_HALF_PERIOD);
+    step_and_advance(20.0 - CLK_CPU_HALF_PERIOD);
 
     top->rst = 1;
     
@@ -124,13 +124,27 @@ int main(int argc, char** argv) {
         }
         
         // 每 1s 打印一次
-        static double last_print_time = 0;
+        static double last_print_time = 0.0;
         current_time = get_elapsed_ms();
         if (current_time - last_print_time >= 100) {
             last_print_time = current_time;
-            if (top->seg != 0x3700'0000 || top->seg != 0x0000'0000) SEG_getTime = top->seg & 0x000F'FFFF;
-            std::cout << "\r" << "\033[4A" << "\033[2K"
-                      << "RUN TIME:"
+            if (top->seg != 0x3700'0000 || top->seg != 0x0000'0000) {
+                SEG_getTime = top->seg & 0x000F'FFFF;
+            }
+            
+            // 打印进度条
+            std::cout << "\r" << "\033[6A" << "\033[2K" << "\033[96m";
+            double barWidth = 70.0;
+            double percentage = (PREV_TIME) ? sim_time_ns / NS2MS / PREV_TIME : 0.0;
+            for (double cnt = 0.0; cnt <= barWidth; ++cnt){
+                if (cnt / barWidth > percentage && !SEG_getTime) std::cout << "\033[0m=";
+                else std::cout << "=";
+                if (cnt == barWidth / 2) std::cout << " Simulation Started ";
+            }
+            if (!SEG_getTime) std::cout << "\033[0m";
+            std::cout << "\n\n";
+
+            std::cout << "RUN TIME:"
                       << std::right << std::setw(9) << std::fixed << std::setprecision(1) << current_time / 1000.0
                       << std::left << std::setw(10) << " s"
                       << "SIM TIME:"
@@ -156,7 +170,7 @@ int main(int argc, char** argv) {
                       << std::flush;
         }
     }
-    std::cout << "\n\n======================================= Simulation Finished =======================================\n";
+    std::cout << "\n\n=================================== Simulation Finished ===================================\033[0m\n";
     // 输出 LED 内容
     bool isTick = (top->LED == 0x0122'1c08);
     for (int row = 0; row < 4; ++row){
@@ -175,8 +189,9 @@ int main(int argc, char** argv) {
             }
         }
     }
+
     std::cout << std::setw(16) << (isTick ? "\033[92mPASS!!!" : "\033[91mFAIL!!!") 
-              << std::setw(12) << "Run time: " << std::hex << SEG_getTime << std::dec << " ms\033[0m\n\n";
+        << std::setw(12) << "Run time: " << std::hex << SEG_getTime << std::dec << " ms  " << "\033[0m\n\n";
 
     // 写回文件 传输给python
     std::ofstream f("software_results.txt");

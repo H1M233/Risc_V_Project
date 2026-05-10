@@ -4,9 +4,6 @@ module ex_mem(
     input               clk,
     input               rst,
 
-    // from D-cache stall
-    input               dcache_stall,
-
     // from ex
     input      [31:0]   inst_i,
     input      [4:0]    rd_addr_i,
@@ -26,16 +23,6 @@ module ex_mem(
             rd_data_o   <= 32'b0;
             regs_wen_o  <= 1'b0;
         end
-        // else if(dcache_stall) begin
-        //     inst_o      <= `NOP;
-        //     mem_addr_o  <= 32'b0;
-        //     mem_req_o   <= 1'b0;
-        //     mem_wen_o   <= 1'b0;
-        //     rd_addr_o   <= 5'b0;
-        //     rd_data_o   <= 32'b0;
-        //     regs_wen_o  <= 1'b0;
-        //     rs2_data_o  <= 32'b0;
-        // end
         else begin
             inst_o      <= inst_i;
             rd_addr_o   <= rd_addr_i;

@@ -21,9 +21,11 @@ module bpu_top #(
     input               clk,
     input               rst,
     
-    // from if
-    input      [31:0]   pc_addr,            // if阶段指令地址
-    input      [31:0]   pc_inst,            // if取得的指令
+    // from if1
+    input      [31:0]   pc_addr,            // if1 阶段指令地址
+
+    // from if2
+    input      [31:0]   pc_inst,            // if2 取得的指令
 
     // to pc & id
     output     [31:0]   pred_pc,            // 向if输出预测的地址
@@ -37,9 +39,8 @@ module bpu_top #(
     input               actual_taken,       // ex阶段判断跳转为真
     input               pred_mispredict,    // ex阶段判断预测错误
 
-    // from hazard
-    input               hazard_en,
-    input               dcache_stall
+    input               pipe_flush,
+    input               pipe_hold
     
 );
     // connect gshare with bpu_controller
@@ -101,9 +102,8 @@ module bpu_top #(
         .actual_taken               (actual_taken),
         .pred_mispredict            (pred_mispredict),
 
-        // from hazard
-        .hazard_en                  (hazard_en),
-        .dcache_stall               (dcache_stall),
+        .pipe_flush                 (pipe_flush),
+        .pipe_hold                  (pipe_hold),
 
         // Gshare - 查询
         .gshare_pht_index           (gshare_pht_index_i),
@@ -196,15 +196,6 @@ module bpu_top #(
         .update_index_i             (btb_update_index_i),
         .update_tag_i               (btb_update_tag_i),
         .update_target_i            (btb_update_target_i)
-    );
-
-    pred_cnt PRED_CNT(
-        .clk                        (clk),
-        .rst                        (rst),
-
-        .update_btb_en              (update_btb_en),
-        .update_gshare_en           (update_gshare_en),
-        .pred_mispredict            (pred_mispredict)
     );
 
 endmodule
