@@ -7,9 +7,6 @@ module pc(
     // from D-cache stall
     input               dcache_stall,
 
-    // from I-cache front stall
-    input               icache_block,
-
     // from hazard
     input               hazard_en,
 
@@ -22,10 +19,7 @@ module pc(
 
     // from bpu
     input      [31:0]   pred_pc,
-    input               pred_taken,
-
-    // to I-cache
-    output reg          icache_flush
+    input               pred_taken
 );
     always @(posedge clk) begin
         if(!rst) begin
@@ -37,21 +31,14 @@ module pc(
         else if(hazard_en) begin
             pc_addr_o <= pc_addr_o;
         end
-        else if(pred_taken) begin
-            pc_addr_o <= pred_pc;
-        end
         else if(dcache_stall) begin
             pc_addr_o <= pc_addr_o;
         end
-        else if(icache_block) begin
-            pc_addr_o <= pc_addr_o;
+        else if(pred_taken) begin
+            pc_addr_o <= pred_pc;
         end
         else begin
             pc_addr_o <= pc_addr_o + 4;
         end
-    end
-
-    always@(posedge clk) begin
-        icache_flush <= (jump_en || pred_taken);
     end
 endmodule

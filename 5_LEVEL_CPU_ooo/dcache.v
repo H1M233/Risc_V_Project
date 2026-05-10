@@ -96,6 +96,11 @@ module dcache#(
 
     // 数据传递寄存器
     wire cpu_req = (cpu_req_load | cpu_req_store);
+    reg        req_load_q;
+    reg        req_store_q;
+    reg [31:0] req_addr_q;
+    reg [31:0] req_wdata_q;
+    reg [1:0]  req_mask_q;
     reg cpu_req_load_reg;
     reg cpu_req_store_reg;
     reg finished;
@@ -131,6 +136,11 @@ module dcache#(
             mem_we      <= 4'b0;
             mem_wen     <= 1'b0;
             mem_ack     <= 1'b0;
+            req_load_q  <= 1'b0;
+            req_store_q <= 1'b0;
+            req_addr_q  <= 32'b0;
+            req_wdata_q <= 32'b0;
+            req_mask_q  <= 2'b0;
 
             // 重置寄存器
             for (w = 0; w < WAYS; w = w + 1) begin
@@ -141,11 +151,10 @@ module dcache#(
             for (i = 0; i < LINE_NUM; i = i + 1) plru_state[i] <= 1'b0;
         end
         else begin  
-            // 传输 DRAM
-            mem_addr    <= (cpu_req) ? cpu_addr : 32'b0;
-            mem_wdata   <= store_merge(32'b0, cpu_wdata, cpu_addr[1:0], cpu_mask);
-            mem_we      <= (cpu_req_store && (state == QUERY_AND_LOAD)) ? unmask(cpu_mask, cpu_addr[1:0]) : 4'b0;
-            mem_wen     <= cpu_req_store && (state == QUERY_AND_LOAD);
+            mem_addr    <= 32'b0;
+            mem_wdata   <= 32'b0;
+            mem_we      <= 4'b0;
+            mem_wen     <= 1'b0;
 
             // 状态传递
             cpu_req_load_reg    <= cpu_req_load;
@@ -172,6 +181,11 @@ module dcache#(
                 QUERY_AND_LOAD: begin
                     // 状态判断
                     if (cpu_req_load | cpu_req_store) begin
+                        req_load_q  <= cpu_req_load;
+                        req_store_q <= cpu_req_store;
+                        req_addr_q  <= cpu_addr;
+                        req_wdata_q <= cpu_wdata;
+                        req_mask_q  <= cpu_mask;
                         state <= HIT_BRANCH;
                         finished <= 1'b0;
                     end
@@ -184,6 +198,7 @@ module dcache#(
                             finished <= 1'b1;
                         end
                         else begin
+                            mem_addr <= req_addr_q;
                             state <= LOAD_MISS_WAIT;
                             finished <= 1'b0;
                         end
@@ -201,17 +216,18 @@ module dcache#(
                 end
 
                 LOAD_HIT_OUTPUT: begin
-                    cpu_rdata <= load_shift(cache_rdata_reg[hit_way_idx], cpu_addr_reg_reg[1:0], cpu_mask_reg_reg);
+                    cpu_rdata <= load_shift(cache_rdata_reg[hit_way_idx], req_addr_q[1:0], req_mask_q);
                     finished <= 1'b0;
                     state <= QUERY_AND_LOAD;
                 end
 
                 LOAD_MISS_WAIT: begin
+                    mem_addr                <= req_addr_q;
                     miss_way                <= plru_state[index_reg];
                     miss_index              <= index_reg;   
                     miss_tag                <= tag_reg;
-                    miss_addr               <= cpu_addr_reg_reg;
-                    miss_mask               <= cpu_mask_reg_reg;
+                    miss_addr               <= req_addr_q;
+                    miss_mask               <= req_mask_q;
 
                     plru_state[index_reg]   <= ~plru_state[index_reg];
                     state                   <= LOAD_MISS_OUTPUT;
@@ -219,6 +235,7 @@ module dcache#(
                 end
 
                 LOAD_MISS_OUTPUT: begin
+                    mem_addr <= miss_addr;
                     cpu_rdata <= load_shift(mem_rdata, miss_addr[1:0], miss_mask);
                     valid_array[miss_way][miss_index] <= 1'b1;
                     tag_array[miss_way][miss_index]   <= miss_tag;
@@ -228,17 +245,27 @@ module dcache#(
                 end
 
                 STORE_HIT: begin
+                    mem_addr  <= req_addr_q;
+                    mem_wdata <= store_merge(32'b0, req_wdata_q, req_addr_q[1:0], req_mask_q);
+                    mem_we    <= req_store_q ? unmask(req_mask_q, req_addr_q[1:0]) : 4'b0;
+                    mem_wen   <= req_store_q;
+
                     data_array[hit_way_idx][index_reg] <= store_merge(
                         cache_rdata_reg[hit_way_idx],
-                        cpu_wdata_reg_reg,
-                        cpu_addr_reg_reg[1:0],
-                        cpu_mask_reg_reg
+                        req_wdata_q,
+                        req_addr_q[1:0],
+                        req_mask_q
                     );
                     state <= QUERY_AND_LOAD;
                     finished <= 1'b0;
                 end
 
                 STORE_MISS: begin
+                    mem_addr  <= req_addr_q;
+                    mem_wdata <= store_merge(32'b0, req_wdata_q, req_addr_q[1:0], req_mask_q);
+                    mem_we    <= req_store_q ? unmask(req_mask_q, req_addr_q[1:0]) : 4'b0;
+                    mem_wen   <= req_store_q;
+
                     // BRAM 存储也需要停顿 可引入 store_buffer 解决
                     state <= QUERY_AND_LOAD;
                     finished <= 1'b0;
@@ -296,6 +323,7 @@ module dcache#(
                         2'b01: load_shift = {24'b0, word[15:8]};
                         2'b10: load_shift = {24'b0, word[23:16]};
                         2'b11: load_shift = {24'b0, word[31:24]};
+                        default: load_shift = 32'b0;
                     endcase
                 end
 
@@ -336,6 +364,7 @@ module dcache#(
                         2'b01: store_merge[15:8]  = wdata[7:0];
                         2'b10: store_merge[23:16] = wdata[7:0];
                         2'b11: store_merge[31:24] = wdata[7:0];
+                        default: store_merge = old_word;
                     endcase
                 end
 

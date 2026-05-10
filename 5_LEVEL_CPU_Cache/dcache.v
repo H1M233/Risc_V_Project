@@ -34,24 +34,6 @@ module dcache#(
 );
     localparam LINE_NUM = 2 ** INDEX_WIDTH;
 
-    // ============================================================
-    //
-    // 命中计数器
-    // reg [31:0] dcache_hit;
-    // reg [31:0] dcache_miss;
-    // always@(posedge clk) begin
-    //     if(!rst) begin
-    //         dcache_hit  <= 32'b0;
-    //         dcache_miss <= 32'b0;
-    //     end
-    //     else begin
-    //         dcache_hit  <= (state == LOAD_HIT_OUTPUT & state == STORE_HIT) ? dcache_hit + 1'b1 : dcache_hit;
-    //         dcache_miss <= (state == LOAD_MISS_OUTPUT && state == STORE_MISS) ? dcache_miss + 1'b1 : dcache_miss;
-    //     end
-    // end
-    //
-    // ============================================================
-
     // 存储结构：
     (* ram_style = "block" *) reg [31:0] data_array[0:WAYS - 1][0:LINE_NUM - 1];
     reg [TAG_WIDTH - 1:0] tag_array[0:WAYS - 1][0:LINE_NUM - 1];

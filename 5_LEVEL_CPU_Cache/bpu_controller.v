@@ -23,9 +23,11 @@ module bpu_controller #(
     input                           clk,
     input                           rst,
     
-    // from if
-    input      [31:0]               pc_addr,            // if 阶段指令地址
-    input      [31:0]               pc_inst,            // if 取得的指令
+    // from if1
+    input      [31:0]               pc_addr,            // if1 阶段指令地址
+
+    // from if2
+    input      [31:0]               pc_inst,            // if2 取得的指令
 
     // to pc & id
     output reg [31:0]               pred_pc,            // 向 if 输出预测的地址
@@ -39,9 +41,8 @@ module bpu_controller #(
     input                           actual_taken,       // ex 阶段判断跳转为真
     input                           pred_mispredict,    // ex 阶段判断预测错误
 
-    // from hazard
-    input                           hazard_en,
-    input                           dcache_stall,
+    input                           pipe_flush,
+    input                           pipe_hold,
 
     // Gshare - 查询
     output reg [BHR_WIDTH - 1:0]    gshare_pht_index,
@@ -98,13 +99,10 @@ module bpu_controller #(
     wire            is_ret_JAL  = (is_JAL && rd_addr == 5'b00001);
     wire            is_ras_push = (is_ret_JAL && !ras_isfull);
 
-    wire    [31:0]  pc_add_4    = pc_addr + 32'h4;
-    wire    [31:0]  pc_add_JAL  = pc_addr + JAL_imm;
-    wire    [31:0]  pc_add_B    = pc_addr + B_imm;
-
-    // 存储预测结果至第二个预测周期
-    reg     [31:0]  pred_next_pc, JAL_next_pc;
-    reg             prev_JAL, prev_JALR, prev_JALR_ret;
+    reg     [31:0]  pc_reg, pc_add_4_reg;
+    wire    [31:0]  pc_add_4    = pc_reg + 32'h4;
+    wire    [31:0]  pc_add_JAL  = pc_reg + JAL_imm;
+    wire    [31:0]  pc_add_B    = pc_reg + B_imm;
 
     // Gshare索引：取PC中间位与BHR异或
     wire [BHR_WIDTH - 1:0]  pht_index           = pc_addr[BHR_WIDTH + 1:2] ^ gshare_ghr;
@@ -116,72 +114,99 @@ module bpu_controller #(
     wire [BTB_INDEX_WIDTH - 1:0]        btb_update_index_w  = update_pc[BTB_INDEX_WIDTH + 1:2];
     wire [31 - BTB_INDEX_WIDTH - 2:0]   btb_update_tag_w    = update_pc[31:BTB_INDEX_WIDTH + 2];
 
-    // 预测结果
-    always@(*) begin
-        if(prev_JALR_ret) begin
-            pred_taken  = 1'b1;
-            pred_pc     = ras_pop_addr;
-        end
-        else if(gshare_prev_b && gshare_pred_taken) begin
-            pred_taken  = 1'b1;
-            pred_pc     = pred_next_pc;
-        end
-        else if(prev_JALR) begin
-            pred_taken  = btb_hit;
-            pred_pc     = btb_target_pc;
-        end
-        else if(prev_JAL) begin
-            pred_taken  = 1'b1;
-            pred_pc     = JAL_next_pc;
-        end
-        else begin
-            pred_taken  = 1'b0;
-            pred_pc     = pc_add_4;
-        end
-    end
-
     // 查询
     always@(posedge clk) begin
-        if(!rst | pred_mispredict | pred_taken) begin
+        if (!rst) begin
+            // PC
+            pc_reg              <= 0;
+
             // TYPE_B
-            gshare_prev_b       <= 0;
-            pred_next_pc        <= 0;
             gshare_pht_index    <= 0;
 
             // JALR
-            prev_JALR           <= 0;
-            prev_JALR_ret       <= 0;
-            ras_pop_en          <= 0;
             btb_query_index     <= 0;
             btb_query_tag       <= 0;
+        end
+        if (pipe_flush) begin       // 冲刷查询入口 避免下一个错误地址进入
+            // PC
+            pc_reg              <= 0;
 
-            // JAL
-            prev_JAL            <= 0;
-            ras_push_en         <= 0;
-            ras_push_addr       <= 0;
-            JAL_next_pc         <= 0;
-        end
-        else if(hazard_en | dcache_stall) begin
-            // hazard发生时暂停
-        end
-        else begin
             // TYPE_B
-            gshare_prev_b       <= is_B_type;
-            pred_next_pc        <= pc_add_B;
+            gshare_pht_index    <= 0;
+
+            // JALR
+            btb_query_index     <= 0;
+            btb_query_tag       <= 0;
+        end
+        else if (!pipe_hold) begin
+            // PC
+            pc_reg              <= pc_addr;
+
+            // TYPE_B
             gshare_pht_index    <= pht_index;
 
             // JALR
-            prev_JALR           <= is_JALR;
-            prev_JALR_ret       <= is_ras_pop;
-            ras_pop_en          <= is_ras_pop;
             btb_query_index     <= btb_query_index_w;
             btb_query_tag       <= btb_query_tag_w;
+        end
+    end
+    
+    // 预测结果
+    always @(posedge clk) begin
+        if (!rst) begin
+            pred_taken      <= 0;
+            pred_pc         <= 0;
+        end
+        else if (pipe_flush) begin     // ex 确认错误再归零
+            pred_taken      <= 0;
+            pred_pc         <= 0;
+        end
+        else if (!pipe_hold) begin
+            if (is_ras_pop) begin
+                pred_taken  <= 1'b1;
+                pred_pc     <= ras_pop_addr;
+            end
+            else if (is_B_type) begin
+                pred_taken  <= gshare_pred_taken;
+                pred_pc     <= pc_add_B;
+            end
+            else if (is_JALR) begin
+                pred_taken  <= btb_hit;
+                pred_pc     <= btb_target_pc;
+            end
+            else if (is_JAL) begin
+                pred_taken  <= 1'b1;
+                pred_pc     <= pc_add_JAL;
+            end
+            else begin
+                pred_taken  <= 1'b0;
+                pred_pc     <= pc_add_4_reg;
+            end
+        end
+    end
+    always @(posedge clk) begin
+        if (!rst) begin
+            // RAS
+            ras_pop_en      <= 0;
+            ras_push_en     <= 0;
+            ras_push_addr   <= 0;
 
-            // JAL
-            prev_JAL            <= is_JAL;
-            ras_push_en         <= is_ras_push;
-            ras_push_addr       <= pc_add_4;
-            JAL_next_pc         <= pc_add_JAL;
+            // Gshare
+            gshare_prev_b   <= 0;
+        end
+        if (pipe_flush) begin
+            // RAS - 弹栈入栈只能一个周期
+            ras_pop_en      <= 0;
+            ras_push_en     <= 0;
+        end
+        else if (!pipe_hold) begin
+            // RAS
+            ras_pop_en      <= is_ras_pop;
+            ras_push_en     <= is_ras_push;
+            ras_push_addr   <= pc_add_4;
+
+            // Gshare
+            gshare_prev_b   <= is_B_type;
         end
     end
 

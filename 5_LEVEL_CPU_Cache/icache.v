@@ -9,10 +9,9 @@ module icache #(
     input               rst,
 
     // CPU / IF side
-    input      [31:0]   cpu_addr,
-    output     [31:0]   cpu_inst,
-    input               flush,
-    output              stall,  
+    input      [31:0]   cpu_pc,
+    output reg [31:0]   cpu_inst,
+    input               pipe_hold,
 
     // IROM side
     output     [31:0]   mem_addr,
@@ -20,35 +19,12 @@ module icache #(
 );
     localparam LINE_NUM    = 2 ** INDEX_WIDTH;  // 组数
 
-    // ============================================================
-    //
-    // 命中计数器
-    // reg [31:0] icache_hit;
-    // reg [31:0] icache_miss;
-    // always@(posedge clk) begin
-    //     if(!rst) begin
-    //         icache_hit  <= 32'b0;
-    //         icache_miss <= 32'b0;
-    //     end
-    //     else begin
-    //         icache_hit  <= (state == S_QUERY && hit) ? icache_hit + 1'b1 : icache_hit;
-    //         icache_miss <= (state == S_QUERY && miss) ? icache_miss + 1'b1 : icache_miss;
-    //     end
-    // end
-    //
-    // ============================================================
-    
-    // 状态
-    reg [1:0] state;
-    localparam S_QUERY  = 2'd0;
-    localparam S_REFILL = 2'd1;
-
     // 提取索引和 tag
-    wire [INDEX_WIDTH - 1:0] index  = cpu_addr[INDEX_WIDTH + 1:2];
-    wire [TAG_WIDTH - 1:0]   tag    = cpu_addr[31:INDEX_WIDTH + 2];
+    wire [INDEX_WIDTH - 1:0] index  = cpu_pc[INDEX_WIDTH + 1:2];
+    wire [TAG_WIDTH - 1:0]   tag    = cpu_pc[31:INDEX_WIDTH + 2];
 
     // 存储结构：
-    reg [31:0]              data_array  [0:WAYS - 1][0:LINE_NUM - 1];
+    (* ram_style = "block" *) reg [31:0] data_array [0:WAYS - 1][0:LINE_NUM - 1];
     reg [TAG_WIDTH - 1:0]   tag_array   [0:WAYS - 1][0:LINE_NUM - 1];
     reg                     valid_array [0:WAYS - 1][0:LINE_NUM - 1];
 
@@ -104,29 +80,16 @@ module icache #(
     end
 
     // PLRU更新
-    wire        update_plru     = (state == S_QUERY && hit);
+    wire        update_plru     = hit;
     wire [1:0]  accessed_way    = hit_way_idx;
 
-    // CPU接口
-    reg [31:0]              miss_addr;
-    reg [INDEX_WIDTH-1:0]   miss_index;
-    reg [TAG_WIDTH-1:0]     miss_tag;
-    reg [1:0]               miss_way;
-
-    assign stall    = (state == S_QUERY & miss);
-    assign mem_addr = cpu_addr;
-    assign cpu_inst =   (hit) ? data_array[hit_way_idx][index] : 
-                        (state == S_REFILL) ? mem_inst : `NOP;
+    assign mem_addr = cpu_pc;
 
    // 主状态机
     integer i, w;
     always @(posedge clk) begin
         if (!rst) begin
-            state           <= S_QUERY;
-            miss_addr       <= 0;
-            miss_index      <= 0;
-            miss_tag        <= 0;
-            miss_way        <= 0;
+            cpu_inst        <= 0;
 
             // 清除所有 valid
             for (w = 0; w < WAYS; w = w + 1) begin
@@ -139,27 +102,19 @@ module icache #(
             for (i = 0; i < LINE_NUM; i = i + 1) plru_state[i] <= 3'b0;
         end 
         else begin
-            if (flush) begin
-                state <= S_QUERY;
-            end
-            else if (state == S_QUERY) begin
-                if (miss) begin
-                    miss_addr  <= cpu_addr;
-                    miss_index <= index;
-                    miss_tag   <= tag;
-                    miss_way   <= replace_way;  // 选择替换的路
-                    state      <= S_REFILL;
-                end
-            end
-            else if (state == S_REFILL)begin
-                // 写入选中的路
-                valid_array[miss_way][miss_index] <= 1'b1;
-                tag_array[miss_way][miss_index]   <= miss_tag;
-                data_array[miss_way][miss_index]  <= mem_inst;
-                state <= S_QUERY;
+            if (pipe_hold) begin
+                cpu_inst <= cpu_inst;
             end
             else begin
-                state <= S_QUERY;
+                if (hit) begin
+                    cpu_inst                        <= data_array[hit_way_idx][index];
+                end
+                if (miss) begin
+                    cpu_inst                        <= mem_inst;
+                    valid_array[replace_way][index] <= 1'b1;
+                    tag_array[replace_way][index]   <= tag;
+                    data_array[replace_way][index]  <= mem_inst;
+                end
             end
 
             // PLRU 更新（独立于状态机）

@@ -1,12 +1,6 @@
 `include "rv32I.vh"
 
 module id(
-    // from hazard
-    input      [31:0]   forward_rs1_data,
-    input               forward_rs1_en,
-    input      [31:0]   forward_rs2_data,
-    input               forward_rs2_en,
-
     // from if_id
     input      [31:0]   inst_i,             // 从if_id模块传来的指令内容
     input      [31:0]   pc_addr_i,          // 从if_id模块传来的指令地址
@@ -38,8 +32,8 @@ module id(
     output reg [4:0]    rs2_addr_o
 );  
     // 提取指令
-    wire [31:0] data1       = forward_rs1_en ? forward_rs1_data : rs1_data_i;
-    wire [31:0] data2       = forward_rs2_en ? forward_rs2_data : rs2_data_i;
+    wire [31:0] data1       = rs1_data_i;
+    wire [31:0] data2       = rs2_data_i;
     wire [6:0]  opcode      = inst_i[6:0];              // 传入指令opcode
     wire [4:0]  rd_o        = inst_i[11:7];             // 传入指令rd地址
     wire [4:0]  rs1_o       = inst_i[19:15];            // 传入指令rs1地址

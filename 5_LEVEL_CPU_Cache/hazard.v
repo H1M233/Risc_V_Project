@@ -11,11 +11,6 @@ module hazard(
 
     input      [4:0]    mem_waddr_i,
     input               mem_regs_wen_i,
-    
-    output reg [31:0]   forward_rs1_data,
-    output reg          forward_rs1_en,
-    output reg [31:0]   forward_rs2_data,
-    output reg          forward_rs2_en,
 
     output reg          hazard_en
 );
@@ -57,11 +52,6 @@ module hazard(
             (id_is_jalr   && (rs1_wait_ex || rs1_wait_mem));
 
     always @(*) begin
-        forward_rs1_en   = 1'b0;
-        forward_rs2_en   = 1'b0;
-        forward_rs1_data = 32'b0;
-        forward_rs2_data = 32'b0;
-
         hazard_en = (ex_is_load && (rs1_hit_ex || rs2_hit_ex)) || ctrl_dep_wait;
     end
 
