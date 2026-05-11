@@ -77,6 +77,7 @@ module lsu_ooo (
     reg  [4:0]  rd_r     [0:DEPTH-1];
     reg         wen_r    [0:DEPTH-1];
     reg  [31:0] addr     [0:DEPTH-1];
+    reg  [31:0] imm_save [0:DEPTH-1];
     reg  [31:0] data     [0:DEPTH-1];
     reg  [1:0]  msz      [0:DEPTH-1];
     reg         musig    [0:DEPTH-1];
@@ -99,11 +100,12 @@ module lsu_ooo (
     assign load_wb_tag = load_wb_tag_p;
     assign load_wb_value = load_wb_val_p;
 
-    localparam S_IDLE  = 2'd0;
-    localparam S_LOAD  = 2'd1;
-    localparam S_STORE = 2'd2;
-    localparam S_WAIT  = 2'd3;
-    reg [1:0] state;
+    localparam S_IDLE  = 3'd0;
+    localparam S_LOAD  = 3'd1;
+    localparam S_STORE = 3'd2;
+    localparam S_WAIT  = 3'd3;
+    localparam S_WB    = 3'd4;
+    reg [2:0] state;
 
     wire head_valid    = vld[head];
     wire head_is_load  = is_ld[head];
@@ -156,7 +158,8 @@ module lsu_ooo (
 
     wire [2:0] tail_p1 = tail + 3'd1;
     wire [1:0] push_cnt = {1'b0, pushA_valid} + {1'b0, pushB_valid};
-    wire       will_pop = (state == S_WAIT) && dcache_ack;
+    wire       will_pop = ((state == S_WAIT) && dcache_ack && !is_ld[head]) ||
+                          ((state == S_WB) && load_wb_pending && load_wb_grant);
 
     integer i;
     always @(posedge clk) begin
@@ -165,6 +168,7 @@ module lsu_ooo (
                 vld[i] <= 1'b0;
                 is_ld[i] <= 1'b0;
                 is_st[i] <= 1'b0;
+                imm_save[i] <= 32'b0;
                 addr_rdy[i] <= 1'b0;
                 data_rdy[i] <= 1'b0;
             end
@@ -185,17 +189,14 @@ module lsu_ooo (
         end else begin
             store_done <= 1'b0;
 
-            if (load_wb_pending && load_wb_grant)
-                load_wb_pending <= 1'b0;
-
             for (i = 0; i < DEPTH; i = i + 1) begin
                 if (vld[i] && !addr_rdy[i]) begin
                     if (cdb_valid_0 && (cdb_tag_0 == r1_tag[i])) begin
                         addr_rdy[i] <= 1'b1;
-                        addr[i] <= cdb_value_0 + addr[i];
+                        addr[i] <= cdb_value_0 + imm_save[i];
                     end else if (cdb_valid_1 && (cdb_tag_1 == r1_tag[i])) begin
                         addr_rdy[i] <= 1'b1;
-                        addr[i] <= cdb_value_1 + addr[i];
+                        addr[i] <= cdb_value_1 + imm_save[i];
                     end
                 end
                 if (vld[i] && is_st[i] && !data_rdy[i]) begin
@@ -218,6 +219,7 @@ module lsu_ooo (
                 wen_r[tail] <= pushA_wen && (pushA_rd != 5'b0);
                 msz[tail] <= pushA_msz;
                 musig[tail] <= pushA_musig;
+                imm_save[tail] <= pushA_imm;
                 r1_tag[tail] <= pushA_rs1_tag;
                 r2_tag[tail] <= pushA_rs2_tag;
                 if (pushA_rs1_ready || pushA_r1_cdb0 || pushA_r1_cdb1) begin
@@ -226,7 +228,7 @@ module lsu_ooo (
                                    pushA_r1_cdb1 ? cdb_value_1 : pushA_rs1_val) + pushA_imm;
                 end else begin
                     addr_rdy[tail] <= 1'b0;
-                    addr[tail] <= pushA_imm;
+                    addr[tail] <= 32'b0;
                 end
                 if (pushA_is_store) begin
                     data_rdy[tail] <= pushA_rs2_ready || pushA_r2_cdb0 || pushA_r2_cdb1;
@@ -247,6 +249,7 @@ module lsu_ooo (
                 wen_r[tail_p1] <= push_wen_1 && (push_rd_1 != 5'b0);
                 msz[tail_p1] <= push_mem_size_1;
                 musig[tail_p1] <= push_mem_unsigned_1;
+                imm_save[tail_p1] <= push_imm_1;
                 r1_tag[tail_p1] <= push_rs1_tag_1;
                 r2_tag[tail_p1] <= push_rs2_tag_1;
                 if (push_rs1_ready_1 || pushB_r1_cdb0 || pushB_r1_cdb1) begin
@@ -255,7 +258,7 @@ module lsu_ooo (
                                       pushB_r1_cdb1 ? cdb_value_1 : push_rs1_val_1) + push_imm_1;
                 end else begin
                     addr_rdy[tail_p1] <= 1'b0;
-                    addr[tail_p1] <= push_imm_1;
+                    addr[tail_p1] <= 32'b0;
                 end
                 if (push_is_store_1) begin
                     data_rdy[tail_p1] <= push_rs2_ready_1 || pushB_r2_cdb0 || pushB_r2_cdb1;
@@ -315,10 +318,20 @@ module lsu_ooo (
                             load_wb_pending <= 1'b1;
                             load_wb_tag_p <= rob[head];
                             load_wb_val_p <= load_ext(dcache_rdata, msz[head], musig[head]);
+                            state <= S_WB;
                         end else begin
                             store_done <= 1'b1;
                             store_done_tag <= rob[head];
+                            vld[head] <= 1'b0;
+                            head <= head + 3'd1;
+                            state <= S_IDLE;
                         end
+                    end
+                end
+
+                S_WB: begin
+                    if (load_wb_pending && load_wb_grant) begin
+                        load_wb_pending <= 1'b0;
                         vld[head] <= 1'b0;
                         head <= head + 3'd1;
                         state <= S_IDLE;

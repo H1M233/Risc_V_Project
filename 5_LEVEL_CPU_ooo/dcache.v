@@ -36,7 +36,8 @@ module dcache#(
     localparam LOAD_WAIT1 = 3'd2;
     localparam LOAD_WAIT2 = 3'd3;
     localparam LOAD_RESP  = 3'd4;
-    localparam STORE_ACK  = 3'd5;
+    localparam STORE_HOLD = 3'd5;
+    localparam STORE_ACK  = 3'd6;
 
     reg [2:0] state;
 
@@ -76,9 +77,9 @@ module dcache#(
                         end else begin
                             mem_addr  <= cpu_addr;
                             mem_wdata <= store_merge(32'b0, cpu_wdata, cpu_addr[1:0], cpu_mask);
-                            mem_we    <= unmask(cpu_mask, cpu_addr[1:0]);
-                            mem_wen   <= 1'b1;
-                            state <= STORE_ACK;
+                            mem_we    <= 4'b0000;
+                            mem_wen   <= 1'b0;
+                            state <= STORE_HOLD;
                         end
                     end
                 end
@@ -111,6 +112,14 @@ module dcache#(
                     cpu_rdata <= load_shift(mem_rdata, req_addr_q[1:0], req_mask_q);
                     mem_ack   <= 1'b1;
                     state <= IDLE;
+                end
+
+                STORE_HOLD: begin
+                    mem_addr  <= req_addr_q;
+                    mem_wdata <= store_merge(32'b0, req_wdata_q, req_addr_q[1:0], req_mask_q);
+                    mem_we    <= unmask(req_mask_q, req_addr_q[1:0]);
+                    mem_wen   <= 1'b1;
+                    state <= STORE_ACK;
                 end
 
                 STORE_ACK: begin

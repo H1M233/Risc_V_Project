@@ -83,12 +83,20 @@ module rat (
 
         // Commit clear
         if (commit_0 && commit_wen_0 && commit_rd_0 != 0) begin
-            if (nb[commit_rd_0] && nt[commit_rd_0] == commit_tag_0) nb[commit_rd_0] = 0;
-            nv[commit_rd_0] = commit_value_0;
+            if (nb[commit_rd_0] && nt[commit_rd_0] == commit_tag_0) begin
+                nb[commit_rd_0] = 0;
+                nt[commit_rd_0] = 0;
+                nr[commit_rd_0] = 1;
+                nv[commit_rd_0] = commit_value_0;
+            end
         end
         if (commit_1 && commit_wen_1 && commit_rd_1 != 0) begin
-            if (nb[commit_rd_1] && nt[commit_rd_1] == commit_tag_1) nb[commit_rd_1] = 0;
-            nv[commit_rd_1] = commit_value_1;
+            if (nb[commit_rd_1] && nt[commit_rd_1] == commit_tag_1) begin
+                nb[commit_rd_1] = 0;
+                nt[commit_rd_1] = 0;
+                nr[commit_rd_1] = 1;
+                nv[commit_rd_1] = commit_value_1;
+            end
         end
 
         // Dispatch slot0
@@ -126,8 +134,9 @@ module rat (
     assign rs1_value_0 = (rs1_0 == 0) ? 32'b0 :
                          s0_r1_cdb ? cdb_value_0 :
                          s0_r1_cdb1 ? cdb_value_1 :
-                         busy[rs1_0] ? value[rs1_0] : rs1_arch_value_0;
-    assign rs1_tag_0   = (rs1_0 == 0) ? 5'b0 : tag[rs1_0];
+                         busy[rs1_0] ? (ready[rs1_0] ? value[rs1_0] : 32'b0) : rs1_arch_value_0;
+    assign rs1_tag_0   = (rs1_0 == 0) ? 5'b0 :
+                         busy[rs1_0] ? tag[rs1_0] : 5'b0;
 
     assign rs2_busy_0  = (rs2_0 != 0) && busy[rs2_0];
     assign rs2_ready_0 = (rs2_0 == 0) ? 1'b1 :
@@ -137,8 +146,9 @@ module rat (
     assign rs2_value_0 = (rs2_0 == 0) ? 32'b0 :
                          s0_r2_cdb ? cdb_value_0 :
                          s0_r2_cdb1 ? cdb_value_1 :
-                         busy[rs2_0] ? value[rs2_0] : rs2_arch_value_0;
-    assign rs2_tag_0   = (rs2_0 == 0) ? 5'b0 : tag[rs2_0];
+                         busy[rs2_0] ? (ready[rs2_0] ? value[rs2_0] : 32'b0) : rs2_arch_value_0;
+    assign rs2_tag_0   = (rs2_0 == 0) ? 5'b0 :
+                         busy[rs2_0] ? tag[rs2_0] : 5'b0;
 
     // Slot1 reads: slot0 forward + CDB bypass
     wire s1_r1_fwd = alloc_0 && rd_wen_0 && rd_0 != 0 && rd_0 == rs1_1;
@@ -158,8 +168,10 @@ module rat (
                          s1_r1_fwd ? 32'b0 :
                          s1_r1_cdb ? cdb_value_0 :
                          s1_r1_cdb1 ? cdb_value_1 :
-                         busy[rs1_1] ? value[rs1_1] : rs1_arch_value_1;
-    assign rs1_tag_1   = (rs1_1 == 0) ? 5'b0 : (s1_r1_fwd ? rob_tag_0 : tag[rs1_1]);
+                         busy[rs1_1] ? (ready[rs1_1] ? value[rs1_1] : 32'b0) : rs1_arch_value_1;
+    assign rs1_tag_1   = (rs1_1 == 0) ? 5'b0 :
+                         s1_r1_fwd ? rob_tag_0 :
+                         busy[rs1_1] ? tag[rs1_1] : 5'b0;
 
     assign rs2_busy_1  = (rs2_1 == 0) ? 0 : s1_r2_fwd ? 1 : (busy[rs2_1] ? 1 : 0);
     assign rs2_ready_1 = (rs2_1 == 0) ? 1'b1 :
@@ -171,7 +183,9 @@ module rat (
                          s1_r2_fwd ? 32'b0 :
                          s1_r2_cdb ? cdb_value_0 :
                          s1_r2_cdb1 ? cdb_value_1 :
-                         busy[rs2_1] ? value[rs2_1] : rs2_arch_value_1;
-    assign rs2_tag_1   = (rs2_1 == 0) ? 5'b0 : (s1_r2_fwd ? rob_tag_0 : tag[rs2_1]);
+                         busy[rs2_1] ? (ready[rs2_1] ? value[rs2_1] : 32'b0) : rs2_arch_value_1;
+    assign rs2_tag_1   = (rs2_1 == 0) ? 5'b0 :
+                         s1_r2_fwd ? rob_tag_0 :
+                         busy[rs2_1] ? tag[rs2_1] : 5'b0;
 
 endmodule
