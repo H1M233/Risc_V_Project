@@ -218,6 +218,8 @@ module issue_queue #(
         grant1_valid = 1'b0;
         grant0_idx = 5'b0;
         grant1_idx = 5'b0;
+        scan_idx = 5'b0;
+        second_start = 5'b0;
 
         for (si = 0; si < DEPTH; si = si + 1) begin
             scan_idx = rr_ptr + si[4:0];
