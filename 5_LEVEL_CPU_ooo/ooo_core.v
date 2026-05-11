@@ -13,12 +13,13 @@ module ooo_core #(
     parameter USE_BPU = 0,
     parameter USE_FAST_DCACHE = 1,
     parameter USE_SIMPLE_DCACHE_FALLBACK = 0,
-    parameter USE_IQ_PIPELINE = 1,
-    parameter USE_CDB_PIPELINE = 1,
-    parameter USE_ALU_INPUT_REG = 1,
+    parameter USE_IQ_PIPELINE = 0,
+    parameter USE_CDB_PIPELINE = 0,
+    parameter USE_ALU_INPUT_REG = 0,
     parameter USE_JAL_EARLY_REDIRECT = 1,
+    parameter USE_BRANCH_EARLY_REDIRECT = 1,
     parameter USE_STORE_BUFFER = 1,
-    parameter USE_LOAD_STORE_FORWARD = 0
+    parameter USE_LOAD_STORE_FORWARD = 1
 )(
     input           cpu_rst,
     input           cpu_clk,
@@ -233,17 +234,20 @@ module ooo_core #(
                               !alu_frontend_redirect &&
                               ((disp_en_0 && d_jal_0) || (disp_en_1 && d_jal_1));
     wire [31:0] early_jal_target = (disp_en_0 && d_jal_0) ? jal_target_0 : jal_target_1;
-
-    assign frontend_flush = alu_frontend_redirect || early_jal_redirect;
-    assign flush_target_pc = alu_frontend_redirect ? redirect_pc_w : early_jal_target;
+    wire early_branch_ready_0;
+    wire early_branch_ready_1;
+    wire early_branch_redirect;
+    wire [31:0] early_branch_target;
+    wire early_ctrl_resolved_0;
+    wire early_ctrl_resolved_1;
 
     always @(posedge cpu_clk) begin
         if (!cpu_rst || frontend_flush)
             unresolved_ctrl <= 0;
-        else if (disp_en_0 && d_ctrl_0) begin
+        else if (disp_en_0 && d_ctrl_0 && !early_ctrl_resolved_0) begin
             unresolved_ctrl <= 1;
             unresolved_rob_tag <= rob_tag_0;
-        end else if (disp_en_1 && d_ctrl_1) begin
+        end else if (disp_en_1 && d_ctrl_1 && !early_ctrl_resolved_1) begin
             unresolved_ctrl <= 1;
             unresolved_rob_tag <= rob_tag_1;
         end else if (ctrl_resolved_any)
@@ -342,10 +346,64 @@ module ooo_core #(
     wire [31:0] src1_val_1 = d_ur1_1 ? r1_val_1 : 32'b0;
     wire [31:0] src2_val_1 = d_ur2_1 ? r2_val_1 : 32'b0;
 
-    wire        pred_taken_eff_0 = (USE_JAL_EARLY_REDIRECT && d_jal_0) ? 1'b1 : fq_pt_0;
-    wire        pred_taken_eff_1 = (USE_JAL_EARLY_REDIRECT && d_jal_1) ? 1'b1 : fq_pt_1;
-    wire [31:0] pred_pc_eff_0    = (USE_JAL_EARLY_REDIRECT && d_jal_0) ? jal_target_0 : fq_ppc_0;
-    wire [31:0] pred_pc_eff_1    = (USE_JAL_EARLY_REDIRECT && d_jal_1) ? jal_target_1 : fq_ppc_1;
+    reg early_branch_taken_0;
+    reg early_branch_taken_1;
+    always @(*) begin
+        early_branch_taken_0 = 1'b0;
+        case (d_bt_0)
+            `BEQ:  early_branch_taken_0 = (src1_val_0 == src2_val_0);
+            `BNE:  early_branch_taken_0 = (src1_val_0 != src2_val_0);
+            `BLT:  early_branch_taken_0 = ($signed(src1_val_0) < $signed(src2_val_0));
+            `BGE:  early_branch_taken_0 = !($signed(src1_val_0) < $signed(src2_val_0));
+            `BLTU: early_branch_taken_0 = (src1_val_0 < src2_val_0);
+            `BGEU: early_branch_taken_0 = !(src1_val_0 < src2_val_0);
+            default: early_branch_taken_0 = 1'b0;
+        endcase
+    end
+
+    always @(*) begin
+        early_branch_taken_1 = 1'b0;
+        case (d_bt_1)
+            `BEQ:  early_branch_taken_1 = (src1_val_1 == src2_val_1);
+            `BNE:  early_branch_taken_1 = (src1_val_1 != src2_val_1);
+            `BLT:  early_branch_taken_1 = ($signed(src1_val_1) < $signed(src2_val_1));
+            `BGE:  early_branch_taken_1 = !($signed(src1_val_1) < $signed(src2_val_1));
+            `BLTU: early_branch_taken_1 = (src1_val_1 < src2_val_1);
+            `BGEU: early_branch_taken_1 = !(src1_val_1 < src2_val_1);
+            default: early_branch_taken_1 = 1'b0;
+        endcase
+    end
+
+    wire [31:0] early_branch_next_pc_0 = early_branch_taken_0 ? (fq_pc_0 + d_imm_0) : (fq_pc_0 + 32'd4);
+    wire [31:0] early_branch_next_pc_1 = early_branch_taken_1 ? (fq_pc_1 + d_imm_1) : (fq_pc_1 + 32'd4);
+
+    assign early_branch_ready_0 = USE_BRANCH_EARLY_REDIRECT &&
+                                  disp_en_0 && d_br_0 && src1_ready_0 && src2_ready_0;
+    assign early_branch_ready_1 = USE_BRANCH_EARLY_REDIRECT &&
+                                  disp_en_1 && d_br_1 && src1_ready_1 && src2_ready_1;
+    assign early_branch_redirect = !alu_frontend_redirect &&
+                                   ((early_branch_ready_0 && (early_branch_next_pc_0 != fq_ppc_0)) ||
+                                    (early_branch_ready_1 && (early_branch_next_pc_1 != fq_ppc_1)));
+    assign early_branch_target = (early_branch_ready_0 && (early_branch_next_pc_0 != fq_ppc_0)) ?
+                                 early_branch_next_pc_0 : early_branch_next_pc_1;
+    assign early_ctrl_resolved_0 = (USE_JAL_EARLY_REDIRECT && disp_en_0 && d_jal_0) ||
+                                   early_branch_ready_0;
+    assign early_ctrl_resolved_1 = (USE_JAL_EARLY_REDIRECT && disp_en_1 && d_jal_1) ||
+                                   early_branch_ready_1;
+
+    assign frontend_flush = alu_frontend_redirect || early_jal_redirect || early_branch_redirect;
+    assign flush_target_pc = alu_frontend_redirect ? redirect_pc_w :
+                             early_jal_redirect    ? early_jal_target :
+                                                     early_branch_target;
+
+    wire        pred_taken_eff_0 = (USE_JAL_EARLY_REDIRECT && d_jal_0) ? 1'b1 :
+                                   early_branch_ready_0 ? early_branch_taken_0 : fq_pt_0;
+    wire        pred_taken_eff_1 = (USE_JAL_EARLY_REDIRECT && d_jal_1) ? 1'b1 :
+                                   early_branch_ready_1 ? early_branch_taken_1 : fq_pt_1;
+    wire [31:0] pred_pc_eff_0    = (USE_JAL_EARLY_REDIRECT && d_jal_0) ? jal_target_0 :
+                                   early_branch_ready_0 ? early_branch_next_pc_0 : fq_ppc_0;
+    wire [31:0] pred_pc_eff_1    = (USE_JAL_EARLY_REDIRECT && d_jal_1) ? jal_target_1 :
+                                   early_branch_ready_1 ? early_branch_next_pc_1 : fq_ppc_1;
 
     // ========================================================================
     // ROB
@@ -568,6 +626,7 @@ module ooo_core #(
 
     lsu_ooo #(
         .USE_STORE_BUFFER(USE_STORE_BUFFER),
+        .USE_LOAD_STORE_FORWARD(USE_LOAD_STORE_FORWARD),
         .STORE_BUFFER_DEPTH(4)
     ) LSU (
         .clk(cpu_clk), .rst(cpu_rst),

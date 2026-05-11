@@ -37,7 +37,7 @@ module fetch_queue (
 
     assign empty       = (count == 0);
     assign full        = (count == DEPTH);
-    assign almost_full = (count >= DEPTH - 1);
+    assign almost_full = full;
 
     assign pop_valid_0      = (count >= 1);
     assign pop_pc_0         = pc_mem  [head[AW-1:0]];

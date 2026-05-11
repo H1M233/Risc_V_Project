@@ -44,6 +44,8 @@ module dcache#(
 
     wire [INDEX_WIDTH-1:0] req_index = req_addr_q[INDEX_WIDTH+1:2];
     wire [TAG_WIDTH-1:0]   req_tag   = req_addr_q[31:INDEX_WIDTH+2];
+    wire [INDEX_WIDTH-1:0] cpu_index = cpu_addr[INDEX_WIDTH+1:2];
+    wire [TAG_WIDTH-1:0]   cpu_tag   = cpu_addr[31:INDEX_WIDTH+2];
 
     wire req_test_dram  = (req_addr_q >= 32'h8000_0000) &&
                           (req_addr_q <  32'h8001_0000);
@@ -53,6 +55,14 @@ module dcache#(
     wire req_cacheable  = (req_test_dram || req_board_dram) && !req_known_mmio;
     wire req_hit = valid[req_index] && (tag[req_index] == req_tag);
     wire hit = req_cacheable && req_hit;
+    wire cpu_test_dram  = (cpu_addr >= 32'h8000_0000) &&
+                          (cpu_addr <  32'h8001_0000);
+    wire cpu_board_dram = (cpu_addr >= 32'h8010_0000) &&
+                          (cpu_addr <  32'h8014_0000);
+    wire cpu_known_mmio = (cpu_addr[31:12] == 20'h80200);
+    wire cpu_cacheable  = (cpu_test_dram || cpu_board_dram) && !cpu_known_mmio;
+    wire cpu_hit = cpu_cacheable && valid[cpu_index] && (tag[cpu_index] == cpu_tag);
+    wire fast_enabled = USE_FAST_DCACHE && !USE_SIMPLE_DCACHE_FALLBACK;
 
     localparam IDLE            = 4'd0;
     localparam LOOKUP          = 4'd1;
@@ -107,7 +117,12 @@ module dcache#(
                         req_mask_q  <= cpu_mask;
                         mem_addr    <= cpu_addr;
                         mem_wdata   <= cpu_req_store ? store_merge(32'b0, cpu_wdata, cpu_addr[1:0], cpu_mask) : 32'b0;
-                        if (USE_FAST_DCACHE && !USE_SIMPLE_DCACHE_FALLBACK)
+                        if (fast_enabled && cpu_req_load && cpu_hit) begin
+                            cpu_rdata <= load_shift(data[cpu_index], cpu_addr[1:0], cpu_mask);
+                            perf_load_hit <= 1'b1;
+                            mem_ack <= 1'b1;
+                            state <= IDLE;
+                        end else if (fast_enabled)
                             state <= LOOKUP;
                         else if (cpu_req_load)
                             state <= LOAD_WAIT0;

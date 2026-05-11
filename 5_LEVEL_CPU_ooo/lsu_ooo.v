@@ -2,6 +2,7 @@
 
 module lsu_ooo #(
     parameter USE_STORE_BUFFER = 1,
+    parameter USE_LOAD_STORE_FORWARD = 1,
     parameter STORE_BUFFER_DEPTH = 4
 )(
     input               clk,
@@ -146,6 +147,125 @@ module lsu_ooo #(
             endcase
         end
     endfunction
+
+    function [3:0] lane_mask;
+        input [1:0] size;
+        input [1:0] addr_low;
+        begin
+            case (size)
+                2'b00: begin
+                    case (addr_low)
+                        2'b00: lane_mask = 4'b0001;
+                        2'b01: lane_mask = 4'b0010;
+                        2'b10: lane_mask = 4'b0100;
+                        2'b11: lane_mask = 4'b1000;
+                        default: lane_mask = 4'b0000;
+                    endcase
+                end
+                2'b01: lane_mask = addr_low[1] ? 4'b1100 : 4'b0011;
+                2'b10: lane_mask = 4'b1111;
+                default: lane_mask = 4'b0000;
+            endcase
+        end
+    endfunction
+
+    function [31:0] store_align;
+        input [31:0] wdata;
+        input [1:0]  size;
+        input [1:0]  addr_low;
+        begin
+            store_align = 32'b0;
+            case (size)
+                2'b00: begin
+                    case (addr_low)
+                        2'b00: store_align[7:0]   = wdata[7:0];
+                        2'b01: store_align[15:8]  = wdata[7:0];
+                        2'b10: store_align[23:16] = wdata[7:0];
+                        2'b11: store_align[31:24] = wdata[7:0];
+                        default: store_align = 32'b0;
+                    endcase
+                end
+                2'b01: begin
+                    if (addr_low[1])
+                        store_align[31:16] = wdata[15:0];
+                    else
+                        store_align[15:0] = wdata[15:0];
+                end
+                2'b10: store_align = wdata;
+                default: store_align = 32'b0;
+            endcase
+        end
+    endfunction
+
+    function [31:0] load_shift_raw;
+        input [31:0] word;
+        input [1:0]  size;
+        input [1:0]  addr_low;
+        begin
+            case (size)
+                2'b00: begin
+                    case (addr_low)
+                        2'b00: load_shift_raw = {24'b0, word[7:0]};
+                        2'b01: load_shift_raw = {24'b0, word[15:8]};
+                        2'b10: load_shift_raw = {24'b0, word[23:16]};
+                        2'b11: load_shift_raw = {24'b0, word[31:24]};
+                        default: load_shift_raw = 32'b0;
+                    endcase
+                end
+                2'b01: load_shift_raw = addr_low[1] ? {16'b0, word[31:16]} :
+                                                       {16'b0, word[15:0]};
+                2'b10: load_shift_raw = word;
+                default: load_shift_raw = word;
+            endcase
+        end
+    endfunction
+
+    reg        sb_forward_valid;
+    reg [31:0] sb_forward_raw;
+    reg [31:0] sb_forward_word;
+    reg [31:0] sb_store_word;
+    reg [3:0]  sb_forward_cover;
+    reg [3:0]  sb_load_need;
+    reg [3:0]  sb_store_lanes;
+    reg [2:0]  sb_scan_ext;
+    reg [1:0]  sb_scan_idx;
+    integer sb_scan_i;
+    always @(*) begin
+        sb_forward_valid = 1'b0;
+        sb_forward_raw = 32'b0;
+        sb_forward_word = 32'b0;
+        sb_store_word = 32'b0;
+        sb_forward_cover = 4'b0000;
+        sb_load_need = 4'b0000;
+        sb_store_lanes = 4'b0000;
+        sb_scan_ext = 3'b0;
+        sb_scan_idx = 2'b0;
+
+        if (USE_STORE_BUFFER && USE_LOAD_STORE_FORWARD &&
+            head_valid && head_is_load && head_addr_rdy && !sbuf_empty) begin
+            sb_load_need = lane_mask(msz[head], addr[head][1:0]);
+            for (sb_scan_i = 0; sb_scan_i < STORE_BUFFER_DEPTH; sb_scan_i = sb_scan_i + 1) begin
+                sb_scan_ext = {1'b0, sb_head} + sb_scan_i[2:0];
+                if (sb_scan_ext >= SBUF_DEPTH_COUNT)
+                    sb_scan_ext = sb_scan_ext - SBUF_DEPTH_COUNT;
+                sb_scan_idx = sb_scan_ext[1:0];
+                if ((sb_scan_i[2:0] < sb_count) && sb_v[sb_scan_idx] &&
+                    (sb_addr[sb_scan_idx][31:2] == addr[head][31:2])) begin
+                    sb_store_lanes = lane_mask(sb_mask[sb_scan_idx], sb_addr[sb_scan_idx][1:0]);
+                    sb_store_word = store_align(sb_data[sb_scan_idx], sb_mask[sb_scan_idx], sb_addr[sb_scan_idx][1:0]);
+                    if (sb_store_lanes[0]) sb_forward_word[7:0]   = sb_store_word[7:0];
+                    if (sb_store_lanes[1]) sb_forward_word[15:8]  = sb_store_word[15:8];
+                    if (sb_store_lanes[2]) sb_forward_word[23:16] = sb_store_word[23:16];
+                    if (sb_store_lanes[3]) sb_forward_word[31:24] = sb_store_word[31:24];
+                    sb_forward_cover = sb_forward_cover | sb_store_lanes;
+                end
+            end
+            if ((sb_forward_cover & sb_load_need) == sb_load_need) begin
+                sb_forward_valid = 1'b1;
+                sb_forward_raw = load_shift_raw(sb_forward_word, msz[head], addr[head][1:0]);
+            end
+        end
+    end
 
     wire pushA_valid = mem_push_0 || mem_push_1;
     wire pushB_valid = mem_push_0 && mem_push_1;
@@ -330,6 +450,11 @@ module lsu_ooo #(
                         store_done_tag <= rob[head];
                         vld[head] <= 1'b0;
                         head <= head + 3'd1;
+                    end else if (sb_forward_valid && !load_wb_pending) begin
+                        load_wb_pending <= 1'b1;
+                        load_wb_tag_p <= rob[head];
+                        load_wb_val_p <= load_ext(sb_forward_raw, msz[head], musig[head]);
+                        state <= S_WB;
                     end else if (USE_STORE_BUFFER && !sbuf_empty) begin
                         dcache_req_load <= 1'b0;
                         dcache_req_store <= 1'b1;
@@ -358,7 +483,13 @@ module lsu_ooo #(
                 end
 
                 S_LOAD: begin
-                    if (!dcache_stall) begin
+                    if (dcache_ack) begin
+                        dcache_req_load <= 1'b0;
+                        load_wb_pending <= 1'b1;
+                        load_wb_tag_p <= rob[head];
+                        load_wb_val_p <= load_ext(dcache_rdata, msz[head], musig[head]);
+                        state <= S_WB;
+                    end else if (!dcache_stall) begin
                         dcache_req_load <= 1'b0;
                         state <= S_WAIT;
                     end
