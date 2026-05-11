@@ -9,7 +9,16 @@
 // - CDB: ALU0>ALU1>LSU, LSU has pending buffer
 // - Dispatch: IQ/LSQ compact push, resource check per slot
 module ooo_core #(
-    parameter OOO_USE_BPU = 0
+    parameter OOO_USE_BPU = 0,
+    parameter USE_BPU = 0,
+    parameter USE_FAST_DCACHE = 1,
+    parameter USE_SIMPLE_DCACHE_FALLBACK = 0,
+    parameter USE_IQ_PIPELINE = 1,
+    parameter USE_CDB_PIPELINE = 1,
+    parameter USE_ALU_INPUT_REG = 1,
+    parameter USE_JAL_EARLY_REDIRECT = 1,
+    parameter USE_STORE_BUFFER = 1,
+    parameter USE_LOAD_STORE_FORWARD = 0
 )(
     input           cpu_rst,
     input           cpu_clk,
@@ -36,8 +45,9 @@ module ooo_core #(
     // BPU (disabled when OOO_USE_BPU=0)
     wire [31:0] bpu_pred_pc;
     wire        bpu_pred_taken;
-    wire [31:0] use_pred_pc    = (OOO_USE_BPU) ? bpu_pred_pc    : (pc_reg + 32'd4);
-    wire        use_pred_taken = (OOO_USE_BPU) ? bpu_pred_taken : 1'b0;
+    localparam USE_BPU_EFFECTIVE = OOO_USE_BPU || USE_BPU;
+    wire [31:0] use_pred_pc    = (USE_BPU_EFFECTIVE) ? bpu_pred_pc    : (pc_reg + 32'd4);
+    wire        use_pred_taken = (USE_BPU_EFFECTIVE) ? bpu_pred_taken : 1'b0;
 
     // fetch queue
     wire fq_empty, fq_full, fq_almost_full;
@@ -108,7 +118,7 @@ module ooo_core #(
     reg        bpu_upd_taken, bpu_upd_mispred;
 
     generate
-        if (OOO_USE_BPU) begin : gen_bpu
+        if (USE_BPU_EFFECTIVE) begin : gen_bpu
             bpu_top #(.BHR_WIDTH(10), .PHT_SIZE(1024), .RAS_DEPTH(8)) BPU (
                 .clk(cpu_clk), .rst(cpu_rst),
                 .pc_addr(pc_reg), .pc_inst(ic_inst),
@@ -214,12 +224,18 @@ module ooo_core #(
     reg [4:0]  unresolved_rob_tag;
 
     wire ctrl_resolved_any = alu0_ctrl_resolved || alu1_ctrl_resolved;
-    wire need_frontend_redirect = (alu0_ctrl_resolved && alu0_need_redirect) ||
-                                  (alu1_ctrl_resolved && alu1_need_redirect);
+    wire alu_frontend_redirect = (alu0_ctrl_resolved && alu0_need_redirect) ||
+                                 (alu1_ctrl_resolved && alu1_need_redirect);
     wire [31:0] redirect_pc_w = alu0_need_redirect ? alu0_redirect_pc : alu1_redirect_pc;
+    wire [31:0] jal_target_0 = fq_pc_0 + d_imm_0;
+    wire [31:0] jal_target_1 = fq_pc_1 + d_imm_1;
+    wire early_jal_redirect = USE_JAL_EARLY_REDIRECT &&
+                              !alu_frontend_redirect &&
+                              ((disp_en_0 && d_jal_0) || (disp_en_1 && d_jal_1));
+    wire [31:0] early_jal_target = (disp_en_0 && d_jal_0) ? jal_target_0 : jal_target_1;
 
-    assign frontend_flush = need_frontend_redirect;
-    assign flush_target_pc = redirect_pc_w;
+    assign frontend_flush = alu_frontend_redirect || early_jal_redirect;
+    assign flush_target_pc = alu_frontend_redirect ? redirect_pc_w : early_jal_target;
 
     always @(posedge cpu_clk) begin
         if (!cpu_rst || frontend_flush)
@@ -237,7 +253,7 @@ module ooo_core #(
     // ========================================================================
     // Dispatch: resource checking
     // ========================================================================
-    wire slot0_candidate = fq_valid_0 && !unresolved_ctrl && !frontend_flush;
+    wire slot0_candidate = fq_valid_0 && !unresolved_ctrl && !alu_frontend_redirect;
     wire slot1_candidate = fq_valid_1 && slot0_candidate && !d_ctrl_0;
 
     wire [4:0] need_iq_1  = {4'b0, !d_mem_0};
@@ -326,6 +342,11 @@ module ooo_core #(
     wire [31:0] src1_val_1 = d_ur1_1 ? r1_val_1 : 32'b0;
     wire [31:0] src2_val_1 = d_ur2_1 ? r2_val_1 : 32'b0;
 
+    wire        pred_taken_eff_0 = (USE_JAL_EARLY_REDIRECT && d_jal_0) ? 1'b1 : fq_pt_0;
+    wire        pred_taken_eff_1 = (USE_JAL_EARLY_REDIRECT && d_jal_1) ? 1'b1 : fq_pt_1;
+    wire [31:0] pred_pc_eff_0    = (USE_JAL_EARLY_REDIRECT && d_jal_0) ? jal_target_0 : fq_ppc_0;
+    wire [31:0] pred_pc_eff_1    = (USE_JAL_EARLY_REDIRECT && d_jal_1) ? jal_target_1 : fq_ppc_1;
+
     // ========================================================================
     // ROB
     // ========================================================================
@@ -376,7 +397,9 @@ module ooo_core #(
     wire        iq_pt_0, iq_pt_1;
     wire [31:0] iq_ppc_0, iq_ppc_1;
 
-    issue_queue IQ (
+    issue_queue #(
+        .USE_IQ_PIPELINE(USE_IQ_PIPELINE)
+    ) IQ (
         .clk(cpu_clk), .rst(cpu_rst),
         .iq_push_0(disp_en_0 && !d_mem_0),
         .push_pc_0(fq_pc_0), .push_rd_0(d_rd_0), .push_wen_0(d_wen_eff_0),
@@ -387,7 +410,7 @@ module ooo_core #(
         .push_is_branch_0(d_br_0), .push_is_jal_0(d_jal_0), .push_is_jalr_0(d_jalr_0),
         .push_is_lui_0(d_lui_0), .push_is_auipc_0(d_auipc_0),
         .push_branch_type_0(d_bt_0), .push_op_class_0(d_oc_0),
-        .push_pred_taken_0(fq_pt_0), .push_pred_pc_0(fq_ppc_0),
+        .push_pred_taken_0(pred_taken_eff_0), .push_pred_pc_0(pred_pc_eff_0),
         .iq_push_1(disp_en_1 && !d_mem_1),
         .push_pc_1(fq_pc_1), .push_rd_1(d_rd_1), .push_wen_1(d_wen_eff_1),
         .push_rob_tag_1(rob_tag_1), .push_alu_op_1(d_alu_1), .push_imm_1(d_imm_1),
@@ -397,7 +420,7 @@ module ooo_core #(
         .push_is_branch_1(d_br_1), .push_is_jal_1(d_jal_1), .push_is_jalr_1(d_jalr_1),
         .push_is_lui_1(d_lui_1), .push_is_auipc_1(d_auipc_1),
         .push_branch_type_1(d_bt_1), .push_op_class_1(d_oc_1),
-        .push_pred_taken_1(fq_pt_1), .push_pred_pc_1(fq_ppc_1),
+        .push_pred_taken_1(pred_taken_eff_1), .push_pred_pc_1(pred_pc_eff_1),
         .cdb_valid_0(cdb_valid_0), .cdb_tag_0(cdb_tag_0), .cdb_value_0(cdb_value_0),
         .cdb_valid_1(cdb_valid_1), .cdb_tag_1(cdb_tag_1), .cdb_value_1(cdb_value_1),
         .issue_en_0(iq_en_0), .issue_pc_0(iq_pc_0),
@@ -431,7 +454,9 @@ module ooo_core #(
     wire        alu0_act_taken, alu1_act_taken;
     wire [31:0] alu0_act_npc, alu1_act_npc;
 
-    alu_unit ALU0 (
+    alu_unit #(
+        .USE_ALU_INPUT_REG(USE_ALU_INPUT_REG)
+    ) ALU0 (
         .clk(cpu_clk), .rst(cpu_rst), .en(iq_en_0),
         .pc(iq_pc_0), .rd(iq_rd_0), .wen(iq_wen_0), .rob_tag(iq_rtag_0),
         .alu_op(iq_alu_0), .src1(iq_s1_0), .src2(iq_s2_0), .imm(iq_imm_0),
@@ -448,7 +473,9 @@ module ooo_core #(
         .update_actual_taken(alu0_upd_taken), .pred_mispredict(alu0_mispred)
     );
 
-    alu_unit ALU1 (
+    alu_unit #(
+        .USE_ALU_INPUT_REG(USE_ALU_INPUT_REG)
+    ) ALU1 (
         .clk(cpu_clk), .rst(cpu_rst), .en(iq_en_1),
         .pc(iq_pc_1), .rd(iq_rd_1), .wen(iq_wen_1), .rob_tag(iq_rtag_1),
         .alu_op(iq_alu_1), .src1(iq_s1_1), .src2(iq_s2_1), .imm(iq_imm_1),
@@ -483,19 +510,49 @@ module ooo_core #(
     wire take_alu1_p1 = !used_alu1 && alu1_valid;
     wire take_lsu_p1  = !used_lsu && lsu_wb_valid && !take_alu1_p1;
 
-    assign cdb_valid_0 = take_alu0_p0 || take_alu1_p0 || take_lsu_p0;
-    assign cdb_tag_0   = take_alu0_p0 ? alu0_tag :
-                         take_alu1_p0 ? alu1_tag :
-                         take_lsu_p0  ? lsu_wb_tag : 5'b0;
-    assign cdb_value_0 = take_alu0_p0 ? alu0_val :
-                         take_alu1_p0 ? alu1_val :
-                         take_lsu_p0  ? lsu_wb_val : 32'b0;
+    wire arb_cdb_valid_0 = take_alu0_p0 || take_alu1_p0 || take_lsu_p0;
+    wire [4:0] arb_cdb_tag_0 = take_alu0_p0 ? alu0_tag :
+                               take_alu1_p0 ? alu1_tag :
+                               take_lsu_p0  ? lsu_wb_tag : 5'b0;
+    wire [31:0] arb_cdb_value_0 = take_alu0_p0 ? alu0_val :
+                                  take_alu1_p0 ? alu1_val :
+                                  take_lsu_p0  ? lsu_wb_val : 32'b0;
 
-    assign cdb_valid_1 = take_alu1_p1 || take_lsu_p1;
-    assign cdb_tag_1   = take_alu1_p1 ? alu1_tag :
-                         take_lsu_p1  ? lsu_wb_tag : 5'b0;
-    assign cdb_value_1 = take_alu1_p1 ? alu1_val :
-                         take_lsu_p1  ? lsu_wb_val : 32'b0;
+    wire arb_cdb_valid_1 = take_alu1_p1 || take_lsu_p1;
+    wire [4:0] arb_cdb_tag_1 = take_alu1_p1 ? alu1_tag :
+                               take_lsu_p1  ? lsu_wb_tag : 5'b0;
+    wire [31:0] arb_cdb_value_1 = take_alu1_p1 ? alu1_val :
+                                  take_lsu_p1  ? lsu_wb_val : 32'b0;
+
+    reg        cdb_valid_0_q, cdb_valid_1_q;
+    reg [4:0]  cdb_tag_0_q, cdb_tag_1_q;
+    reg [31:0] cdb_value_0_q, cdb_value_1_q;
+
+    always @(posedge cpu_clk) begin
+        if (!cpu_rst) begin
+            cdb_valid_0_q <= 1'b0;
+            cdb_valid_1_q <= 1'b0;
+            cdb_tag_0_q <= 5'b0;
+            cdb_tag_1_q <= 5'b0;
+            cdb_value_0_q <= 32'b0;
+            cdb_value_1_q <= 32'b0;
+        end else begin
+            cdb_valid_0_q <= arb_cdb_valid_0;
+            cdb_tag_0_q <= arb_cdb_tag_0;
+            cdb_value_0_q <= arb_cdb_value_0;
+            cdb_valid_1_q <= arb_cdb_valid_1;
+            cdb_tag_1_q <= arb_cdb_tag_1;
+            cdb_value_1_q <= arb_cdb_value_1;
+        end
+    end
+
+    assign cdb_valid_0 = USE_CDB_PIPELINE ? cdb_valid_0_q : arb_cdb_valid_0;
+    assign cdb_tag_0   = USE_CDB_PIPELINE ? cdb_tag_0_q   : arb_cdb_tag_0;
+    assign cdb_value_0 = USE_CDB_PIPELINE ? cdb_value_0_q : arb_cdb_value_0;
+
+    assign cdb_valid_1 = USE_CDB_PIPELINE ? cdb_valid_1_q : arb_cdb_valid_1;
+    assign cdb_tag_1   = USE_CDB_PIPELINE ? cdb_tag_1_q   : arb_cdb_tag_1;
+    assign cdb_value_1 = USE_CDB_PIPELINE ? cdb_value_1_q : arb_cdb_value_1;
 
     assign lsu_wb_grant = take_lsu_p0 || take_lsu_p1;
 
@@ -507,8 +564,12 @@ module ooo_core #(
     wire [31:0] dc_addr, dc_wdata;
     wire [31:0] dc_rdata;
     wire       dc_stall, dc_ack;
+    wire       dc_load_hit, dc_load_miss;
 
-    lsu_ooo LSU (
+    lsu_ooo #(
+        .USE_STORE_BUFFER(USE_STORE_BUFFER),
+        .STORE_BUFFER_DEPTH(4)
+    ) LSU (
         .clk(cpu_clk), .rst(cpu_rst),
         .mem_push_0(disp_en_0 && d_mem_0),
         .push_rd_0(d_rd_0), .push_wen_0(d_wen_eff_0), .push_rob_tag_0(rob_tag_0),
@@ -538,7 +599,12 @@ module ooo_core #(
     // ========================================================================
     // DCache
     // ========================================================================
-    dcache DCACHE (
+    dcache #(
+        .USE_FAST_DCACHE(USE_FAST_DCACHE),
+        .USE_SIMPLE_DCACHE_FALLBACK(USE_SIMPLE_DCACHE_FALLBACK),
+        .INDEX_WIDTH(6),
+        .LINE_WORDS(1)
+    ) DCACHE (
         .clk(cpu_clk), .rst(cpu_rst),
         .cpu_req_load(dc_req_load), .cpu_req_store(dc_req_store),
         .cpu_mask(dc_mask), .cpu_addr(dc_addr),
@@ -546,7 +612,73 @@ module ooo_core #(
         .stall(dc_stall),
         .mem_addr(perip_addr), .mem_we(perip_we),
         .mem_wen(perip_wen), .mem_wdata(perip_wdata),
-        .mem_rdata(perip_rdata), .mem_ack(dc_ack)
+        .mem_rdata(perip_rdata), .mem_ack(dc_ack),
+        .perf_load_hit(dc_load_hit), .perf_load_miss(dc_load_miss)
     );
+
+`ifdef PERF_DEBUG
+    reg [31:0] cycle_cnt;
+    reg [31:0] commit_cnt;
+    reg [31:0] dispatch0_cnt;
+    reg [31:0] dispatch1_cnt;
+    reg [31:0] issue0_cnt;
+    reg [31:0] issue1_cnt;
+    reg [31:0] load_cnt;
+    reg [31:0] store_cnt;
+    reg [31:0] load_hit_cnt;
+    reg [31:0] load_miss_cnt;
+    reg [31:0] branch_cnt;
+    reg [31:0] redirect_cnt;
+    reg [31:0] stall_rob_cnt;
+    reg [31:0] stall_iq_cnt;
+    reg [31:0] stall_lsq_cnt;
+    reg [31:0] stall_ctrl_cnt;
+    reg [31:0] stall_fetchq_cnt;
+
+    always @(posedge cpu_clk) begin
+        if (!cpu_rst) begin
+            cycle_cnt <= 32'b0;
+            commit_cnt <= 32'b0;
+            dispatch0_cnt <= 32'b0;
+            dispatch1_cnt <= 32'b0;
+            issue0_cnt <= 32'b0;
+            issue1_cnt <= 32'b0;
+            load_cnt <= 32'b0;
+            store_cnt <= 32'b0;
+            load_hit_cnt <= 32'b0;
+            load_miss_cnt <= 32'b0;
+            branch_cnt <= 32'b0;
+            redirect_cnt <= 32'b0;
+            stall_rob_cnt <= 32'b0;
+            stall_iq_cnt <= 32'b0;
+            stall_lsq_cnt <= 32'b0;
+            stall_ctrl_cnt <= 32'b0;
+            stall_fetchq_cnt <= 32'b0;
+        end else begin
+            cycle_cnt <= cycle_cnt + 32'd1;
+            commit_cnt <= commit_cnt + {31'b0, commit_en_0} + {31'b0, commit_en_1};
+            dispatch0_cnt <= dispatch0_cnt + {31'b0, disp_en_0};
+            dispatch1_cnt <= dispatch1_cnt + {31'b0, disp_en_1};
+            issue0_cnt <= issue0_cnt + {31'b0, iq_en_0};
+            issue1_cnt <= issue1_cnt + {31'b0, iq_en_1};
+            load_cnt <= load_cnt + {31'b0, dc_req_load};
+            store_cnt <= store_cnt + {31'b0, dc_req_store};
+            load_hit_cnt <= load_hit_cnt + {31'b0, dc_load_hit};
+            load_miss_cnt <= load_miss_cnt + {31'b0, dc_load_miss};
+            branch_cnt <= branch_cnt + {31'b0, (disp_en_0 && d_ctrl_0)} + {31'b0, (disp_en_1 && d_ctrl_1)};
+            redirect_cnt <= redirect_cnt + {31'b0, frontend_flush};
+            if (fq_valid_0 && unresolved_ctrl)
+                stall_ctrl_cnt <= stall_ctrl_cnt + 32'd1;
+            if (fq_almost_full)
+                stall_fetchq_cnt <= stall_fetchq_cnt + 32'd1;
+            if (slot0_candidate && (rob_free_count < 6'd1))
+                stall_rob_cnt <= stall_rob_cnt + 32'd1;
+            if (slot0_candidate && (iq_free_count < need_iq_1))
+                stall_iq_cnt <= stall_iq_cnt + 32'd1;
+            if (slot0_candidate && (lsq_free_count < need_lsq_1))
+                stall_lsq_cnt <= stall_lsq_cnt + 32'd1;
+        end
+    end
+`endif
 
 endmodule
