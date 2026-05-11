@@ -52,6 +52,7 @@ module dcache#(
     wire req_known_mmio = (req_addr_q[31:12] == 20'h80200);
     wire req_cacheable  = (req_test_dram || req_board_dram) && !req_known_mmio;
     wire req_hit = valid[req_index] && (tag[req_index] == req_tag);
+    wire hit = req_cacheable && req_hit;
 
     localparam IDLE            = 4'd0;
     localparam LOOKUP          = 4'd1;
