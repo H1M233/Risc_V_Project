@@ -12,28 +12,27 @@ module btb #(
     input   rst,
     
     // 查询
-    input      [INDEX_WIDTH - 1:0]          query_index_i,
-    input      [TAG_WIDTH - 1:0]            query_tag_i,
-    output                                  hit_o,              // 返回是否命中
-    output     [31:0]                       target_pc_o,        // 返回预测的目标地址
+    input      [INDEX_WIDTH - 1:0]  query_index_i,
+    input      [TAG_WIDTH - 1:0]    query_tag_i,
+    output                          hit_o,              // 返回是否命中
+    output     [31:0]               target_pc_o,        // 返回预测的目标地址
     
     // 更新
-    input                                   update_en_i,        // ex 阶段返回的BTB更新使能
-    input      [INDEX_WIDTH - 1:0]          update_index_i,
-    input      [TAG_WIDTH - 1:0]            update_tag_i,
-    input      [31:0]                       update_target_i     // ex 阶段返回的实际目标地址
+    input                           update_en_i,        // ex 阶段返回的BTB更新使能
+    input      [INDEX_WIDTH - 1:0]  update_index_i,
+    input      [TAG_WIDTH - 1:0]    update_tag_i,
+    input      [31:0]               update_target_i     // ex 阶段返回的实际目标地址
 );
-    localparam LINE_NUM = 2 ** INDEX_WIDTH;     // 组数：最多记录多少历史
+    localparam LINE_NUM = 2 ** INDEX_WIDTH;             // 组数：最多记录多少历史
     
     // 存储结构：
     `define ARRAY_ADDR(index, way) ((index) * WAYS + way)
     localparam ARRAY_DEPTH = LINE_NUM * WAYS;   // vivado 不会推断二维数组为 memory
     localparam ARRAY_WIDTH = INDEX_WIDTH + $clog2(WAYS);
 
-    (* max_fanout = 30 *)
-    reg  [31:0]                     target  [0:ARRAY_DEPTH - 1];      // 提供上次跳转的目标地址
-    reg  [TAG_WIDTH:0]              tagv    [0:ARRAY_DEPTH - 1];      // 用于区分映射到同一索引的不同地址，最高位为 valid
-    reg                             lru     [0:LINE_NUM - 1];         // LRU 替换信息：每组的最近最少使用记录（0表示Way0最近被使用，1表示Way1最近被使用）
+    reg  [31:0]         target  [0:ARRAY_DEPTH - 1];      // 提供上次跳转的目标地址
+    reg  [TAG_WIDTH:0]  tagv    [0:ARRAY_DEPTH - 1];      // 用于区分映射到同一索引的不同地址，最高位为 valid
+    reg                 lru     [0:LINE_NUM - 1];         // LRU 替换信息：每组的最近最少使用记录（0表示Way0最近被使用，1表示Way1最近被使用）
     
     // 查询
     wire [31:0] way_target [0:WAYS];

@@ -121,9 +121,6 @@ module top_riscv(
     // ============================================================
     wire [6:0]      ex_hazard_opcode_o;
 
-    // unused
-    wire [31:0]     ex_rs1_data_o;
-
     // ex to ex_mem & hazard
     wire [31:0]     ex_rd_data_o;
     wire [4:0]      ex_rd_addr_o;
@@ -442,8 +439,6 @@ module top_riscv(
 
         .jump_en            (ex_jump_en_o),
         .jump_addr_o        (ex_jump_addr_o),
-
-        .rs1_data_o         (ex_rs1_data_o),
 
         .update_btb_en      (ex_pred_update_btb_en),
         .update_gshare_en   (ex_pred_update_gshare_en),

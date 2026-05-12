@@ -9,7 +9,9 @@ module if2(
     input      [31:0]   inst_i,
 
     // to if_id & bpu
+    (* max_fanout = 30 *)
     output reg [31:0]   pc_o,
+    (* max_fanout = 30 *)
     output reg [31:0]   inst_o
 );
     always @(*) begin

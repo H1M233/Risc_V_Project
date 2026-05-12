@@ -243,20 +243,16 @@ module bpu_controller #(
         end
         else begin
             // BTB更新
-            btb_update_en <= update_btb_en;
-            if (update_btb_en) begin
-                btb_update_index            <= btb_update_index_w;
-                btb_update_tag              <= btb_update_tag_w;
-                btb_update_target           <= update_target;
-            end
+            btb_update_en               <= update_btb_en;
+            btb_update_index            <= btb_update_index_w;
+            btb_update_tag              <= btb_update_tag_w;
+            btb_update_target           <= update_target;
             
             // Gshare更新
-            gshare_update_en <= update_gshare_en;
-            if (update_gshare_en) begin
-                gshare_update_pht_index     <= update_pht_index;
-                gshare_actual_taken         <= actual_taken;
-                gshare_pred_mispredict      <= pred_mispredict;
-            end
+            gshare_update_en            <= update_gshare_en;
+            gshare_update_pht_index     <= update_pht_index;
+            gshare_actual_taken         <= actual_taken;
+            gshare_pred_mispredict      <= pred_mispredict;
         end
     end
 endmodule

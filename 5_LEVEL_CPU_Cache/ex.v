@@ -49,9 +49,6 @@ module ex(
     output reg [31:0]   jump_addr_o,
     output reg          jump_en,
 
-    // unused
-    output reg [31:0]   rs1_data_o,
-
     // to bpu
     output reg          update_btb_en,
     output reg          update_gshare_en,
@@ -139,57 +136,79 @@ module ex(
     (* max_fanout = 20 *) wire sel_jal   = is_jal;
     (* max_fanout = 20 *) wire sel_jalr  = is_jalr;
 
+    (* max_fanout = 20 *)
     wire mem_can_forward =  (mem_forward_regs_wen_i) &&
                             (mem_forward_rd_addr_i != 5'b0) &&
                             (mem_forward_opcode_i != `TYPE_L);
 
+    (* max_fanout = 20 *)
     wire wb_can_forward =   (wb_forward_regs_wen_i) &&
                             (wb_forward_rd_addr_i != 5'b0);
 
+    (* max_fanout = 20 *)
     wire rs1_mem_hit =  (mem_can_forward) &&
                         (mem_forward_rd_addr_i == rs1_addr_i);
 
+    (* max_fanout = 20 *)
     wire rs2_mem_hit =  (mem_can_forward) &&
                         (mem_forward_rd_addr_i == rs2_addr_i);
 
+    (* max_fanout = 20 *)
     wire rs1_wb_hit  =  (wb_can_forward) &&
                         (wb_forward_rd_addr_i == rs1_addr_i);
 
+    (* max_fanout = 20 *)
     wire rs2_wb_hit  =  (wb_can_forward) &&
                         (wb_forward_rd_addr_i == rs2_addr_i);
 
+    (* max_fanout = 20 *)
     wire [31:0] rs1_fwd_data =  (rs1_mem_hit) ? mem_forward_rd_data_i :
                                 (rs1_wb_hit)  ? wb_forward_rd_data_i  : 
                                                 rs1_data_i;
 
+    (* max_fanout = 20 *)
     wire [31:0] rs2_fwd_data =  (rs2_mem_hit) ? mem_forward_rd_data_i :
                                 (rs2_wb_hit)  ? wb_forward_rd_data_i  :
                                                 rs2_data_i;
 
     // Branch/JALR 正确性由 hazard 显式 stall 保证。
     // 不在分支比较链路上再接复杂 EX/MEM/WB 转发，避免关键路径变长。
+    (* max_fanout = 20 *)
     wire [31:0] branch_rs1_data = rs1_data_i;
+    (* max_fanout = 20 *)
     wire [31:0] branch_rs2_data = rs2_data_i;
+    (* max_fanout = 20 *)
     wire [31:0] jalr_rs1_data   = rs1_data_i;
 
+    (* max_fanout = 20 *)
     wire uses_rs1_as_value1 =   is_alu_r ||
                                 is_alu_i ||
                                 is_load ||
                                 is_store ||
                                 is_branch;
 
+    (* max_fanout = 20 *)
     wire uses_rs2_as_value2 =   is_alu_r || is_branch;
 
+    (* max_fanout = 20 *)
     wire [31:0] value1_eff = (uses_rs1_as_value1) ? rs1_fwd_data : value1_i;
+    (* max_fanout = 20 *)
     wire [31:0] value2_eff = (uses_rs2_as_value2) ? rs2_fwd_data : value2_i;
 
+    (* max_fanout = 20 *)
     wire [4:0] shamt = value2_eff[4:0];
 
+    (* max_fanout = 20 *)
     wire [31:0] add_res       = value1_eff + value2_eff;
+    (* max_fanout = 20 *)
     wire [31:0] sub_res       = value1_eff - value2_eff;
+    (* max_fanout = 20 *)
     wire [31:0] mem_addr_calc = rs1_fwd_data + value2_i;
+    (* max_fanout = 20 *)
     wire [31:0] branch_target = jump1_i + jump2_i;
+    (* max_fanout = 20 *)
     wire [31:0] jalr_target   = jalr_rs1_data + jump2_i;
+    (* max_fanout = 20 *)
     wire [31:0] pc_plus4      = pc_addr_i + 32'd4;
 
     wire        ltu_res       = (value1_eff < value2_eff);
@@ -209,6 +228,7 @@ module ex(
     wire [31:0] srl_res     = value1_eff >> shamt;
     wire [31:0] sra_res     = $signed(value1_eff) >>> shamt;
 
+    (* max_fanout = 20 *)
     reg branch_taken;
 
     always @(*) begin
@@ -223,12 +243,17 @@ module ex(
         endcase
     end
 
+    (* max_fanout = 20 *)
     wire        branch_pred_mispredict = is_branch && (pred_taken_i != branch_taken);
+    (* max_fanout = 20 *)
     wire        jalr_pred_mispredict   = is_jalr && ((!pred_taken_i) || (pred_pc_i != jalr_target));
 
+    (* max_fanout = 20 *)
     wire        branch_jump_en         = branch_pred_mispredict;
+    (* max_fanout = 20 *)
     wire        jalr_jump_en           = jalr_pred_mispredict;
 
+    (* max_fanout = 20 *)
     wire [31:0] branch_jump_addr       = branch_taken ? branch_target : pc_plus4;
 
     wire [31:0] resolved_jump_addr     = jalr_jump_en   ? jalr_target      :
@@ -284,8 +309,6 @@ module ex(
         rd_data_o           = 32'b0;
         rd_addr_o           = rd_addr_i;
         mem_req_load_o      = valid_i && (opcode_raw == `TYPE_L);
-
-        rs1_data_o          = rs1_fwd_data;
 
         jump_en             = 1'b0;
         jump_addr_o         = 32'b0;

@@ -3,19 +3,19 @@
     "37 INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.516819",
-        "REAL TIME": "10.3001",
-        "ICACHE HIT": "0.99223",
+        "IPC": "0.518463",
+        "REAL TIME": "10.4001",
+        "ICACHE HIT": "0.992202",
         "DCACHE HIT": "0.999916",
         "RUN TIME": "236",
         "LED": "PASS √"
       },
       "src0": {
-        "IPC": "0.456665",
-        "REAL TIME": "590.306",
-        "ICACHE HIT": "0.983232",
+        "IPC": "0.454844",
+        "REAL TIME": "600.505",
+        "ICACHE HIT": "0.975634",
         "DCACHE HIT": "0.872273",
-        "RUN TIME": "12417",
+        "RUN TIME": "12466",
         "LED": "PASS √"
       },
       "src1": {

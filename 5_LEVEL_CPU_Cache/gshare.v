@@ -30,7 +30,7 @@ module gshare #(
     reg     [BHR_WIDTH - 1:0]   ghr_d1;                     // ID阶段时的GHR
     reg     [BHR_WIDTH - 1:0]   ghr_d2;                     // EX阶段时的GHR
     (* ram_style = "block" *)
-    reg     [1:0]               pht [0:PHT_SIZE - 1];       // PHT2位饱和计数器
+    reg     [1:0]               pht [0:PHT_SIZE - 1];       // PHT 2 位饱和计数器
 
     // 查询
     reg pht_update_en_reg;

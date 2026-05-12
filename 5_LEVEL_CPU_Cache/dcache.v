@@ -45,7 +45,7 @@ module dcache#(
 
     // 提取索引
     (* max_fanout = 30 *) reg [INDEX_WIDTH - 1:0] index;
-    (* max_fanout = 30 *) reg [TAG_WIDTH - 1:0]   tag;
+    (* max_fanout = 30 *) reg [TAG_WIDTH - 1:0] tag;
 
     always @(posedge clk) begin
         index   <= cpu_addr[INDEX_WIDTH + 1:2];
@@ -61,6 +61,7 @@ module dcache#(
             wire [TAG_WIDTH:0] tagv_hit_way = tagv_array[`ARRAY_ADDR(index, w0)];
             wire [TAG_WIDTH - 1:0] tag_hit_way = tagv_hit_way[TAG_WIDTH - 1:0];
             wire valid_hit_way = tagv_hit_way[TAG_WIDTH];
+
             assign hit_way[w0] = valid_hit_way && (tag_hit_way == tag);
         end
     endgenerate

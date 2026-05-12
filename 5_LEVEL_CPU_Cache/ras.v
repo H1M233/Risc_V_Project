@@ -26,35 +26,32 @@ module ras #(
 
     assign isempty_o    = (ptr == 0);
     assign isfull_o     = (ptr == DEPTH);
-    assign pop_addr_o   = (pop_en_i && !isempty_o) ? stack_mem[ptr - 1] : 32'b0;
+    assign pop_addr_o   = (pop_en_i && ptr != 0) ? stack_mem[ptr - 1] : 32'b0;
 
     integer i;
-    always@(posedge clk) begin
-        if(!rst) begin
+    initial begin
+        for(i = 0; i < DEPTH; i = i + 1) stack_mem[i] = 32'b0;
+    end
+
+    always @(posedge clk) begin
+        if (rst & push_en_i & ptr != DEPTH) begin
+            stack_mem[ptr]  <= push_addr_i;
+        end
+    end
+
+    always @(posedge clk) begin
+        if (!rst) begin
             ptr <= 0;
-            for(i = 0; i < DEPTH; i = i + 1) stack_mem[i] <= 32'b0;
         end
         else begin
-            // 仅压栈
-            if(push_en_i && !pop_en_i && ptr != DEPTH) begin
-                stack_mem[ptr]  <= push_addr_i;
-                ptr             <= ptr + 1'b1;
+            // 压栈
+            if(push_en_i && ptr != DEPTH) begin
+                ptr <= ptr + 1'b1;
             end
 
-            // 仅出栈
-            else if(!push_en_i && pop_en_i && ptr != 1'b0) begin
-                ptr             <= ptr - 1'b1;
-            end
-
-            // 同时压栈出栈：指针不变
-            else if(push_en_i && pop_en_i) begin 
-                if (ptr != 0) begin
-                    stack_mem[ptr - 1] <= push_addr_i;  // 替换栈顶
-                end 
-                else begin
-                    stack_mem[ptr] <= push_addr_i;      // 栈空时压入
-                    ptr <= ptr + 1'b1;
-                end
+            // 出栈
+            if(pop_en_i && ptr != 1'b0) begin
+                ptr <= ptr - 1'b1;
             end
         end
     end
