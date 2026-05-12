@@ -1,6 +1,9 @@
 `include "ooo_defs.vh"
 
-module lsu_ooo (
+module lsu_ooo #(
+    parameter USE_STORE_BUFFER = 1,
+    parameter STORE_BUFFER_DEPTH = 4
+)(
     input               clk,
     input               rst,
 
@@ -77,6 +80,7 @@ module lsu_ooo (
     reg  [4:0]  rd_r     [0:DEPTH-1];
     reg         wen_r    [0:DEPTH-1];
     reg  [31:0] addr     [0:DEPTH-1];
+    reg  [31:0] imm_save [0:DEPTH-1];
     reg  [31:0] data     [0:DEPTH-1];
     reg  [1:0]  msz      [0:DEPTH-1];
     reg         musig    [0:DEPTH-1];
@@ -99,11 +103,27 @@ module lsu_ooo (
     assign load_wb_tag = load_wb_tag_p;
     assign load_wb_value = load_wb_val_p;
 
-    localparam S_IDLE  = 2'd0;
-    localparam S_LOAD  = 2'd1;
-    localparam S_STORE = 2'd2;
-    localparam S_WAIT  = 2'd3;
-    reg [1:0] state;
+    localparam S_IDLE  = 3'd0;
+    localparam S_LOAD  = 3'd1;
+    localparam S_STORE = 3'd2;
+    localparam S_WAIT  = 3'd3;
+    localparam S_WB    = 3'd4;
+    reg [2:0] state;
+    reg       active_sbuf_store;
+
+    localparam [2:0] SBUF_DEPTH_COUNT = STORE_BUFFER_DEPTH;
+    reg        sb_v    [0:STORE_BUFFER_DEPTH-1];
+    reg [4:0]  sb_rob  [0:STORE_BUFFER_DEPTH-1];
+    reg [31:0] sb_addr [0:STORE_BUFFER_DEPTH-1];
+    reg [31:0] sb_data [0:STORE_BUFFER_DEPTH-1];
+    reg [1:0]  sb_mask [0:STORE_BUFFER_DEPTH-1];
+    reg [1:0]  sb_head;
+    reg [1:0]  sb_tail;
+    reg [2:0]  sb_count;
+
+    localparam [1:0] SBUF_LAST = SBUF_DEPTH_COUNT[1:0] - 2'd1;
+    wire sbuf_empty = (sb_count == 3'b0);
+    wire sbuf_full  = (sb_count == SBUF_DEPTH_COUNT);
 
     wire head_valid    = vld[head];
     wire head_is_load  = is_ld[head];
@@ -156,7 +176,14 @@ module lsu_ooo (
 
     wire [2:0] tail_p1 = tail + 3'd1;
     wire [1:0] push_cnt = {1'b0, pushA_valid} + {1'b0, pushB_valid};
-    wire       will_pop = (state == S_WAIT) && dcache_ack;
+    wire       store_buf_enqueue = USE_STORE_BUFFER &&
+                                   (state == S_IDLE) &&
+                                   head_valid && head_is_store &&
+                                   store_commit_req && (rob[head] == store_commit_rob_tag) &&
+                                   head_addr_rdy && head_data_rdy && !sbuf_full;
+    wire       will_pop = store_buf_enqueue ||
+                          ((state == S_WAIT) && dcache_ack && !active_sbuf_store && !is_ld[head]) ||
+                          ((state == S_WB) && load_wb_pending && load_wb_grant);
 
     integer i;
     always @(posedge clk) begin
@@ -165,6 +192,7 @@ module lsu_ooo (
                 vld[i] <= 1'b0;
                 is_ld[i] <= 1'b0;
                 is_st[i] <= 1'b0;
+                imm_save[i] <= 32'b0;
                 addr_rdy[i] <= 1'b0;
                 data_rdy[i] <= 1'b0;
             end
@@ -182,20 +210,28 @@ module lsu_ooo (
             load_wb_val_p <= 32'b0;
             store_done <= 1'b0;
             store_done_tag <= 5'b0;
+            active_sbuf_store <= 1'b0;
+            sb_head <= 2'b0;
+            sb_tail <= 2'b0;
+            sb_count <= 3'b0;
+            for (i = 0; i < STORE_BUFFER_DEPTH; i = i + 1) begin
+                sb_v[i] <= 1'b0;
+                sb_rob[i] <= 5'b0;
+                sb_addr[i] <= 32'b0;
+                sb_data[i] <= 32'b0;
+                sb_mask[i] <= 2'b0;
+            end
         end else begin
             store_done <= 1'b0;
-
-            if (load_wb_pending && load_wb_grant)
-                load_wb_pending <= 1'b0;
 
             for (i = 0; i < DEPTH; i = i + 1) begin
                 if (vld[i] && !addr_rdy[i]) begin
                     if (cdb_valid_0 && (cdb_tag_0 == r1_tag[i])) begin
                         addr_rdy[i] <= 1'b1;
-                        addr[i] <= cdb_value_0 + addr[i];
+                        addr[i] <= cdb_value_0 + imm_save[i];
                     end else if (cdb_valid_1 && (cdb_tag_1 == r1_tag[i])) begin
                         addr_rdy[i] <= 1'b1;
-                        addr[i] <= cdb_value_1 + addr[i];
+                        addr[i] <= cdb_value_1 + imm_save[i];
                     end
                 end
                 if (vld[i] && is_st[i] && !data_rdy[i]) begin
@@ -218,6 +254,7 @@ module lsu_ooo (
                 wen_r[tail] <= pushA_wen && (pushA_rd != 5'b0);
                 msz[tail] <= pushA_msz;
                 musig[tail] <= pushA_musig;
+                imm_save[tail] <= pushA_imm;
                 r1_tag[tail] <= pushA_rs1_tag;
                 r2_tag[tail] <= pushA_rs2_tag;
                 if (pushA_rs1_ready || pushA_r1_cdb0 || pushA_r1_cdb1) begin
@@ -226,7 +263,7 @@ module lsu_ooo (
                                    pushA_r1_cdb1 ? cdb_value_1 : pushA_rs1_val) + pushA_imm;
                 end else begin
                     addr_rdy[tail] <= 1'b0;
-                    addr[tail] <= pushA_imm;
+                    addr[tail] <= 32'b0;
                 end
                 if (pushA_is_store) begin
                     data_rdy[tail] <= pushA_rs2_ready || pushA_r2_cdb0 || pushA_r2_cdb1;
@@ -247,6 +284,7 @@ module lsu_ooo (
                 wen_r[tail_p1] <= push_wen_1 && (push_rd_1 != 5'b0);
                 msz[tail_p1] <= push_mem_size_1;
                 musig[tail_p1] <= push_mem_unsigned_1;
+                imm_save[tail_p1] <= push_imm_1;
                 r1_tag[tail_p1] <= push_rs1_tag_1;
                 r2_tag[tail_p1] <= push_rs2_tag_1;
                 if (push_rs1_ready_1 || pushB_r1_cdb0 || pushB_r1_cdb1) begin
@@ -255,7 +293,7 @@ module lsu_ooo (
                                       pushB_r1_cdb1 ? cdb_value_1 : push_rs1_val_1) + push_imm_1;
                 end else begin
                     addr_rdy[tail_p1] <= 1'b0;
-                    addr[tail_p1] <= push_imm_1;
+                    addr[tail_p1] <= 32'b0;
                 end
                 if (push_is_store_1) begin
                     data_rdy[tail_p1] <= push_rs2_ready_1 || pushB_r2_cdb0 || pushB_r2_cdb1;
@@ -276,14 +314,38 @@ module lsu_ooo (
                 S_IDLE: begin
                     dcache_req_load <= 1'b0;
                     dcache_req_store <= 1'b0;
-                    if (head_valid && head_is_load && head_addr_rdy && !load_wb_pending) begin
+                    active_sbuf_store <= 1'b0;
+                    if (store_buf_enqueue) begin
+                        sb_v[sb_tail] <= 1'b1;
+                        sb_rob[sb_tail] <= rob[head];
+                        sb_addr[sb_tail] <= addr[head];
+                        sb_data[sb_tail] <= data[head];
+                        sb_mask[sb_tail] <= msz[head];
+                        if (sb_tail == SBUF_LAST)
+                            sb_tail <= 2'b0;
+                        else
+                            sb_tail <= sb_tail + 2'd1;
+                        sb_count <= sb_count + 3'd1;
+                        store_done <= 1'b1;
+                        store_done_tag <= rob[head];
+                        vld[head] <= 1'b0;
+                        head <= head + 3'd1;
+                    end else if (USE_STORE_BUFFER && !sbuf_empty) begin
+                        dcache_req_load <= 1'b0;
+                        dcache_req_store <= 1'b1;
+                        dcache_addr <= sb_addr[sb_head];
+                        dcache_mask <= sb_mask[sb_head];
+                        dcache_wdata <= sb_data[sb_head];
+                        active_sbuf_store <= 1'b1;
+                        state <= S_STORE;
+                    end else if (head_valid && head_is_load && head_addr_rdy && !load_wb_pending) begin
                         dcache_req_load <= 1'b1;
                         dcache_req_store <= 1'b0;
                         dcache_addr <= addr[head];
                         dcache_mask <= msz[head];
                         dcache_wdata <= 32'b0;
                         state <= S_LOAD;
-                    end else if (head_valid && head_is_store &&
+                    end else if (!USE_STORE_BUFFER && head_valid && head_is_store &&
                                  store_commit_req && (rob[head] == store_commit_rob_tag) &&
                                  head_addr_rdy && head_data_rdy) begin
                         dcache_req_load <= 1'b0;
@@ -311,14 +373,33 @@ module lsu_ooo (
 
                 S_WAIT: begin
                     if (dcache_ack) begin
-                        if (is_ld[head]) begin
+                        if (active_sbuf_store) begin
+                            sb_v[sb_head] <= 1'b0;
+                            if (sb_head == SBUF_LAST)
+                                sb_head <= 2'b0;
+                            else
+                                sb_head <= sb_head + 2'd1;
+                            sb_count <= sb_count - 3'd1;
+                            active_sbuf_store <= 1'b0;
+                            state <= S_IDLE;
+                        end else if (is_ld[head]) begin
                             load_wb_pending <= 1'b1;
                             load_wb_tag_p <= rob[head];
                             load_wb_val_p <= load_ext(dcache_rdata, msz[head], musig[head]);
+                            state <= S_WB;
                         end else begin
                             store_done <= 1'b1;
                             store_done_tag <= rob[head];
+                            vld[head] <= 1'b0;
+                            head <= head + 3'd1;
+                            state <= S_IDLE;
                         end
+                    end
+                end
+
+                S_WB: begin
+                    if (load_wb_pending && load_wb_grant) begin
+                        load_wb_pending <= 1'b0;
                         vld[head] <= 1'b0;
                         head <= head + 3'd1;
                         state <= S_IDLE;

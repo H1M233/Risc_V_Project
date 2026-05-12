@@ -1,4 +1,5 @@
 `include "rv32I.vh"
+`include "alu.vh"
 
 module id(
     // from if_id
@@ -26,9 +27,12 @@ module id(
     output reg [31:0]   value2_o,           // 传入寄存器2的数据
     output reg          pred_taken_o,
     output reg [31:0]   pred_pc_o,
+    output reg [`OP_NUM - 1:0] opcode_packged_o,
 
     // to regs & hazard
+    (* max_fanout = 30 *)
     output reg [4:0]    rs1_addr_o,
+    (* max_fanout = 30 *)
     output reg [4:0]    rs2_addr_o
 );  
     // 提取指令
@@ -38,6 +42,19 @@ module id(
     wire [4:0]  rd_o        = inst_i[11:7];             // 传入指令rd地址
     wire [4:0]  rs1_o       = inst_i[19:15];            // 传入指令rs1地址
     wire [4:0]  rs2_o       = inst_i[24:20];            // 传入指令rs2地址
+
+    // 打包 opcode
+    always @(*) begin
+        opcode_packged_o[`OP_I]       = (opcode == `TYPE_I);
+        opcode_packged_o[`OP_R]       = (opcode == `TYPE_R);
+        opcode_packged_o[`OP_AUIPC]   = (opcode == `AUIPC);
+        opcode_packged_o[`OP_LUI]     = (opcode == `LUI);
+        opcode_packged_o[`OP_JAL]     = (opcode == `JAL);
+        opcode_packged_o[`OP_JALR]    = (opcode == `JALR);
+        opcode_packged_o[`OP_BRANCH]  = (opcode == `TYPE_B);
+        opcode_packged_o[`OP_LOAD]    = (opcode == `TYPE_L);
+        opcode_packged_o[`OP_STORE]   = (opcode == `TYPE_S);
+    end
 
     always@(*) begin
         pc_addr_o       = pc_addr_i;

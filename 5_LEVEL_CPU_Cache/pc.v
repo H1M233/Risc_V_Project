@@ -14,7 +14,8 @@ module pc(
     input      [31:0]   jump_addr_i,
     input               jump_en,
 
-    // to if & I-cache
+    // to if
+    (* max_fanout = 30 *)
     output reg [31:0]   pc_addr_o,
 
     // from bpu

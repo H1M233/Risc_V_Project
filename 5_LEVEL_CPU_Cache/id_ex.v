@@ -1,4 +1,5 @@
 `include "rv32I.vh"
+`include "alu.vh"
 
 module id_ex(
     input               clk,
@@ -25,13 +26,14 @@ module id_ex(
     input      [31:0]   value2_i,
     input               pred_taken_i,
     input      [31:0]   pred_pc_i,
-
+    input      [`OP_NUM - 1:0] opcode_packged_i,
 
     // to ex
     output reg [31:0]   pc_addr_o,
     output reg [31:0]   inst_o,
     output reg [31:0]   jump1_o,
     output reg [31:0]   jump2_o,
+    (* max_fanout = 30 *)
     output reg [4:0]    rd_addr_o,
     output reg          regs_wen_o,
     output reg [31:0]   rs1_data_o,
@@ -42,6 +44,7 @@ module id_ex(
     output reg [31:0]   value2_o,
     output reg          pred_taken_o,
     output reg [31:0]   pred_pc_o,
+    output reg [`OP_NUM - 1:0] opcode_packged_o,
     output reg          valid_o
 );
     wire flush_id_ex = jump_en | hazard_en;
@@ -59,6 +62,9 @@ module id_ex(
             rs2_data_o   <= 32'b0;
             rs1_addr_o   <= 5'b0;
             rs2_addr_o   <= 5'b0;
+            pred_taken_o <= 1'b0;
+            pred_pc_o    <= 32'b0;
+            opcode_packged_o <= 0;
             valid_o      <= 1'b0;
         end
         else if(!dcache_stall) begin
@@ -77,19 +83,10 @@ module id_ex(
             rs2_data_o   <= rs2_data_i;
             rs1_addr_o   <= rs1_addr_i;
             rs2_addr_o   <= rs2_addr_i;
-            valid_o      <= ~flush_id_ex;
-        end
-    end
-
-    // ÌØÊâ´¦Àí pred_taken
-    always @(posedge clk) begin
-        if (!rst) begin
-            pred_taken_o <= 1'b0;
-            pred_pc_o    <= 32'b0;
-        end
-        else if (!dcache_stall & !hazard_en) begin
             pred_taken_o <= pred_taken_i;
             pred_pc_o    <= pred_pc_i;
+            opcode_packged_o <= opcode_packged_i;
+            valid_o      <= ~flush_id_ex;
         end
     end
 endmodule

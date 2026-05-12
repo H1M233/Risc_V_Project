@@ -1,9 +1,12 @@
 `include "rv32I.vh"
 
 module dcache#(
+    parameter USE_FAST_DCACHE = 1,
+    parameter USE_SIMPLE_DCACHE_FALLBACK = 0,
     parameter INDEX_WIDTH   = 6,
     parameter TAG_WIDTH     = 24,
-    parameter WAYS          = 2
+    parameter WAYS          = 2,
+    parameter LINE_WORDS    = 1
 )(
     input               clk,
     input               rst,
@@ -22,168 +25,185 @@ module dcache#(
     output reg [31:0]   mem_wdata,
     input      [31:0]   mem_rdata,
 
-    output reg          mem_ack
+    output reg          mem_ack,
+    output reg          perf_load_hit,
+    output reg          perf_load_miss
 );
-    localparam LINE_NUM = 2 ** INDEX_WIDTH;
 
-    (* ram_style = "block" *) reg [31:0] data_array[0:WAYS - 1][0:LINE_NUM - 1];
-    reg [TAG_WIDTH - 1:0] tag_array[0:WAYS - 1][0:LINE_NUM - 1];
-    reg valid_array[0:WAYS - 1][0:LINE_NUM - 1];
-    reg plru_state [0:LINE_NUM - 1];
+    localparam SETS = (1 << INDEX_WIDTH);
 
-    reg        req_valid_q;
+    reg                 valid [0:SETS-1];
+    reg [TAG_WIDTH-1:0] tag   [0:SETS-1];
+    reg [31:0]          data  [0:SETS-1];
+
     reg        req_load_q;
     reg        req_store_q;
     reg [31:0] req_addr_q;
     reg [31:0] req_wdata_q;
     reg [1:0]  req_mask_q;
-    reg [INDEX_WIDTH - 1:0] req_index_q;
-    reg [TAG_WIDTH - 1:0]   req_tag_q;
 
-    localparam IDLE       = 3'd0;
-    localparam LOOKUP     = 3'd1;
-    localparam LOAD_MISS  = 3'd2;
-    localparam LOAD_WAIT  = 3'd3;
-    localparam LOAD_RESP  = 3'd4;
-    localparam STORE_RESP = 3'd5;
+    wire [INDEX_WIDTH-1:0] req_index = req_addr_q[INDEX_WIDTH+1:2];
+    wire [TAG_WIDTH-1:0]   req_tag   = req_addr_q[31:INDEX_WIDTH+2];
 
-    reg [2:0] state;
+    wire req_test_dram  = (req_addr_q >= 32'h8000_0000) &&
+                          (req_addr_q <  32'h8001_0000);
+    wire req_board_dram = (req_addr_q >= 32'h8010_0000) &&
+                          (req_addr_q <  32'h8014_0000);
+    wire req_known_mmio = (req_addr_q[31:12] == 20'h80200);
+    wire req_cacheable  = (req_test_dram || req_board_dram) && !req_known_mmio;
+    wire req_hit = valid[req_index] && (tag[req_index] == req_tag);
+
+    localparam IDLE            = 4'd0;
+    localparam LOOKUP          = 4'd1;
+    localparam LOAD_HIT_RESP   = 4'd2;
+    localparam LOAD_WAIT0      = 4'd3;
+    localparam LOAD_WAIT1      = 4'd4;
+    localparam LOAD_WAIT2      = 4'd5;
+    localparam LOAD_MISS_RESP  = 4'd6;
+    localparam STORE_HOLD      = 4'd7;
+    localparam STORE_ACK       = 4'd8;
+
+    reg [3:0] state;
 
     assign stall = (state != IDLE);
 
-    wire [WAYS - 1:0] hit_way;
-    genvar w0;
-    generate
-        for (w0 = 0; w0 < WAYS; w0 = w0 + 1) begin : hit_gen
-            assign hit_way[w0] = req_valid_q &&
-                                 valid_array[w0][req_index_q] &&
-                                 (tag_array[w0][req_index_q] == req_tag_q);
-        end
-    endgenerate
-
-    wire hit = |hit_way;
-    wire hit_way_idx = hit_way[0] ? 1'b0 :
-                       hit_way[1] ? 1'b1 : 1'b0;
-    wire miss_way_idx = plru_state[req_index_q];
-    wire [31:0] hit_word = data_array[hit_way_idx][req_index_q];
-
-    integer i, w;
+    integer i;
     always @(posedge clk) begin
         if (!rst) begin
             state       <= IDLE;
-            req_valid_q <= 1'b0;
+            cpu_rdata   <= 32'b0;
+            mem_addr    <= 32'b0;
+            mem_we      <= 4'b0000;
+            mem_wen     <= 1'b0;
+            mem_wdata   <= 32'b0;
+            mem_ack     <= 1'b0;
+            perf_load_hit  <= 1'b0;
+            perf_load_miss <= 1'b0;
             req_load_q  <= 1'b0;
             req_store_q <= 1'b0;
             req_addr_q  <= 32'b0;
             req_wdata_q <= 32'b0;
             req_mask_q  <= 2'b0;
-            req_index_q <= {INDEX_WIDTH{1'b0}};
-            req_tag_q   <= {TAG_WIDTH{1'b0}};
-            cpu_rdata   <= 32'b0;
-            mem_addr    <= 32'b0;
-            mem_we      <= 4'b0;
-            mem_wen     <= 1'b0;
-            mem_wdata   <= 32'b0;
-            mem_ack     <= 1'b0;
-
-            for (w = 0; w < WAYS; w = w + 1) begin
-                for (i = 0; i < LINE_NUM; i = i + 1) begin
-                    data_array[w][i] <= 32'b0;
-                    tag_array[w][i] <= {TAG_WIDTH{1'b0}};
-                    valid_array[w][i] <= 1'b0;
-                end
+            for (i = 0; i < SETS; i = i + 1) begin
+                valid[i] <= 1'b0;
+                tag[i]   <= {TAG_WIDTH{1'b0}};
+                data[i]  <= 32'b0;
             end
-            for (i = 0; i < LINE_NUM; i = i + 1)
-                plru_state[i] <= 1'b0;
         end else begin
             mem_ack <= 1'b0;
-            mem_we  <= 4'b0;
-            mem_wen <= 1'b0;
+            perf_load_hit  <= 1'b0;
+            perf_load_miss <= 1'b0;
 
             case (state)
                 IDLE: begin
-                    mem_addr  <= 32'b0;
-                    mem_wdata <= 32'b0;
+                    mem_we  <= 4'b0000;
+                    mem_wen <= 1'b0;
                     if (cpu_req_load || cpu_req_store) begin
-                        req_valid_q <= 1'b1;
                         req_load_q  <= cpu_req_load;
                         req_store_q <= cpu_req_store;
                         req_addr_q  <= cpu_addr;
                         req_wdata_q <= cpu_wdata;
                         req_mask_q  <= cpu_mask;
-                        req_index_q <= cpu_addr[INDEX_WIDTH + 1:2];
-                        req_tag_q   <= cpu_addr[31:INDEX_WIDTH + 2];
-                        state <= LOOKUP;
+                        mem_addr    <= cpu_addr;
+                        mem_wdata   <= cpu_req_store ? store_merge(32'b0, cpu_wdata, cpu_addr[1:0], cpu_mask) : 32'b0;
+                        if (USE_FAST_DCACHE && !USE_SIMPLE_DCACHE_FALLBACK)
+                            state <= LOOKUP;
+                        else if (cpu_req_load)
+                            state <= LOAD_WAIT0;
+                        else
+                            state <= STORE_HOLD;
                     end
                 end
 
                 LOOKUP: begin
-                    if (req_load_q) begin
-                        if (hit) begin
-                            cpu_rdata <= load_shift(hit_word, req_addr_q[1:0], req_mask_q);
-                            mem_ack <= 1'b1;
-                            req_valid_q <= 1'b0;
-                            plru_state[req_index_q] <= ~hit_way_idx;
-                            state <= IDLE;
-                        end else begin
+                    mem_we  <= 4'b0000;
+                    mem_wen <= 1'b0;
+                    if (!req_cacheable) begin
+                        if (req_load_q) begin
                             mem_addr <= req_addr_q;
-                            state <= LOAD_MISS;
+                            state <= LOAD_WAIT0;
+                        end else begin
+                            state <= STORE_HOLD;
                         end
-                    end else if (req_store_q) begin
+                    end else if (req_load_q && req_hit) begin
+                        cpu_rdata <= load_shift(data[req_index], req_addr_q[1:0], req_mask_q);
+                        perf_load_hit <= 1'b1;
+                        state <= LOAD_HIT_RESP;
+                    end else if (req_load_q) begin
+                        mem_addr <= req_addr_q;
+                        perf_load_miss <= 1'b1;
+                        state <= LOAD_WAIT0;
+                    end else begin
                         mem_addr  <= req_addr_q;
                         mem_wdata <= store_merge(32'b0, req_wdata_q, req_addr_q[1:0], req_mask_q);
-                        mem_we    <= unmask(req_mask_q, req_addr_q[1:0]);
-                        mem_wen   <= 1'b1;
-                        if (hit) begin
-                            data_array[hit_way_idx][req_index_q] <= store_merge(
-                                hit_word,
-                                req_wdata_q,
-                                req_addr_q[1:0],
-                                req_mask_q
-                            );
-                            plru_state[req_index_q] <= ~hit_way_idx;
-                        end
-                        state <= STORE_RESP;
-                    end else begin
-                        req_valid_q <= 1'b0;
-                        state <= IDLE;
+                        if (req_hit)
+                            data[req_index] <= store_merge(data[req_index], req_wdata_q, req_addr_q[1:0], req_mask_q);
+                        state <= STORE_HOLD;
                     end
                 end
 
-                LOAD_MISS: begin
-                    mem_addr <= req_addr_q;
-                    state <= LOAD_WAIT;
-                end
-
-                LOAD_WAIT: begin
-                    mem_addr <= req_addr_q;
-                    state <= LOAD_RESP;
-                end
-
-                LOAD_RESP: begin
-                    mem_addr <= req_addr_q;
-                    cpu_rdata <= load_shift(mem_rdata, req_addr_q[1:0], req_mask_q);
-                    valid_array[miss_way_idx][req_index_q] <= 1'b1;
-                    tag_array[miss_way_idx][req_index_q] <= req_tag_q;
-                    data_array[miss_way_idx][req_index_q] <= mem_rdata;
-                    plru_state[req_index_q] <= ~miss_way_idx;
+                LOAD_HIT_RESP: begin
+                    mem_we  <= 4'b0000;
+                    mem_wen <= 1'b0;
                     mem_ack <= 1'b1;
-                    req_valid_q <= 1'b0;
                     state <= IDLE;
                 end
 
-                STORE_RESP: begin
+                LOAD_WAIT0: begin
+                    mem_we   <= 4'b0000;
+                    mem_wen  <= 1'b0;
+                    mem_addr <= req_addr_q;
+                    state <= LOAD_WAIT1;
+                end
+
+                LOAD_WAIT1: begin
+                    mem_we   <= 4'b0000;
+                    mem_wen  <= 1'b0;
+                    mem_addr <= req_addr_q;
+                    state <= LOAD_WAIT2;
+                end
+
+                LOAD_WAIT2: begin
+                    mem_we   <= 4'b0000;
+                    mem_wen  <= 1'b0;
+                    mem_addr <= req_addr_q;
+                    state <= LOAD_MISS_RESP;
+                end
+
+                LOAD_MISS_RESP: begin
+                    mem_we    <= 4'b0000;
+                    mem_wen   <= 1'b0;
+                    mem_addr  <= req_addr_q;
+                    cpu_rdata <= load_shift(mem_rdata, req_addr_q[1:0], req_mask_q);
+                    if (USE_FAST_DCACHE && !USE_SIMPLE_DCACHE_FALLBACK && req_cacheable) begin
+                        valid[req_index] <= 1'b1;
+                        tag[req_index]   <= req_tag;
+                        data[req_index]  <= mem_rdata;
+                    end
+                    mem_ack <= 1'b1;
+                    state <= IDLE;
+                end
+
+                STORE_HOLD: begin
+                    mem_addr  <= req_addr_q;
+                    mem_wdata <= store_merge(32'b0, req_wdata_q, req_addr_q[1:0], req_mask_q);
+                    mem_we    <= unmask(req_mask_q, req_addr_q[1:0]);
+                    mem_wen   <= 1'b1;
+                    state <= STORE_ACK;
+                end
+
+                STORE_ACK: begin
+                    mem_we    <= 4'b0000;
+                    mem_wen   <= 1'b0;
                     mem_addr  <= req_addr_q;
                     mem_wdata <= store_merge(32'b0, req_wdata_q, req_addr_q[1:0], req_mask_q);
                     mem_ack   <= 1'b1;
-                    req_valid_q <= 1'b0;
                     state <= IDLE;
                 end
 
                 default: begin
-                    req_valid_q <= 1'b0;
-                    mem_addr <= 32'b0;
-                    mem_wdata <= 32'b0;
+                    mem_we  <= 4'b0000;
+                    mem_wen <= 1'b0;
                     state <= IDLE;
                 end
             endcase
@@ -211,8 +231,12 @@ module dcache#(
                         default: unmask = 4'b0000;
                     endcase
                 end
-                2'b10: unmask = 4'b1111;
-                default: unmask = 4'b0000;
+                2'b10: begin
+                    unmask = 4'b1111;
+                end
+                default: begin
+                    unmask = 4'b0000;
+                end
             endcase
         end
     endfunction
@@ -239,8 +263,12 @@ module dcache#(
                         default: load_shift = 32'b0;
                     endcase
                 end
-                2'b10: load_shift = word;
-                default: load_shift = word;
+                2'b10: begin
+                    load_shift = word;
+                end
+                default: begin
+                    load_shift = word;
+                end
             endcase
         end
     endfunction
@@ -269,8 +297,12 @@ module dcache#(
                         default: store_merge = old_word;
                     endcase
                 end
-                2'b10: store_merge = wdata;
-                default: store_merge = old_word;
+                2'b10: begin
+                    store_merge = wdata;
+                end
+                default: begin
+                    store_merge = old_word;
+                end
             endcase
         end
     endfunction

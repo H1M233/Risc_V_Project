@@ -29,22 +29,52 @@ module gshare #(
     reg     [BHR_WIDTH - 1:0]   ghr;                        // GHR全局历史寄存器：用于投机更新
     reg     [BHR_WIDTH - 1:0]   ghr_d1;                     // ID阶段时的GHR
     reg     [BHR_WIDTH - 1:0]   ghr_d2;                     // EX阶段时的GHR
-    reg     [1:0]               pht[0:PHT_SIZE - 1];        // PHT2位饱和计数器
+    (* ram_style = "block" *)
+    reg     [1:0]               pht [0:PHT_SIZE - 1];       // PHT2位饱和计数器
 
     // 查询
+    reg pht_update_en_reg;
+    reg [1:0] pht_reg, pht_update_old, pht_update_new, update_taken_reg;
+    reg [BHR_WIDTH - 1:0] update_pht_index_reg;
     assign gshare_ghr_o     = ghr;
     assign gshare_ghr_d2_o  = ghr_d2;
-    assign pred_taken_o     = pht[pht_index_i][1];
+    assign pred_taken_o     = pht_reg[1];
 
-    // 更新
+    // Block RAM
     integer i;
+    initial begin
+        for (i = 0; i < PHT_SIZE; i = i + 1) begin
+            pht[i] = 2'b01;
+        end
+    end
+    always @(posedge clk) begin
+        // 读
+        pht_reg         <= pht[pht_index_i];
+        pht_update_old  <= pht[update_pht_index_i];
+
+        // 写
+        if (rst & pht_update_en_reg) begin
+            pht[update_pht_index_reg] <= pht_update_new;
+        end
+    end
+    
+    // 更新
+    always @(*) begin
+        case(pht_update_old)
+            2'b00:      pht_update_new = (update_taken_reg) ? 2'b01 : 2'b00;
+            2'b01:      pht_update_new = (update_taken_reg) ? 2'b10 : 2'b00;
+            2'b10:      pht_update_new = (update_taken_reg) ? 2'b11 : 2'b01;
+            2'b11:      pht_update_new = (update_taken_reg) ? 2'b11 : 2'b10;
+            default:    pht_update_new = 2'b00;
+        endcase
+    end
+
     always@(posedge clk) begin
         if(!rst) begin
             // 复位
             ghr     <= 0;
             ghr_d1  <= 0;
             ghr_d2  <= 0;
-            for(i = 0; i < PHT_SIZE; i = i + 1) pht[i] <= 2'b01;
         end
         else begin
             // 流水线延迟
@@ -52,20 +82,13 @@ module gshare #(
             ghr_d2  <= ghr_d1;
             
             // 更新
-            if(update_en_i) begin
-                // PHT
-                case(pht[update_pht_index_i])
-                    2'b00:      pht[update_pht_index_i] <= (actual_taken_i) ? 2'b01 : 2'b00;
-                    2'b01:      pht[update_pht_index_i] <= (actual_taken_i) ? 2'b10 : 2'b00;
-                    2'b10:      pht[update_pht_index_i] <= (actual_taken_i) ? 2'b11 : 2'b01;
-                    2'b11:      pht[update_pht_index_i] <= (actual_taken_i) ? 2'b11 : 2'b10;
-                    default:    pht[update_pht_index_i] <= 2'b00;
-                endcase
-            end
+            pht_update_en_reg       <= update_en_i;
+            update_taken_reg        <= actual_taken_i;
+            update_pht_index_reg    <= update_pht_index_i;
 
             // GHR
-            if      (update_en_i && pred_mispredict_i)  ghr <= {ghr_d2[BHR_WIDTH - 2:0], actual_taken_i};     // 预测错误回退GHR
-            else if (prev_b)                            ghr <= {ghr[BHR_WIDTH - 2:0], pred_taken_o};          // 预测投机更新GHR
+            if      (pht_update_en_reg)  ghr <= {ghr_d2[BHR_WIDTH - 2:0], update_taken_reg};    // 预测错误回退GHR
+            else if (prev_b)             ghr <= {ghr[BHR_WIDTH - 2:0], pred_taken_o};           // 预测投机更新GHR
             // 其他情况不更新GHR
         end
     end

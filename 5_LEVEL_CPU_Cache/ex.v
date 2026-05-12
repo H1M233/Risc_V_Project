@@ -1,4 +1,5 @@
 `include "rv32I.vh"
+`include "alu.vh"
 
 module ex(
     // from id_ex
@@ -16,6 +17,8 @@ module ex(
     input      [31:0]   value2_i,
     input               pred_taken_i,
     input      [31:0]   pred_pc_i,
+    input      [8:0]    opcode_packged_i,
+    (* max_fanout = 20 *)
     input               valid_i,
 
     // from mem
@@ -36,9 +39,11 @@ module ex(
     output reg [31:0]   inst_o,
     output reg          regs_wen_o,
 
-    // to ex_mem & hazard
+    // to ex_mem & hazard   
     output reg [4:0]    rd_addr_o,
+    (* max_fanout = 20 *)
     output reg [31:0]   rd_data_o,
+    output reg          mem_req_load_o,
 
     // to jump
     output reg [31:0]   jump_addr_o,
@@ -50,6 +55,7 @@ module ex(
     // to bpu
     output reg          update_btb_en,
     output reg          update_gshare_en,
+    (* max_fanout = 20 *)
     output reg [31:0]   pc_addr_o,
     output reg [31:0]   update_target,
     output reg          actual_taken,
@@ -62,10 +68,76 @@ module ex(
     output reg [31:0]   dcache_addr,
     output reg [31:0]   dcache_wdata
 );
+    (* max_fanout = 20 *)
     wire [6:0] opcode_raw = inst_i[6:0];
-    wire [6:0] opcode     = valid_i ? opcode_raw : `TYPE_I;
+    (* max_fanout = 20 *)
     wire [2:0] funct3     = inst_i[14:12];
+    (* max_fanout = 20 *)
     wire [6:0] funct7     = inst_i[31:25];
+
+    // 主操作码独热
+    (* max_fanout = 20 *) wire is_alu_i  = valid_i & opcode_packged_i[`OP_I];
+    (* max_fanout = 20 *) wire is_alu_r  = valid_i & opcode_packged_i[`OP_R];
+    (* max_fanout = 20 *) wire is_auipc  = valid_i & opcode_packged_i[`OP_AUIPC];
+    (* max_fanout = 20 *) wire is_lui    = valid_i & opcode_packged_i[`OP_LUI];
+    (* max_fanout = 20 *) wire is_jal    = valid_i & opcode_packged_i[`OP_JAL];
+    (* max_fanout = 20 *) wire is_jalr   = valid_i & opcode_packged_i[`OP_JALR];
+    (* max_fanout = 20 *) wire is_branch = valid_i & opcode_packged_i[`OP_BRANCH];
+    (* max_fanout = 20 *) wire is_load   = valid_i & opcode_packged_i[`OP_LOAD];
+    (* max_fanout = 20 *) wire is_store  = valid_i & opcode_packged_i[`OP_STORE];
+
+    // funct3
+    (* max_fanout = 20 *) wire f3_000 = (funct3 == 3'b000); // ADD/SUB, ADDI, LB, SB
+    (* max_fanout = 20 *) wire f3_001 = (funct3 == 3'b001); // SLL, SLLI, LH, SH
+    (* max_fanout = 20 *) wire f3_010 = (funct3 == 3'b010); // SLT, SLTI, LW, SW
+    (* max_fanout = 20 *) wire f3_011 = (funct3 == 3'b011); // SLTU, SLTIU
+    (* max_fanout = 20 *) wire f3_100 = (funct3 == 3'b100); // XOR, XORI, LBU
+    (* max_fanout = 20 *) wire f3_101 = (funct3 == 3'b101); // SRL/SRA, SRLI/SRAI, LHU
+    (* max_fanout = 20 *) wire f3_110 = (funct3 == 3'b110); // OR, ORI
+    (* max_fanout = 20 *) wire f3_111 = (funct3 == 3'b111); // AND, ANDI
+
+    // funct7
+    (* max_fanout = 20 *) wire f7_0000000 = (funct7 == 7'b0000000);
+    (* max_fanout = 20 *) wire f7_0100000 = (funct7 == 7'b0100000);
+
+    // I-type
+    (* max_fanout = 20 *) wire sel_addi  = is_alu_i & f3_000;
+    (* max_fanout = 20 *) wire sel_slti  = is_alu_i & f3_010;
+    (* max_fanout = 20 *) wire sel_sltiu = is_alu_i & f3_011;
+    (* max_fanout = 20 *) wire sel_xori  = is_alu_i & f3_100;
+    (* max_fanout = 20 *) wire sel_ori   = is_alu_i & f3_110;
+    (* max_fanout = 20 *) wire sel_andi  = is_alu_i & f3_111;
+    (* max_fanout = 20 *) wire sel_slli  = is_alu_i & f3_001;
+    (* max_fanout = 20 *) wire sel_srli  = is_alu_i & f3_101 & f7_0000000;
+    (* max_fanout = 20 *) wire sel_srai  = is_alu_i & f3_101 & f7_0100000;
+
+    // R-type
+    (* max_fanout = 20 *) wire sel_add   = is_alu_r & f3_000 & f7_0000000;
+    (* max_fanout = 20 *) wire sel_sub   = is_alu_r & f3_000 & f7_0100000;
+    (* max_fanout = 20 *) wire sel_sll   = is_alu_r & f3_001;
+    (* max_fanout = 20 *) wire sel_slt   = is_alu_r & f3_010;
+    (* max_fanout = 20 *) wire sel_sltu  = is_alu_r & f3_011;
+    (* max_fanout = 20 *) wire sel_xor   = is_alu_r & f3_100;
+    (* max_fanout = 20 *) wire sel_srl   = is_alu_r & f3_101 & f7_0000000;
+    (* max_fanout = 20 *) wire sel_sra   = is_alu_r & f3_101 & f7_0100000;
+    (* max_fanout = 20 *) wire sel_or    = is_alu_r & f3_110;
+    (* max_fanout = 20 *) wire sel_and   = is_alu_r & f3_111;
+
+    // Load & Store
+    (* max_fanout = 20 *) wire sel_lb    = is_load & f3_000;
+    (* max_fanout = 20 *) wire sel_lh    = is_load & f3_001;
+    (* max_fanout = 20 *) wire sel_lw    = is_load & f3_010;
+    (* max_fanout = 20 *) wire sel_lbu   = is_load & f3_100;
+    (* max_fanout = 20 *) wire sel_lhu   = is_load & f3_101;
+    (* max_fanout = 20 *) wire sel_sb    = is_store & f3_000;
+    (* max_fanout = 20 *) wire sel_sh    = is_store & f3_001;
+    (* max_fanout = 20 *) wire sel_sw    = is_store & f3_010;
+
+    // 其它
+    (* max_fanout = 20 *) wire sel_lui   = is_lui;
+    (* max_fanout = 20 *) wire sel_auipc = is_auipc;
+    (* max_fanout = 20 *) wire sel_jal   = is_jal;
+    (* max_fanout = 20 *) wire sel_jalr  = is_jalr;
 
     wire mem_can_forward =  (mem_forward_regs_wen_i) &&
                             (mem_forward_rd_addr_i != 5'b0) &&
@@ -94,23 +166,19 @@ module ex(
                                 (rs2_wb_hit)  ? wb_forward_rd_data_i  :
                                                 rs2_data_i;
 
-    wire is_branch = valid_i && (opcode_raw == `TYPE_B);
-    wire is_jalr   = valid_i && (opcode_raw == `JALR);
-
     // Branch/JALR 正确性由 hazard 显式 stall 保证。
     // 不在分支比较链路上再接复杂 EX/MEM/WB 转发，避免关键路径变长。
     wire [31:0] branch_rs1_data = rs1_data_i;
     wire [31:0] branch_rs2_data = rs2_data_i;
     wire [31:0] jalr_rs1_data   = rs1_data_i;
 
-    wire uses_rs1_as_value1 =   (opcode == `TYPE_R) ||
-                                (opcode == `TYPE_I) ||
-                                (opcode == `TYPE_L) ||
-                                (opcode == `TYPE_S) ||
-                                (opcode == `TYPE_B);
+    wire uses_rs1_as_value1 =   is_alu_r ||
+                                is_alu_i ||
+                                is_load ||
+                                is_store ||
+                                is_branch;
 
-    wire uses_rs2_as_value2 =   (opcode == `TYPE_R) ||
-                                (opcode == `TYPE_B);
+    wire uses_rs2_as_value2 =   is_alu_r || is_branch;
 
     wire [31:0] value1_eff = (uses_rs1_as_value1) ? rs1_fwd_data : value1_i;
     wire [31:0] value2_eff = (uses_rs2_as_value2) ? rs2_fwd_data : value2_i;
@@ -169,12 +237,53 @@ module ex(
 
     wire        resolved_jump_en       = branch_jump_en | jalr_jump_en;
 
+    (* max_fanout = 20 *) wire [31:0] alu_result;
+    (* max_fanout = 20 *) reg [31:0] alu_result_pre;
+
+    // ALU 结果（TYPE_I 和 TYPE_R 公用一个预选）
     always @(*) begin
+        alu_result_pre = 32'b0;
+
+        (* parallel_case, full_case *)
+        case (1'b1)
+            sel_addi:  alu_result_pre = add_res;
+            sel_slti:  alu_result_pre = {31'b0, lts_res};
+            sel_sltiu: alu_result_pre = {31'b0, ltu_res};
+            sel_xori:  alu_result_pre = xor_res;
+            sel_ori:   alu_result_pre = or_res;
+            sel_andi:  alu_result_pre = and_res;
+            sel_slli:  alu_result_pre = sll_res;
+            sel_srli:  alu_result_pre = srl_res;
+            sel_srai:  alu_result_pre = sra_res;
+
+            sel_add:   alu_result_pre = add_res;
+            sel_sub:   alu_result_pre = sub_res;
+            sel_sll:   alu_result_pre = sll_res;
+            sel_slt:   alu_result_pre = {31'b0, lts_res};
+            sel_sltu:  alu_result_pre = {31'b0, ltu_res};
+            sel_xor:   alu_result_pre = xor_res;
+            sel_srl:   alu_result_pre = srl_res;
+            sel_sra:   alu_result_pre = sra_res;
+            sel_or:    alu_result_pre = or_res;
+            sel_and:   alu_result_pre = and_res;
+
+            sel_lui:   alu_result_pre = add_res;
+            sel_auipc: alu_result_pre = add_res;
+            sel_jal:   alu_result_pre = add_res;
+            sel_jalr:  alu_result_pre = add_res;
+            default:   alu_result_pre = 32'b0;
+        endcase
+    end
+
+    assign alu_result = alu_result_pre;
+
+    always @(*) begin
+        // 默认值
         pc_addr_o           = pc_addr_i;
         regs_wen_o          = valid_i ? regs_wen_i : 1'b0;
-
         rd_data_o           = 32'b0;
         rd_addr_o           = rd_addr_i;
+        mem_req_load_o      = valid_i && (opcode_raw == `TYPE_L);
 
         rs1_data_o          = rs1_fwd_data;
 
@@ -196,197 +305,41 @@ module ex(
         dcache_addr         = mem_addr_calc;
         dcache_wdata        = rs2_fwd_data;
 
-        case (opcode)
-
-            `LUI: begin
-                rd_data_o = add_res;
+        // 数据回写: ALU & 立即数 & 跳转
+        if (valid_i) begin
+            if (is_lui | is_auipc | is_jal | is_jalr | is_alu_i | is_alu_r) begin
+                rd_data_o = alu_result;
             end
+        end
 
-            `AUIPC: begin
-                rd_data_o = add_res;
-            end
+        // 分支 & 跳转 控制
+        if (is_branch) begin
+            update_gshare_en = valid_i;
+            actual_taken     = branch_taken;
+            pred_mispredict  = branch_pred_mispredict;
+            jump_en          = branch_jump_en;
+            jump_addr_o      = branch_jump_addr;
+        end
+        if (is_jalr) begin
+            update_btb_en   = valid_i;
+            update_target   = jalr_target;
+            pred_mispredict = jalr_pred_mispredict;
+            jump_en         = resolved_jump_en;
+            jump_addr_o     = resolved_jump_addr;
+        end
 
-            `JAL: begin
-                rd_data_o = add_res;
-            end
-
-            `JALR: begin
-                rd_data_o       = add_res;
-                update_btb_en   = valid_i;
-                update_target   = jalr_target;
-                pred_mispredict = jalr_pred_mispredict;
-                jump_en         = resolved_jump_en;
-                jump_addr_o     = resolved_jump_addr;
-            end
-
-            `TYPE_B: begin
-                update_gshare_en = valid_i;
-                actual_taken     = branch_taken;
-                pred_mispredict  = branch_pred_mispredict;
-                jump_en          = resolved_jump_en;
-                jump_addr_o      = resolved_jump_addr;
-            end
-
-            `TYPE_L: begin
-                case(funct3)
-                    `LB: begin
-                        dcache_mask  = 2'b00;
-                    end
-
-                    `LH: begin
-                        dcache_mask  = 2'b01;
-                    end
-
-                    `LW: begin
-                        dcache_mask  = 2'b10;
-                    end
-
-                    `LBU: begin
-                        dcache_mask  = 2'b00;
-                    end
-
-                    `LHU: begin
-                        dcache_mask  = 2'b01;
-                    end
-                    
-                    default: begin
-                        dcache_mask  = 2'b00;
-                    end
-                endcase
-            end
-
-            `TYPE_S: begin
-                case (funct3)
-                    `SB: begin
-                        dcache_mask = 2'b00;
-                    end
-                    `SH: begin
-                        dcache_mask = 2'b01;
-                    end
-                    `SW: begin
-                        dcache_mask = 2'b10;
-                    end
-                    default: begin
-                        dcache_mask = 2'b00;
-                    end
-                endcase
-            end
-
-            `TYPE_I: begin
-                case (funct3)
-                    `ADDI: begin
-                        rd_data_o = add_res;
-                    end
-
-                    `SLTI: begin
-                        rd_data_o = {31'b0, lts_res};
-                    end
-
-                    `SLTIU: begin
-                        rd_data_o = {31'b0, ltu_res};
-                    end
-
-                    `XORI: begin
-                        rd_data_o = xor_res;
-                    end
-
-                    `ORI: begin
-                        rd_data_o = or_res;
-                    end
-
-                    `ANDI: begin
-                        rd_data_o = and_res;
-                    end
-
-                    `SLLI: begin
-                        rd_data_o = sll_res;
-                    end
-
-                    `SRLI_SRAI: begin
-                        if (funct7 == 7'b0000000) begin
-                            rd_data_o = srl_res;
-                        end
-                        else if (funct7 == 7'b0100000) begin
-                            rd_data_o = sra_res;
-                        end
-                        else begin
-                            rd_data_o = 32'b0;
-                        end
-                    end
-
-                    default: begin
-                        rd_data_o = 32'b0;
-                    end
-                endcase
-            end
-
-            `TYPE_R: begin
-                case (funct3)
-                    `ADD_SUB: begin
-                        if (funct7 == 7'b0000000) begin
-                            rd_data_o = add_res;
-                        end
-                        else if (funct7 == 7'b0100000) begin
-                            rd_data_o = sub_res;
-                        end
-                        else begin
-                            rd_data_o = 32'b0;
-                        end
-                    end
-
-                    `SLL: begin
-                        rd_data_o = sll_res;
-                    end
-
-                    `SLT: begin
-                        rd_data_o = {31'b0, lts_res};
-                    end
-
-                    `SLTU: begin
-                        rd_data_o = {31'b0, ltu_res};
-                    end
-
-                    `XOR: begin
-                        rd_data_o = xor_res;
-                    end
-
-                    `SRL_SRA: begin
-                        if (funct7 == 7'b0000000) begin
-                            rd_data_o = srl_res;
-                        end
-                        else if (funct7 == 7'b0100000) begin
-                            rd_data_o = sra_res;
-                        end
-                        else begin
-                            rd_data_o = 32'b0;
-                        end
-                    end
-
-                    `OR: begin
-                        rd_data_o = or_res;
-                    end
-
-                    `AND: begin
-                        rd_data_o = and_res;
-                    end
-
-                    default: begin
-                        rd_data_o = 32'b0;
-                    end
-                endcase
-            end
-
-            default: begin
-                rd_data_o        = 32'b0;
-                jump_en          = 1'b0;
-                jump_addr_o      = 32'b0;
-                update_btb_en    = 1'b0;
-                update_gshare_en = 1'b0;
-                update_target    = 32'b0;
-                actual_taken     = 1'b0;
-                pred_mispredict  = 1'b0;
-            end
+        // DCACHE 控制: load & store
+        (* parallel_case, full_case *)
+        case (1'b1)
+            sel_lb:  dcache_mask = 2'b00;
+            sel_lh:  dcache_mask = 2'b01;
+            sel_lw:  dcache_mask = 2'b10;
+            sel_lbu: dcache_mask = 2'b00;
+            sel_lhu: dcache_mask = 2'b01;
+            sel_sb:  dcache_mask = 2'b00;
+            sel_sh:  dcache_mask = 2'b01;
+            sel_sw:  dcache_mask = 2'b10;
+            default: dcache_mask = 2'b00;
         endcase
     end
-
 endmodule

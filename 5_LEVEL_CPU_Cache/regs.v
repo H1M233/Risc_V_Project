@@ -14,7 +14,9 @@ module regs(
     input      [4:0]    rs2_addr_i,
 
     // to id
+    (* max_fanout = 30 *)
     output reg [31:0]   rs1_data_o,
+    (* max_fanout = 30 *)
     output reg [31:0]   rs2_data_o
 );
     reg [31:0] regs[31:0];              // 32个32位寄存器
@@ -46,14 +48,13 @@ module regs(
 
     integer i;
     // 写寄存器
+    initial begin
+        for (i = 0; i < 32; i = i + 1) begin
+            regs[i] = 32'b0;
+        end
+    end
     always @(posedge clk) begin
-        if (!rst) begin
-            // 复位时将所有寄存器清零
-            for (i = 0; i < 32; i = i + 1) begin
-                regs[i] <= 32'b0;
-            end
-        end 
-        else if (regs_wen && (rd_addr_i != 0))  begin
+        if (rst && regs_wen && (rd_addr_i != 0))  begin
             regs[rd_addr_i] <= rd_data_i;       // 写入数据到指定寄存器，x0寄存器不可写
         end
     end

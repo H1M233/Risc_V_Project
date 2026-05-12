@@ -19,6 +19,7 @@ module dcache#(
     input               cpu_req_store,
     input      [1:0]    cpu_mask,
     input      [31:0]   cpu_addr,
+    (* max_fanout = 20 *)
     input      [31:0]   cpu_wdata,
     output reg [31:0]   cpu_rdata,
     output              stall,
@@ -35,14 +36,16 @@ module dcache#(
     localparam LINE_NUM = 2 ** INDEX_WIDTH;
 
     // 存储结构：
-    (* ram_style = "block" *) reg [31:0] data_array[0:WAYS - 1][0:LINE_NUM - 1];
-    reg [TAG_WIDTH - 1:0] tag_array[0:WAYS - 1][0:LINE_NUM - 1];
-    reg valid_array[0:WAYS - 1][0:LINE_NUM - 1];
+    localparam ARRAY_DEPTH = LINE_NUM * WAYS;   // vivado 不会推断二维数组为 memory
+    (* ram_style = "block" *) reg [31:0] data_array[0:ARRAY_DEPTH - 1];
+    (* ram_style = "distributed" *) reg [TAG_WIDTH:0] tagv_array[0:ARRAY_DEPTH - 1];
     reg plru_state [0:LINE_NUM - 1];                // 每组的访问历史（用于选择替换哪一路）
 
+    `define ARRAY_ADDR(index, way) ((index) * WAYS + way)
+
     // 提取索引
-    reg [INDEX_WIDTH - 1:0] index;
-    reg [TAG_WIDTH - 1:0]   tag;
+    (* max_fanout = 30 *) reg [INDEX_WIDTH - 1:0] index;
+    (* max_fanout = 30 *) reg [TAG_WIDTH - 1:0]   tag;
 
     always @(posedge clk) begin
         index   <= cpu_addr[INDEX_WIDTH + 1:2];
@@ -55,15 +58,18 @@ module dcache#(
     genvar w0;
     generate
         for(w0 = 0; w0 < WAYS; w0 = w0 + 1) begin : hit_gen
-            assign hit_way[w0] = valid_array[w0][index] && (tag_array[w0][index] == tag);
+            wire [TAG_WIDTH:0] tagv_hit_way = tagv_array[`ARRAY_ADDR(index, w0)];
+            wire [TAG_WIDTH - 1:0] tag_hit_way = tagv_hit_way[TAG_WIDTH - 1:0];
+            wire valid_hit_way = tagv_hit_way[TAG_WIDTH];
+            assign hit_way[w0] = valid_hit_way && (tag_hit_way == tag);
         end
     endgenerate
     
     // DCACHE 输出缓存
     reg [31:0] cache_rdata_reg [0:1];
     always @(posedge clk) begin
-        cache_rdata_reg[0] <= data_array[0][index];
-        cache_rdata_reg[1] <= data_array[1][index];
+        cache_rdata_reg[0] <= data_array[`ARRAY_ADDR(index, 0)];
+        cache_rdata_reg[1] <= data_array[`ARRAY_ADDR(index, 1)];
     end
 
     // 状态
@@ -80,7 +86,7 @@ module dcache#(
     wire cpu_req = (cpu_req_load | cpu_req_store);
     reg cpu_req_load_reg;
     reg cpu_req_store_reg;
-    reg finished;
+    (* max_fanout = 20 *)
     reg [31:0] cpu_wdata_reg, cpu_wdata_reg_reg;
     reg [31:0] cpu_addr_reg, cpu_addr_reg_reg;
     reg [1:0]  cpu_mask_reg, cpu_mask_reg_reg;
@@ -98,26 +104,24 @@ module dcache#(
     // 冻结流水线条件
     assign stall = cpu_req & (state == QUERY_AND_LOAD | state == HIT_BRANCH | state == LOAD_MISS_WAIT);
 
-    integer i, w;
+    // LUT as Logic
+    integer i;
+    initial begin
+        for (i = 0; i < ARRAY_DEPTH; i = i + 1) begin
+            tagv_array[i] = 0;
+        end
+        for (i = 0; i < LINE_NUM; i = i + 1) plru_state[i] = 1'b0;
+    end
     always @(posedge clk) begin
         if(!rst) begin
             state       <= QUERY_AND_LOAD;
             cpu_rdata   <= 32'b0;
-            finished    <= 1'b0;
 
             mem_addr    <= 32'b0;
             mem_wdata   <= 32'b0;
             mem_we      <= 4'b0;
             mem_wen     <= 1'b0;
             mem_ack     <= 1'b0;
-
-            // 重置寄存器
-            for (w = 0; w < WAYS; w = w + 1) begin
-                for (i = 0; i < LINE_NUM; i = i + 1) begin
-                    valid_array[w][i] <= 1'b0;
-                end
-            end
-            for (i = 0; i < LINE_NUM; i = i + 1) plru_state[i] <= 1'b0;
         end
         else begin  
             // 传输 DRAM
@@ -138,21 +142,15 @@ module dcache#(
             index_reg           <= index;
             tag_reg             <= tag;
 
-            mem_ack             <= finished;
+            mem_ack             <= (state == LOAD_HIT_OUTPUT | state == LOAD_MISS_OUTPUT | state == STORE_HIT | state == STORE_MISS);
 
-            // casez (hit_way)
-            //     2'b?1: hit_way_idx <= 1'b0;
-            //     2'b10: hit_way_idx <= 1'b1;
-            //     default: hit_way_idx <= 1'b0;
-            // endcase 
-            hit_way_idx <= ~hit_way[0];     // 由于只有两路直接优化判断 way0 是否命中，已有 hit 在外层做判断
+            hit_way_idx         <= ~hit_way[0];     // 由于只有两路直接优化判断 way0 是否命中，已有 hit 在外层做判断
 
             case(state)
                 QUERY_AND_LOAD: begin
                     // 状态判断
                     if (cpu_req_load | cpu_req_store) begin
                         state <= HIT_BRANCH;
-                        finished <= 1'b0;
                     end
                 end
 
@@ -160,28 +158,23 @@ module dcache#(
                     if (cpu_req_load_reg) begin
                         if (hit) begin
                             state <= LOAD_HIT_OUTPUT;
-                            finished <= 1'b1;
                         end
                         else begin
                             state <= LOAD_MISS_WAIT;
-                            finished <= 1'b0;
                         end
                     end
                     else if (cpu_req_store_reg) begin
                         if (hit) begin
                             state <= STORE_HIT;
-                            finished <= 1'b1;
                         end
                         else begin
                             state <= STORE_MISS;
-                            finished <= 1'b1;
                         end
                     end
                 end
 
                 LOAD_HIT_OUTPUT: begin
                     cpu_rdata <= load_shift(cache_rdata_reg[hit_way_idx], cpu_addr_reg_reg[1:0], cpu_mask_reg_reg);
-                    finished <= 1'b0;
                     state <= QUERY_AND_LOAD;
                 end
 
@@ -194,41 +187,48 @@ module dcache#(
 
                     plru_state[index_reg]   <= ~plru_state[index_reg];
                     state                   <= LOAD_MISS_OUTPUT;
-                    finished                <= 1'b1;
                 end
 
                 LOAD_MISS_OUTPUT: begin
                     cpu_rdata <= load_shift(mem_rdata, miss_addr[1:0], miss_mask);
-                    valid_array[miss_way][miss_index] <= 1'b1;
-                    tag_array[miss_way][miss_index]   <= miss_tag;
-                    data_array[miss_way][miss_index]  <= mem_rdata;
                     state <= QUERY_AND_LOAD;
-                    finished <= 1'b0;
                 end
 
                 STORE_HIT: begin
-                    data_array[hit_way_idx][index_reg] <= store_merge(
-                        cache_rdata_reg[hit_way_idx],
-                        cpu_wdata_reg_reg,
-                        cpu_addr_reg_reg[1:0],
-                        cpu_mask_reg_reg
-                    );
                     state <= QUERY_AND_LOAD;
-                    finished <= 1'b0;
                 end
 
                 STORE_MISS: begin
                     // BRAM 存储也需要停顿 可引入 store_buffer 解决
                     state <= QUERY_AND_LOAD;
-                    finished <= 1'b0;
                 end
 
             default: begin
                 state <= QUERY_AND_LOAD;
-                finished <= 1'b0;
             end
             endcase
         end
+    end
+
+    // LUT as Memory
+    always @(posedge clk) begin
+        case (state)
+            LOAD_MISS_OUTPUT: begin
+                data_array[`ARRAY_ADDR(miss_index, miss_way)] <= mem_rdata;
+                tagv_array[`ARRAY_ADDR(miss_index, miss_way)] <= {1'b1, miss_tag};
+            end
+            STORE_HIT: begin
+                data_array[`ARRAY_ADDR(index_reg, hit_way_idx)] <= store_merge(
+                    cache_rdata_reg[hit_way_idx],
+                    cpu_wdata_reg_reg,
+                    cpu_addr_reg_reg[1:0],
+                    cpu_mask_reg_reg
+                );
+            end
+            default: begin
+                // ...
+            end
+        endcase
     end
 
     // 函数：

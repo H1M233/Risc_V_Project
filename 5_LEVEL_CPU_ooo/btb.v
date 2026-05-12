@@ -77,8 +77,6 @@ module btb #(
                 lru[i] <= 1'b0;
                 for (j = 0; j < 2; j = j + 1) begin
                     valid[i][j]  <= 1'b0;
-                    // tag[i][j]    <= 0;
-                    // target[i][j] <= 32'b0;
                 end
             end
         end 

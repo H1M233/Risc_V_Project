@@ -104,6 +104,8 @@ module top_riscv_inorder(
     wire [31:0] dcache_wdata_i;
     wire [31:0] dcache_rdata;
     wire        dcache_ack_mem;
+    wire        dcache_load_hit_unused;
+    wire        dcache_load_miss_unused;
 
     // ====== EX/MEM ======
     wire [31:0] mem_inst_i;
@@ -386,7 +388,10 @@ module top_riscv_inorder(
     // =====================================================================
     // DCache
     // =====================================================================
-    dcache DCACHE(
+    dcache #(
+        .USE_FAST_DCACHE(0),
+        .USE_SIMPLE_DCACHE_FALLBACK(1)
+    ) DCACHE(
         .clk            (cpu_clk),
         .rst            (cpu_rst),
         .cpu_req_load   (dcache_req_load_i),
@@ -401,7 +406,9 @@ module top_riscv_inorder(
         .mem_wen        (perip_wen),
         .mem_wdata      (perip_wdata),
         .mem_rdata      (perip_rdata),
-        .mem_ack        (dcache_ack_mem)
+        .mem_ack        (dcache_ack_mem),
+        .perf_load_hit  (dcache_load_hit_unused),
+        .perf_load_miss (dcache_load_miss_unused)
     );
 
     // =====================================================================

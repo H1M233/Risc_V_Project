@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
     std::cout << "=================================== Simulation Started ===================================\n\n\n\n\n\n";
 
     // 计时器
-    const double PREV_TIME = std::stoi(std::getenv("PREV_TIME"));
+    const double PREV_TIME = std::stof(std::getenv("PREV_TIME"));
     std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();;
     double current_time;
     auto get_elapsed_ms = [&]() -> double {

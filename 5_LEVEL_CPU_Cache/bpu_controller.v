@@ -30,7 +30,9 @@ module bpu_controller #(
     input      [31:0]               pc_inst,            // if2 取得的指令
 
     // to pc & id
+    (* max_fanout = 30 *)
     output reg [31:0]               pred_pc,            // 向 if 输出预测的地址
+    (* max_fanout = 30 *)
     output reg                      pred_taken,         // 从 PHT 中读取的计数器高位值
 
     // from ex
@@ -45,7 +47,7 @@ module bpu_controller #(
     input                           pipe_hold,
 
     // Gshare - 查询
-    output reg [BHR_WIDTH - 1:0]    gshare_pht_index,
+    output     [BHR_WIDTH - 1:0]    gshare_pht_index,
     output reg                      gshare_prev_b,
     input                           gshare_pred_taken,
     input      [BHR_WIDTH - 1:0]    gshare_ghr,
@@ -58,6 +60,7 @@ module bpu_controller #(
     output reg                      gshare_pred_mispredict,
 
     // ras - to bpu_controller
+    (* max_fanout = 30 *)
     output reg                      ras_push_en,
     output reg                      ras_pop_en,
     output reg [31:0]               ras_push_addr,
@@ -68,6 +71,7 @@ module bpu_controller #(
     input                           ras_isfull,
 
     // btb - 查询
+    (* max_fanout = 20 *)
     output reg [BTB_INDEX_WIDTH - 1:0]          btb_query_index,
     output reg [31 - BTB_INDEX_WIDTH - 2:0]     btb_query_tag,
     input                                       btb_hit,
@@ -75,6 +79,7 @@ module bpu_controller #(
 
     // btb - 更新
     output reg                                  btb_update_en,
+    (* max_fanout = 20 *)
     output reg [BTB_INDEX_WIDTH - 1:0]          btb_update_index,
     output reg [31 - BTB_INDEX_WIDTH - 2:0]     btb_update_tag,
     output reg [31:0]                           btb_update_target
@@ -88,9 +93,11 @@ module bpu_controller #(
     wire    [31:0]  B_imm       = {{20{pc_inst[31]}}, pc_inst[7], pc_inst[30:25], pc_inst[11:8], 1'b0};
 
     // 处理 JALR
+    (* max_fanout = 20 *)
     wire            is_JALR     = (pc_inst[6:0] == `JALR);
     wire    [31:0]  JALR_imm    = {{20{pc_inst[31]}}, pc_inst[31:20]};
     wire            is_ret_JALR = (is_JALR && rd_addr == 5'b0 && rs1_addr == 5'b00001 && JALR_imm == 0);
+    (* max_fanout = 20 *)
     wire            is_ras_pop  = (is_ret_JALR && !ras_isempty);
 
     // 处理 JAL
@@ -99,13 +106,15 @@ module bpu_controller #(
     wire            is_ret_JAL  = (is_JAL && rd_addr == 5'b00001);
     wire            is_ras_push = (is_ret_JAL && !ras_isfull);
 
-    reg     [31:0]  pc_reg, pc_add_4_reg;
+    (* max_fanout = 20 *)
+    reg     [31:0]  pc_reg;
     wire    [31:0]  pc_add_4    = pc_reg + 32'h4;
     wire    [31:0]  pc_add_JAL  = pc_reg + JAL_imm;
     wire    [31:0]  pc_add_B    = pc_reg + B_imm;
 
     // Gshare索引：取PC中间位与BHR异或
     wire [BHR_WIDTH - 1:0]  pht_index           = pc_addr[BHR_WIDTH + 1:2] ^ gshare_ghr;
+    (* max_fanout = 50 *)
     wire [BHR_WIDTH - 1:0]  update_pht_index    = update_pc[BHR_WIDTH + 1:2] ^ gshare_ghr_d2;
 
     // BTB索引和tag（tag取pc高位，用于区分映射到同一索引的不同地址）
@@ -115,24 +124,25 @@ module bpu_controller #(
     wire [31 - BTB_INDEX_WIDTH - 2:0]   btb_update_tag_w    = update_pc[31:BTB_INDEX_WIDTH + 2];
 
     // 查询
+    assign gshare_pht_index = (pipe_flush | !rst) ? 0 : pht_index;
     always@(posedge clk) begin
         if (!rst) begin
             // PC
             pc_reg              <= 0;
 
             // TYPE_B
-            gshare_pht_index    <= 0;
+            // gshare_pht_index    <= 0;
 
             // JALR
             btb_query_index     <= 0;
             btb_query_tag       <= 0;
         end
-        if (pipe_flush) begin       // 冲刷查询入口 避免下一个错误地址进入
+        else if (pipe_flush) begin       // 冲刷查询入口 避免下一个错误地址进入
             // PC
             pc_reg              <= 0;
 
             // TYPE_B
-            gshare_pht_index    <= 0;
+            // gshare_pht_index    <= 0;
 
             // JALR
             btb_query_index     <= 0;
@@ -143,7 +153,7 @@ module bpu_controller #(
             pc_reg              <= pc_addr;
 
             // TYPE_B
-            gshare_pht_index    <= pht_index;
+            // gshare_pht_index    <= pht_index;
 
             // JALR
             btb_query_index     <= btb_query_index_w;
@@ -157,11 +167,15 @@ module bpu_controller #(
             pred_taken      <= 0;
             pred_pc         <= 0;
         end
-        else if (pipe_flush) begin     // ex 确认错误再归零
+        else if (pipe_hold) begin           // 暂停优先
+            pred_taken      <= pred_taken;
+            pred_pc         <= pred_pc;
+        end
+        else if (pipe_flush) begin
             pred_taken      <= 0;
             pred_pc         <= 0;
         end
-        else if (!pipe_hold) begin
+        else begin
             if (is_ras_pop) begin
                 pred_taken  <= 1'b1;
                 pred_pc     <= ras_pop_addr;
@@ -180,7 +194,7 @@ module bpu_controller #(
             end
             else begin
                 pred_taken  <= 1'b0;
-                pred_pc     <= pc_add_4_reg;
+                pred_pc     <= pc_add_4;
             end
         end
     end
@@ -194,19 +208,21 @@ module bpu_controller #(
             // Gshare
             gshare_prev_b   <= 0;
         end
-        if (pipe_flush) begin
-            // RAS - 弹栈入栈只能一个周期
-            ras_pop_en      <= 0;
-            ras_push_en     <= 0;
-        end
-        else if (!pipe_hold) begin
-            // RAS
-            ras_pop_en      <= is_ras_pop;
-            ras_push_en     <= is_ras_push;
-            ras_push_addr   <= pc_add_4;
+        else begin
+            if (pipe_flush) begin
+                // RAS - 弹栈入栈只能一个周期
+                ras_pop_en      <= 0;
+                ras_push_en     <= 0;
+            end
+            else if (!pipe_hold) begin
+                // RAS
+                ras_pop_en      <= is_ras_pop;
+                ras_push_en     <= is_ras_push;
+                ras_push_addr   <= pc_add_4;
 
-            // Gshare
-            gshare_prev_b   <= is_B_type;
+                // Gshare
+                gshare_prev_b   <= is_B_type;
+            end
         end
     end
 

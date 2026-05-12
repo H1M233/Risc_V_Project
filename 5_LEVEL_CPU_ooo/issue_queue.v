@@ -1,6 +1,8 @@
 `include "ooo_defs.vh"
 
-module issue_queue (
+module issue_queue #(
+    parameter USE_IQ_PIPELINE = 1
+)(
     input               clk,
     input               rst,
 
@@ -61,47 +63,47 @@ module issue_queue (
     input  [4:0]        cdb_tag_1,
     input  [31:0]       cdb_value_1,
 
-    output              issue_en_0,
-    output [31:0]       issue_pc_0,
-    output [4:0]        issue_rd_0,
-    output              issue_wen_0,
-    output [4:0]        issue_rob_tag_0,
-    output [3:0]        issue_alu_op_0,
-    output [31:0]       issue_src1_0,
-    output [31:0]       issue_src2_0,
-    output [31:0]       issue_imm_0,
-    output              issue_uses_rs1_0,
-    output              issue_uses_rs2_0,
-    output              issue_is_branch_0,
-    output              issue_is_jal_0,
-    output              issue_is_jalr_0,
-    output              issue_is_lui_0,
-    output              issue_is_auipc_0,
-    output [2:0]        issue_branch_type_0,
-    output [1:0]        issue_op_class_0,
-    output              issue_pred_taken_0,
-    output [31:0]       issue_pred_pc_0,
+    output reg          issue_en_0,
+    output reg [31:0]   issue_pc_0,
+    output reg [4:0]    issue_rd_0,
+    output reg          issue_wen_0,
+    output reg [4:0]    issue_rob_tag_0,
+    output reg [3:0]    issue_alu_op_0,
+    output reg [31:0]   issue_src1_0,
+    output reg [31:0]   issue_src2_0,
+    output reg [31:0]   issue_imm_0,
+    output reg          issue_uses_rs1_0,
+    output reg          issue_uses_rs2_0,
+    output reg          issue_is_branch_0,
+    output reg          issue_is_jal_0,
+    output reg          issue_is_jalr_0,
+    output reg          issue_is_lui_0,
+    output reg          issue_is_auipc_0,
+    output reg [2:0]    issue_branch_type_0,
+    output reg [1:0]    issue_op_class_0,
+    output reg          issue_pred_taken_0,
+    output reg [31:0]   issue_pred_pc_0,
 
-    output              issue_en_1,
-    output [31:0]       issue_pc_1,
-    output [4:0]        issue_rd_1,
-    output              issue_wen_1,
-    output [4:0]        issue_rob_tag_1,
-    output [3:0]        issue_alu_op_1,
-    output [31:0]       issue_src1_1,
-    output [31:0]       issue_src2_1,
-    output [31:0]       issue_imm_1,
-    output              issue_uses_rs1_1,
-    output              issue_uses_rs2_1,
-    output              issue_is_branch_1,
-    output              issue_is_jal_1,
-    output              issue_is_jalr_1,
-    output              issue_is_lui_1,
-    output              issue_is_auipc_1,
-    output [2:0]        issue_branch_type_1,
-    output [1:0]        issue_op_class_1,
-    output              issue_pred_taken_1,
-    output [31:0]       issue_pred_pc_1,
+    output reg          issue_en_1,
+    output reg [31:0]   issue_pc_1,
+    output reg [4:0]    issue_rd_1,
+    output reg          issue_wen_1,
+    output reg [4:0]    issue_rob_tag_1,
+    output reg [3:0]    issue_alu_op_1,
+    output reg [31:0]   issue_src1_1,
+    output reg [31:0]   issue_src2_1,
+    output reg [31:0]   issue_imm_1,
+    output reg          issue_uses_rs1_1,
+    output reg          issue_uses_rs2_1,
+    output reg          issue_is_branch_1,
+    output reg          issue_is_jal_1,
+    output reg          issue_is_jalr_1,
+    output reg          issue_is_lui_1,
+    output reg          issue_is_auipc_1,
+    output reg [2:0]    issue_branch_type_1,
+    output reg [1:0]    issue_op_class_1,
+    output reg          issue_pred_taken_1,
+    output reg [31:0]   issue_pred_pc_1,
 
     output [4:0]        free_count,
     input               flush
@@ -134,9 +136,9 @@ module issue_queue (
     reg  [1:0]  oc  [0:DEPTH-1];
     reg         pt  [0:DEPTH-1];
     reg  [31:0] ppc [0:DEPTH-1];
-    reg  [15:0] age [0:DEPTH-1];
-    reg  [15:0] age_cnt;
+    reg         ready_q [0:DEPTH-1];
     reg  [4:0]  cnt;
+    reg  [4:0]  rr_ptr;
 
     assign free_count = DEPTH_COUNT - cnt;
 
@@ -198,82 +200,60 @@ module issue_queue (
     wire pushB_s2_cdb0 = push_uses_rs2_1 && !push_src2_ready_1 && cdb_valid_0 && (push_src2_tag_1 == cdb_tag_0);
     wire pushB_s2_cdb1 = push_uses_rs2_1 && !push_src2_ready_1 && cdb_valid_1 && (push_src2_tag_1 == cdb_tag_1);
 
-    reg [4:0] s0i, s1i;
-    reg       s0f, s1f;
-    reg [15:0] ma0, ma1;
-    integer si;
+    reg ready_sel [0:DEPTH-1];
+    reg grant0_valid, grant1_valid;
+    reg [4:0] grant0_idx, grant1_idx;
+    reg [4:0] scan_idx;
+    reg [4:0] second_start;
+    integer ri, si;
     always @(*) begin
-        s0f = 1'b0;
-        s1f = 1'b0;
-        s0i = 5'b0;
-        s1i = 5'b0;
-        ma0 = 16'hFFFF;
-        ma1 = 16'hFFFF;
+        for (ri = 0; ri < DEPTH; ri = ri + 1) begin
+            if (USE_IQ_PIPELINE)
+                ready_sel[ri] = v[ri] && ready_q[ri];
+            else
+                ready_sel[ri] = v[ri] && (!u1[ri] || s1r[ri]) && (!u2[ri] || s2r[ri]);
+        end
+
+        grant0_valid = 1'b0;
+        grant1_valid = 1'b0;
+        grant0_idx = 5'b0;
+        grant1_idx = 5'b0;
+
         for (si = 0; si < DEPTH; si = si + 1) begin
-            if (v[si] && (!u1[si] || s1r[si]) && (!u2[si] || s2r[si])) begin
-                if (!s0f || (age[si] < ma0)) begin
-                    if (s0f) begin
-                        s1f = 1'b1;
-                        s1i = s0i;
-                        ma1 = ma0;
-                    end
-                    s0f = 1'b1;
-                    s0i = si[4:0];
-                    ma0 = age[si];
-                end else if (!s1f || (age[si] < ma1)) begin
-                    s1f = 1'b1;
-                    s1i = si[4:0];
-                    ma1 = age[si];
-                end
+            scan_idx = rr_ptr + si[4:0];
+            if (scan_idx >= DEPTH)
+                scan_idx = scan_idx - DEPTH;
+            if (!grant0_valid && ready_sel[scan_idx] && (ib[scan_idx] || ij[scan_idx] || ijr[scan_idx])) begin
+                grant0_valid = 1'b1;
+                grant0_idx = scan_idx;
             end
         end
 
-        if (s0f && s1f && (ib[s0i] || ij[s0i] || ijr[s0i]) &&
-            (ib[s1i] || ij[s1i] || ijr[s1i]))
-            s1f = 1'b0;
+        for (si = 0; si < DEPTH; si = si + 1) begin
+            scan_idx = rr_ptr + si[4:0];
+            if (scan_idx >= DEPTH)
+                scan_idx = scan_idx - DEPTH;
+            if (!grant0_valid && ready_sel[scan_idx]) begin
+                grant0_valid = 1'b1;
+                grant0_idx = scan_idx;
+            end
+        end
+
+        if (grant0_valid && !(ib[grant0_idx] || ij[grant0_idx] || ijr[grant0_idx])) begin
+            second_start = grant0_idx + 5'd1;
+            if (second_start >= DEPTH)
+                second_start = second_start - DEPTH;
+            for (si = 0; si < DEPTH; si = si + 1) begin
+                scan_idx = second_start + si[4:0];
+                if (scan_idx >= DEPTH)
+                    scan_idx = scan_idx - DEPTH;
+                if (!grant1_valid && (scan_idx != grant0_idx) && ready_sel[scan_idx]) begin
+                    grant1_valid = 1'b1;
+                    grant1_idx = scan_idx;
+                end
+            end
+        end
     end
-
-    assign issue_en_0 = s0f;
-    assign issue_pc_0 = pc_r[s0i];
-    assign issue_rd_0 = rd_r[s0i];
-    assign issue_wen_0 = wn[s0i];
-    assign issue_rob_tag_0 = rt[s0i];
-    assign issue_alu_op_0 = ao[s0i];
-    assign issue_src1_0 = s1v[s0i];
-    assign issue_src2_0 = s2v[s0i];
-    assign issue_imm_0 = im[s0i];
-    assign issue_uses_rs1_0 = u1[s0i];
-    assign issue_uses_rs2_0 = u2[s0i];
-    assign issue_is_branch_0 = ib[s0i];
-    assign issue_is_jal_0 = ij[s0i];
-    assign issue_is_jalr_0 = ijr[s0i];
-    assign issue_is_lui_0 = ilui[s0i];
-    assign issue_is_auipc_0 = iau[s0i];
-    assign issue_branch_type_0 = bt[s0i];
-    assign issue_op_class_0 = oc[s0i];
-    assign issue_pred_taken_0 = pt[s0i];
-    assign issue_pred_pc_0 = ppc[s0i];
-
-    assign issue_en_1 = s1f;
-    assign issue_pc_1 = pc_r[s1i];
-    assign issue_rd_1 = rd_r[s1i];
-    assign issue_wen_1 = wn[s1i];
-    assign issue_rob_tag_1 = rt[s1i];
-    assign issue_alu_op_1 = ao[s1i];
-    assign issue_src1_1 = s1v[s1i];
-    assign issue_src2_1 = s2v[s1i];
-    assign issue_imm_1 = im[s1i];
-    assign issue_uses_rs1_1 = u1[s1i];
-    assign issue_uses_rs2_1 = u2[s1i];
-    assign issue_is_branch_1 = ib[s1i];
-    assign issue_is_jal_1 = ij[s1i];
-    assign issue_is_jalr_1 = ijr[s1i];
-    assign issue_is_lui_1 = ilui[s1i];
-    assign issue_is_auipc_1 = iau[s1i];
-    assign issue_branch_type_1 = bt[s1i];
-    assign issue_op_class_1 = oc[s1i];
-    assign issue_pred_taken_1 = pt[s1i];
-    assign issue_pred_pc_1 = ppc[s1i];
 
     integer ei;
     always @(posedge clk) begin
@@ -282,11 +262,53 @@ module issue_queue (
                 v[ei] <= 1'b0;
                 s1r[ei] <= 1'b0;
                 s2r[ei] <= 1'b0;
+                ready_q[ei] <= 1'b0;
             end
             cnt <= 5'b0;
-            age_cnt <= 16'b0;
+            rr_ptr <= 5'b0;
+            issue_en_0 <= 1'b0;
+            issue_en_1 <= 1'b0;
+            issue_pc_0 <= 32'b0;
+            issue_pc_1 <= 32'b0;
+            issue_rd_0 <= 5'b0;
+            issue_rd_1 <= 5'b0;
+            issue_wen_0 <= 1'b0;
+            issue_wen_1 <= 1'b0;
+            issue_rob_tag_0 <= 5'b0;
+            issue_rob_tag_1 <= 5'b0;
+            issue_alu_op_0 <= 4'b0;
+            issue_alu_op_1 <= 4'b0;
+            issue_src1_0 <= 32'b0;
+            issue_src1_1 <= 32'b0;
+            issue_src2_0 <= 32'b0;
+            issue_src2_1 <= 32'b0;
+            issue_imm_0 <= 32'b0;
+            issue_imm_1 <= 32'b0;
+            issue_uses_rs1_0 <= 1'b0;
+            issue_uses_rs1_1 <= 1'b0;
+            issue_uses_rs2_0 <= 1'b0;
+            issue_uses_rs2_1 <= 1'b0;
+            issue_is_branch_0 <= 1'b0;
+            issue_is_branch_1 <= 1'b0;
+            issue_is_jal_0 <= 1'b0;
+            issue_is_jal_1 <= 1'b0;
+            issue_is_jalr_0 <= 1'b0;
+            issue_is_jalr_1 <= 1'b0;
+            issue_is_lui_0 <= 1'b0;
+            issue_is_lui_1 <= 1'b0;
+            issue_is_auipc_0 <= 1'b0;
+            issue_is_auipc_1 <= 1'b0;
+            issue_branch_type_0 <= 3'b0;
+            issue_branch_type_1 <= 3'b0;
+            issue_op_class_0 <= 2'b0;
+            issue_op_class_1 <= 2'b0;
+            issue_pred_taken_0 <= 1'b0;
+            issue_pred_taken_1 <= 1'b0;
+            issue_pred_pc_0 <= 32'b0;
+            issue_pred_pc_1 <= 32'b0;
         end else begin
             for (ei = 0; ei < DEPTH; ei = ei + 1) begin
+                ready_q[ei] <= v[ei] && (!u1[ei] || s1r[ei]) && (!u2[ei] || s2r[ei]);
                 if (v[ei]) begin
                     if (u1[ei] && !s1r[ei]) begin
                         if (cdb_valid_0 && (cdb_tag_0 == s1t[ei])) begin
@@ -309,10 +331,99 @@ module issue_queue (
                 end
             end
 
-            if (s0f)
-                v[s0i] <= 1'b0;
-            if (s1f)
-                v[s1i] <= 1'b0;
+            issue_en_0 <= grant0_valid;
+            issue_en_1 <= grant1_valid;
+
+            if (grant0_valid) begin
+                issue_pc_0 <= pc_r[grant0_idx];
+                issue_rd_0 <= rd_r[grant0_idx];
+                issue_wen_0 <= wn[grant0_idx];
+                issue_rob_tag_0 <= rt[grant0_idx];
+                issue_alu_op_0 <= ao[grant0_idx];
+                issue_src1_0 <= s1v[grant0_idx];
+                issue_src2_0 <= s2v[grant0_idx];
+                issue_imm_0 <= im[grant0_idx];
+                issue_uses_rs1_0 <= u1[grant0_idx];
+                issue_uses_rs2_0 <= u2[grant0_idx];
+                issue_is_branch_0 <= ib[grant0_idx];
+                issue_is_jal_0 <= ij[grant0_idx];
+                issue_is_jalr_0 <= ijr[grant0_idx];
+                issue_is_lui_0 <= ilui[grant0_idx];
+                issue_is_auipc_0 <= iau[grant0_idx];
+                issue_branch_type_0 <= bt[grant0_idx];
+                issue_op_class_0 <= oc[grant0_idx];
+                issue_pred_taken_0 <= pt[grant0_idx];
+                issue_pred_pc_0 <= ppc[grant0_idx];
+                v[grant0_idx] <= 1'b0;
+            end else begin
+                issue_pc_0 <= 32'b0;
+                issue_rd_0 <= 5'b0;
+                issue_wen_0 <= 1'b0;
+                issue_rob_tag_0 <= 5'b0;
+                issue_alu_op_0 <= 4'b0;
+                issue_src1_0 <= 32'b0;
+                issue_src2_0 <= 32'b0;
+                issue_imm_0 <= 32'b0;
+                issue_uses_rs1_0 <= 1'b0;
+                issue_uses_rs2_0 <= 1'b0;
+                issue_is_branch_0 <= 1'b0;
+                issue_is_jal_0 <= 1'b0;
+                issue_is_jalr_0 <= 1'b0;
+                issue_is_lui_0 <= 1'b0;
+                issue_is_auipc_0 <= 1'b0;
+                issue_branch_type_0 <= 3'b0;
+                issue_op_class_0 <= 2'b0;
+                issue_pred_taken_0 <= 1'b0;
+                issue_pred_pc_0 <= 32'b0;
+            end
+
+            if (grant1_valid) begin
+                issue_pc_1 <= pc_r[grant1_idx];
+                issue_rd_1 <= rd_r[grant1_idx];
+                issue_wen_1 <= wn[grant1_idx];
+                issue_rob_tag_1 <= rt[grant1_idx];
+                issue_alu_op_1 <= ao[grant1_idx];
+                issue_src1_1 <= s1v[grant1_idx];
+                issue_src2_1 <= s2v[grant1_idx];
+                issue_imm_1 <= im[grant1_idx];
+                issue_uses_rs1_1 <= u1[grant1_idx];
+                issue_uses_rs2_1 <= u2[grant1_idx];
+                issue_is_branch_1 <= ib[grant1_idx];
+                issue_is_jal_1 <= ij[grant1_idx];
+                issue_is_jalr_1 <= ijr[grant1_idx];
+                issue_is_lui_1 <= ilui[grant1_idx];
+                issue_is_auipc_1 <= iau[grant1_idx];
+                issue_branch_type_1 <= bt[grant1_idx];
+                issue_op_class_1 <= oc[grant1_idx];
+                issue_pred_taken_1 <= pt[grant1_idx];
+                issue_pred_pc_1 <= ppc[grant1_idx];
+                v[grant1_idx] <= 1'b0;
+            end else begin
+                issue_pc_1 <= 32'b0;
+                issue_rd_1 <= 5'b0;
+                issue_wen_1 <= 1'b0;
+                issue_rob_tag_1 <= 5'b0;
+                issue_alu_op_1 <= 4'b0;
+                issue_src1_1 <= 32'b0;
+                issue_src2_1 <= 32'b0;
+                issue_imm_1 <= 32'b0;
+                issue_uses_rs1_1 <= 1'b0;
+                issue_uses_rs2_1 <= 1'b0;
+                issue_is_branch_1 <= 1'b0;
+                issue_is_jal_1 <= 1'b0;
+                issue_is_jalr_1 <= 1'b0;
+                issue_is_lui_1 <= 1'b0;
+                issue_is_auipc_1 <= 1'b0;
+                issue_branch_type_1 <= 3'b0;
+                issue_op_class_1 <= 2'b0;
+                issue_pred_taken_1 <= 1'b0;
+                issue_pred_pc_1 <= 32'b0;
+            end
+
+            if (grant1_valid)
+                rr_ptr <= (grant1_idx == DEPTH_COUNT - 5'd1) ? 5'b0 : grant1_idx + 5'd1;
+            else if (grant0_valid)
+                rr_ptr <= (grant0_idx == DEPTH_COUNT - 5'd1) ? 5'b0 : grant0_idx + 5'd1;
 
             if (pushA_valid && ff0) begin
                 v[fs0] <= 1'b1;
@@ -341,7 +452,8 @@ module issue_queue (
                 oc[fs0] <= pushA_oc;
                 pt[fs0] <= pushA_pt;
                 ppc[fs0] <= pushA_ppc;
-                age[fs0] <= age_cnt;
+                ready_q[fs0] <= (!pushA_u1 || pushA_s1_ready || pushA_s1_cdb0 || pushA_s1_cdb1) &&
+                                (!pushA_u2 || pushA_s2_ready || pushA_s2_cdb0 || pushA_s2_cdb1);
             end
 
             if (pushB_valid && ff1) begin
@@ -371,13 +483,13 @@ module issue_queue (
                 oc[fs1] <= push_op_class_1;
                 pt[fs1] <= push_pred_taken_1;
                 ppc[fs1] <= push_pred_pc_1;
-                age[fs1] <= age_cnt + 16'd1;
+                ready_q[fs1] <= (!push_uses_rs1_1 || push_src1_ready_1 || pushB_s1_cdb0 || pushB_s1_cdb1) &&
+                                (!push_uses_rs2_1 || push_src2_ready_1 || pushB_s2_cdb0 || pushB_s2_cdb1);
             end
 
-            age_cnt <= age_cnt + {15'b0, pushA_valid && ff0} + {15'b0, pushB_valid && ff1};
             cnt <= cnt
-                 - {4'b0, s0f}
-                 - {4'b0, s1f}
+                 - {4'b0, grant0_valid}
+                 - {4'b0, grant1_valid}
                  + {4'b0, pushA_valid && ff0}
                  + {4'b0, pushB_valid && ff1};
         end

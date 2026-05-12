@@ -6,15 +6,20 @@ module mem(
     input      [4:0]    rd_addr_i,
     input      [31:0]   rd_data_i,
     input               regs_wen,
+    input               mem_req_load_i,
 
     // from DRAM
+    (* max_fanout = 30 *)
     input      [31:0]   perip_rdata,
 
     // to mem_wb
+    (* max_fanout = 30 *)
     output reg [31:0]   rd_data_o,
+    (* max_fanout = 30 *)
     output reg          regs_wen_o,
 
     // to mem_wb & hazrd
+    (* max_fanout = 30 *)
     output reg [4:0]    rd_addr_o,
 
     // dcache_ack
@@ -23,10 +28,10 @@ module mem(
     wire [6:0]  opcode  = inst_i[6:0];
     wire [2:0]  funct3  = inst_i[14:12];
 
-    always@(*) begin: MEM2
+    always@(*) begin
         rd_data_o   = rd_data_i;
         rd_addr_o   = rd_addr_i;
-        regs_wen_o  = (opcode == `TYPE_L & dcache_ack) | (opcode != `TYPE_L & regs_wen);    // 添加与 Dcache 的握手机制来保证 LOAD 正确
+        regs_wen_o  = mem_req_load_i ? dcache_ack : regs_wen;    // 添加与 Dcache 的握手机制来保证 LOAD 正确
         
         case(opcode)
             `TYPE_L: begin

@@ -1,4 +1,5 @@
 `include "rv32I.vh"
+`include "alu.vh"
 
 module top_riscv(
     input           cpu_rst,
@@ -20,7 +21,6 @@ module top_riscv(
     // PC / I-cache
     // ============================================================
     wire [31:0]     pc_pc_addr_o;
-
     wire [31:0]     icache_inst;
 
     // ============================================================
@@ -73,6 +73,7 @@ module top_riscv(
     wire [4:0]      id_rd_addr_o;
     wire            id_pred_taken_o;
     wire [31:0]     id_pred_pc_o;
+    wire [`OP_NUM - 1:0] id_opcode_packged_o;
 
     // ============================================================
     // ex to dcache
@@ -101,6 +102,7 @@ module top_riscv(
     wire            ex_pred_taken_i;
     wire [31:0]     ex_pred_pc_i;
     wire            ex_valid_i;
+    wire [`OP_NUM - 1:0] ex_opcode_packged_i;
 
     // ============================================================
     // ex to jump
@@ -125,6 +127,7 @@ module top_riscv(
     // ex to ex_mem & hazard
     wire [31:0]     ex_rd_data_o;
     wire [4:0]      ex_rd_addr_o;
+    wire            ex_req_load_o;
 
     // ============================================================
     // ex_mem to mem
@@ -133,6 +136,7 @@ module top_riscv(
     wire            mem_regs_wen_i;
     wire [31:0]     mem_rd_data_i;
     wire [4:0]      mem_rd_addr_i;
+    wire            mem_req_load_i;
 
     // ============================================================
     // mem to mem_wb
@@ -311,12 +315,13 @@ module top_riscv(
         .pipe_hold          (pipe_hold),
 
         .inst_i             (if2_inst_o),
-        .pc_addr_i          (if2_pc_o),
+        .pc_i               (if2_pc_o),
 
-        .pipe_flush         (pipe_flush),
+        .jump_en            (jump_jump_en_o),
+        .pred_taken         (bpu_pred_taken),
 
         .inst_o             (id_inst_i),
-        .pc_addr_o          (id_pc_i)
+        .pc_o               (id_pc_i)
     );
 
     // ============================================================
@@ -344,6 +349,7 @@ module top_riscv(
         .value2_o           (id_value2_o),
         .pred_taken_o       (id_pred_taken_o),
         .pred_pc_o          (id_pred_pc_o),
+        .opcode_packged_o   (id_opcode_packged_o),
 
         .rs1_addr_o         (id_rs1_addr_o),
         .rs2_addr_o         (id_rs2_addr_o)
@@ -375,6 +381,7 @@ module top_riscv(
         .value2_i           (id_value2_o),
         .pred_taken_i       (id_pred_taken_o),
         .pred_pc_i          (id_pred_pc_o),
+        .opcode_packged_i   (id_opcode_packged_o),
 
         .pc_addr_o          (ex_pc_addr_i),
         .inst_o             (ex_inst_i),
@@ -390,6 +397,7 @@ module top_riscv(
         .value2_o           (ex_value2_i),
         .pred_taken_o       (ex_pred_taken_i),
         .pred_pc_o          (ex_pred_pc_i),
+        .opcode_packged_o   (ex_opcode_packged_i),
         .valid_o            (ex_valid_i)
     );
 
@@ -411,6 +419,7 @@ module top_riscv(
         .value2_i           (ex_value2_i),
         .pred_taken_i       (ex_pred_taken_i),
         .pred_pc_i          (ex_pred_pc_i),
+        .opcode_packged_i   (ex_opcode_packged_i),
         .valid_i            (ex_valid_i),
 
         .mem_forward_rd_addr_i  (mem_rd_addr_i),
@@ -429,6 +438,7 @@ module top_riscv(
 
         .rd_addr_o          (ex_rd_addr_o),
         .rd_data_o          (ex_rd_data_o),
+        .mem_req_load_o     (ex_req_load_o),
 
         .jump_en            (ex_jump_en_o),
         .jump_addr_o        (ex_jump_addr_o),
@@ -460,11 +470,13 @@ module top_riscv(
         .rd_addr_i          (ex_rd_addr_o),
         .rd_data_i          (ex_rd_data_o),
         .regs_wen_i         (ex_regs_wen_o),
+        .mem_req_load_i     (ex_req_load_o),
 
         .inst_o             (mem_inst_i),
         .rd_addr_o          (mem_rd_addr_i),
         .rd_data_o          (mem_rd_data_i),
-        .regs_wen_o         (mem_regs_wen_i)
+        .regs_wen_o         (mem_regs_wen_i),
+        .mem_req_load_o     (mem_req_load_i)
     );
 
     // ============================================================
@@ -475,6 +487,7 @@ module top_riscv(
         .rd_addr_i          (mem_rd_addr_i),
         .rd_data_i          (mem_rd_data_i),
         .regs_wen           (mem_regs_wen_i),
+        .mem_req_load_i     (mem_req_load_i),
 
         .perip_rdata        (dcache_rdata),
 

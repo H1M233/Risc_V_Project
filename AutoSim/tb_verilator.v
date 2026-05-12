@@ -31,20 +31,22 @@ module tb_verilator_software(
             $readmemh("./mem_init/dram.txt", tb_verilator_software.uut.student_top_inst.bridge_inst.dram_driver_inst.Mem_DRAM.dram_inst.ram_mem);
         end
         assign seg = tb_verilator_software.uut.student_top_inst.bridge_inst.seg_driver.s;
-        assign mem_inst = tb_verilator.uut.student_top_inst.Core_cpu.MEM.inst_i;
+        assign mem_inst = tb_verilator_software.uut.student_top_inst.Core_cpu.MEM.inst_i;
         assign pc = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.pc_addr_i;
 
         assign icache_req = (tb_verilator_software.uut.student_top_inst.Core_cpu.ICACHE.pipe_hold == 1'd0);
         assign icache_hit = tb_verilator_software.uut.student_top_inst.Core_cpu.ICACHE.hit;
         assign dcache_req = (tb_verilator_software.uut.student_top_inst.Core_cpu.DCACHE.state == 3'd1);
         assign dcache_hit = tb_verilator_software.uut.student_top_inst.Core_cpu.DCACHE.hit;
-        wire [6:0] ex_opcode = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.opcode;
+        wire ex_is_jal = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.is_jal;
+        wire ex_is_jalr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.is_jalr;
+        wire ex_is_branch = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.is_branch;
         always @(posedge clk_cpu) begin
-            if (ex_opcode == `JAL)
+            if (ex_is_jal)
                 func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.add_res;
-            else if (ex_opcode == `JALR)
+            else if (ex_is_jalr)
                 func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.jalr_target;
-            else if (ex_opcode == `TYPE_B & tb_verilator_software.uut.student_top_inst.Core_cpu.EX.branch_taken == 1'b1)
+            else if (ex_is_branch & tb_verilator_software.uut.student_top_inst.Core_cpu.EX.branch_taken == 1'b1)
                 func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.branch_jump_addr;
         end
 
@@ -54,7 +56,7 @@ module tb_verilator_software(
             $readmemh("./mem_init/dram.txt", tb_verilator_software.uut.student_top_inst.bridge_inst.dram_driver_inst.Mem_DRAM.dram_inst.ram_mem);
         end
         assign seg = tb_verilator_software.uut.student_top_inst.bridge_inst.seg_driver.s;
-        assign mem_inst = tb_verilator.uut.student_top_inst.Core_cpu.MEM.inst_i;
+        assign mem_inst = tb_verilator_software.uut.student_top_inst.Core_cpu.MEM.inst_i;
         assign pc = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.pc_addr_i;
 
         assign icache_req = 1'b1;
@@ -79,7 +81,8 @@ module tb_verilator_software(
         assign icache_req = (tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.ICACHE.flush == 1'd0);
         assign icache_hit = tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.ICACHE.hit;
         assign dcache_req = (tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.DCACHE.state == 3'd1);
-        assign dcache_hit = tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.DCACHE.hit;
+        // assign dcache_hit = tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.DCACHE.hit;
+        assign dcache_hit = 1'b0;
         always @(posedge clk_cpu) begin
             if (tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.ALU0.need_redirect)
                 func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.ALU0.redirect_pc;
