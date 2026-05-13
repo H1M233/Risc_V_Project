@@ -18,6 +18,8 @@ module icache #(
     output     [31:0]   mem_addr,
     input      [31:0]   mem_inst
 );
+    assign mem_addr = cpu_pc;
+
     localparam LINE_NUM    = 2 ** INDEX_WIDTH;  // 组数
 
     // 提取索引和 tag
@@ -62,8 +64,6 @@ module icache #(
     // 选择替换的路
     wire replace_way = plru_state[index];
 
-    assign mem_addr = cpu_pc;
-
     (* max_fanout = 20 *)
     wire [ARRAY_DEPTH - 1:0] array_raddr = `ARRAY_ADDR(index, hit_way_idx);
 
@@ -79,6 +79,7 @@ module icache #(
     end
 
     // 初始化 valid & plru
+    integer i;
     initial begin
         for (i = 0; i < ARRAY_DEPTH; i = i + 1) begin
             tagv_array[i] = 0;
@@ -91,7 +92,9 @@ module icache #(
     // LUT as Memory
     (* max_fanout = 30 *)   
     reg [31:0] mem_inst_reg;
-    reg hit_reg, miss_reg;
+    reg miss_reg;
+    reg [ARRAY_WIDTH - 1:0] miss_addr;
+    reg [TAG_WIDTH - 1:0] miss_tag;
 
     always @(posedge clk) begin
         if (!pipe_hold) begin
@@ -104,20 +107,14 @@ module icache #(
     end
 
     // LUT as Logic
-    reg [ARRAY_WIDTH - 1:0] miss_addr;
-    reg [TAG_WIDTH - 1:0] miss_tag;
-    integer i;
-
     always @(posedge clk) begin
         if (!rst) begin
-            hit_reg     <= 1'b0;
             miss_reg    <= 1'b1;
             miss_addr   <= 0;
             miss_tag    <= 0;
         end 
         else begin
             if (!pipe_hold) begin
-                hit_reg     <= hit;
                 miss_reg    <= miss;
                 miss_addr   <= `ARRAY_ADDR(index, replace_way);
                 miss_tag    <= tag;

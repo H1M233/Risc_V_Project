@@ -1,4 +1,5 @@
 `include "rv32I.vh"
+`include "alu.vh"
 
 module mem(
     // from ex_mem
@@ -7,6 +8,7 @@ module mem(
     input      [31:0]   rd_data_i,
     input               regs_wen,
     input               mem_req_load_i,
+    input      [4:0]    load_packaged_i,
 
     // from DRAM
     (* max_fanout = 30 *)
@@ -25,43 +27,24 @@ module mem(
     // dcache_ack
     input               dcache_ack
 );
-    wire [6:0]  opcode  = inst_i[6:0];
-    wire [2:0]  funct3  = inst_i[14:12];
+    wire is_lb   = load_packaged_i[`IS_LB];
+    wire is_lh   = load_packaged_i[`IS_LH];
+    wire is_lw   = load_packaged_i[`IS_LW];
+    wire is_lbu  = load_packaged_i[`IS_LBU];
+    wire is_lhu  = load_packaged_i[`IS_LHU];
 
     always@(*) begin
-        rd_data_o   = rd_data_i;
         rd_addr_o   = rd_addr_i;
         regs_wen_o  = mem_req_load_i ? dcache_ack : regs_wen;    // 添加与 Dcache 的握手机制来保证 LOAD 正确
         
-        case(opcode)
-            `TYPE_L: begin
-                case(funct3)
-                    `LB: begin
-                        rd_data_o   = {{24{perip_rdata[7]}}, perip_rdata[7:0]};
-                    end
-                    `LH: begin
-                        rd_data_o   = {{16{perip_rdata[15]}}, perip_rdata[15:0]};
-                    end
-                    `LW: begin
-                        rd_data_o   = perip_rdata;
-                    end
-                    `LBU: begin
-                        rd_data_o   = {24'b0, perip_rdata[7:0]};
-                    end
-                    `LHU: begin
-                        rd_data_o   = {16'b0, perip_rdata[15:0]};
-                    end
-                    default: begin
-                        rd_data_o   = 32'b0;
-                    end
-                endcase
-            end
-            `TYPE_S: begin
-                // ...
-            end
-            default: begin
-                // ...
-            end
+        (* parallel_case, full_case *)
+        case(1'b1)
+            is_lb:   rd_data_o   = {{24{perip_rdata[7]}}, perip_rdata[7:0]};
+            is_lh:   rd_data_o   = {{16{perip_rdata[15]}}, perip_rdata[15:0]};
+            is_lw:   rd_data_o   = perip_rdata;
+            is_lbu:  rd_data_o   = {24'b0, perip_rdata[7:0]};
+            is_lhu:  rd_data_o   = {16'b0, perip_rdata[15:0]};
+            default: rd_data_o   = rd_data_i;
         endcase
     end
 endmodule

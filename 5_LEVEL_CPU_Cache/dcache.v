@@ -89,7 +89,7 @@ module dcache#(
     reg cpu_req_store_reg;
     (* max_fanout = 20 *)
     reg [31:0] cpu_wdata_reg, cpu_wdata_reg_reg;
-    reg [31:0] cpu_addr_reg, cpu_addr_reg_reg;
+    reg [1:0] cpu_addr_low_r, cpu_addr_low_r2;
     reg [1:0]  cpu_mask_reg, cpu_mask_reg_reg;
     reg [INDEX_WIDTH - 1:0] index_reg;
     reg [TAG_WIDTH - 1:0]   tag_reg;
@@ -99,11 +99,13 @@ module dcache#(
     reg miss_way;
     reg [INDEX_WIDTH - 1:0]  miss_index;
     reg [TAG_WIDTH - 1:0] miss_tag;
-    reg [31:0] miss_addr;
+    reg [1:0] miss_addr_low;
     reg [1:0] miss_mask;
 
     // 冻结流水线条件
     assign stall = cpu_req & (state == QUERY_AND_LOAD | state == HIT_BRANCH | state == LOAD_MISS_WAIT);
+
+    wire [1:0] cpu_addr_low = cpu_addr[1:0];
 
     // LUT as Logic
     integer i;
@@ -127,18 +129,18 @@ module dcache#(
         else begin  
             // 传输 DRAM
             mem_addr    <= (cpu_req) ? cpu_addr : 32'b0;
-            mem_wdata   <= store_merge(32'b0, cpu_wdata, cpu_addr[1:0], cpu_mask);
-            mem_we      <= (cpu_req_store & state == QUERY_AND_LOAD) ? unmask(cpu_mask, cpu_addr[1:0]) : 4'b0;
+            mem_wdata   <= store_merge(32'b0, cpu_wdata, cpu_addr_low, cpu_mask);
+            mem_we      <= (cpu_req_store & state == QUERY_AND_LOAD) ? unmask(cpu_mask, cpu_addr_low) : 4'b0;
             mem_wen     <= cpu_req_store & state == QUERY_AND_LOAD;
 
             // 状态传递
             cpu_req_load_reg    <= cpu_req_load;
             cpu_req_store_reg   <= cpu_req_store;
             cpu_wdata_reg       <= cpu_wdata;
-            cpu_addr_reg        <= cpu_addr;
+            cpu_addr_low_r      <= cpu_addr_low;
             cpu_mask_reg        <= cpu_mask;
             cpu_wdata_reg_reg   <= cpu_wdata_reg;
-            cpu_addr_reg_reg    <= cpu_addr_reg;
+            cpu_addr_low_r2     <= cpu_addr_low_r;
             cpu_mask_reg_reg    <= cpu_mask_reg;
             index_reg           <= index;
             tag_reg             <= tag;
@@ -175,7 +177,7 @@ module dcache#(
                 end
 
                 LOAD_HIT_OUTPUT: begin
-                    cpu_rdata <= load_shift(cache_rdata_reg[hit_way_idx], cpu_addr_reg_reg[1:0], cpu_mask_reg_reg);
+                    cpu_rdata <= load_shift(cache_rdata_reg[hit_way_idx], cpu_addr_low_r2, cpu_mask_reg_reg);
                     state <= QUERY_AND_LOAD;
                 end
 
@@ -183,7 +185,7 @@ module dcache#(
                     miss_way                <= plru_state[index_reg];
                     miss_index              <= index_reg;   
                     miss_tag                <= tag_reg;
-                    miss_addr               <= cpu_addr_reg_reg;
+                    miss_addr_low           <= cpu_addr_low_r2;
                     miss_mask               <= cpu_mask_reg_reg;
 
                     plru_state[index_reg]   <= ~plru_state[index_reg];
@@ -191,7 +193,7 @@ module dcache#(
                 end
 
                 LOAD_MISS_OUTPUT: begin
-                    cpu_rdata <= load_shift(mem_rdata, miss_addr[1:0], miss_mask);
+                    cpu_rdata <= load_shift(mem_rdata, miss_addr_low, miss_mask);
                     state <= QUERY_AND_LOAD;
                 end
 
@@ -222,7 +224,7 @@ module dcache#(
                 data_array[`ARRAY_ADDR(index_reg, hit_way_idx)] <= store_merge(
                     cache_rdata_reg[hit_way_idx],
                     cpu_wdata_reg_reg,
-                    cpu_addr_reg_reg[1:0],
+                    cpu_addr_low_r2,
                     cpu_mask_reg_reg
                 );
             end

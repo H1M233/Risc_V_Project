@@ -2,7 +2,7 @@
 
 module hazard(
     input      [4:0]    ex_waddr_i,
-    input      [6:0]    opcode,
+    input      [6:0]    ex_is_load,
     input               ex_regs_wen_i,
 
     input      [6:0]    id_opcode_i,
@@ -15,7 +15,6 @@ module hazard(
     output reg          hazard_en
 );
 
-    wire ex_is_load;
     wire rs1_hit_ex;
     wire rs2_hit_ex;
     wire id_is_branch;
@@ -26,7 +25,6 @@ module hazard(
     wire rs2_wait_mem;
     wire ctrl_dep_wait;
 
-    assign ex_is_load = opcode == `TYPE_L;
     assign id_is_branch = id_opcode_i == `TYPE_B;
     assign id_is_jalr   = id_opcode_i == `JALR;
 

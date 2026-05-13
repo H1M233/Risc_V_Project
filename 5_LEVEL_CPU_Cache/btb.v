@@ -35,8 +35,8 @@ module btb #(
     reg                 lru     [0:LINE_NUM - 1];         // LRU 替换信息：每组的最近最少使用记录（0表示Way0最近被使用，1表示Way1最近被使用）
     
     // 查询
-    wire [31:0] way_target [0:WAYS];
-    wire [WAYS:0]  way_hit;
+    wire [31:0] way_target [0:WAYS - 1];
+    wire [WAYS - 1:0]  way_hit;
     genvar  w;
     generate
         for(w = 0; w < WAYS; w = w + 1) begin

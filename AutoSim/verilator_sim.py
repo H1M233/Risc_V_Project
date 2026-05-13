@@ -296,7 +296,7 @@ def instTest(prj_name):
 
 
 if __name__ == '__main__':
-    clkFreqList['5_LEVEL_CPU_Cache'] = 250
+    clkFreqList['5_LEVEL_CPU_Cache'] = 300
     clkFreqList['5_LEVEL_CPU_improved'] = 150
     clkFreqList['5_LEVEL_CPU_ooo'] = 250
 

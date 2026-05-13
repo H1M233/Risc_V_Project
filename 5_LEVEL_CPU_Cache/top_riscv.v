@@ -73,7 +73,7 @@ module top_riscv(
     wire [4:0]      id_rd_addr_o;
     wire            id_pred_taken_o;
     wire [31:0]     id_pred_pc_o;
-    wire [`OP_NUM - 1:0] id_opcode_packged_o;
+    wire [`OP_INST_NUM - 1:0] id_inst_packaged_o;
 
     // ============================================================
     // ex to dcache
@@ -95,14 +95,18 @@ module top_riscv(
     wire [31:0]     ex_jump1_i;
     wire [31:0]     ex_jump2_i;
     wire [4:0]      ex_rd_addr_i;
-    wire [31:0]     ex_rs1_data_i;
-    wire [31:0]     ex_rs2_data_i;
     wire [4:0]      ex_rs1_addr_i;
     wire [4:0]      ex_rs2_addr_i;
     wire            ex_pred_taken_i;
     wire [31:0]     ex_pred_pc_i;
     wire            ex_valid_i;
-    wire [`OP_NUM - 1:0] ex_opcode_packged_i;
+    wire [`OP_INST_NUM - 1:0] ex_inst_packaged_i;
+
+    wire            ex_fwd_rs1_hit_ex_i;
+    wire            ex_fwd_rs2_hit_ex_i;
+    wire [31:0]     ex_fwd_rs1_data_i;
+    wire [31:0]     ex_fwd_rs2_data_i;
+    wire [31:0]     ex_fwd_ex_rd_data_i;
 
     // ============================================================
     // ex to jump
@@ -115,11 +119,7 @@ module top_riscv(
     // ============================================================
     wire            ex_regs_wen_o;
     wire [31:0]     ex_inst_o;
-
-    // ============================================================
-    // ex to hazard
-    // ============================================================
-    wire [6:0]      ex_hazard_opcode_o;
+    wire [4:0]      ex_load_packaged_o;
 
     // ex to ex_mem & hazard
     wire [31:0]     ex_rd_data_o;
@@ -134,6 +134,7 @@ module top_riscv(
     wire [31:0]     mem_rd_data_i;
     wire [4:0]      mem_rd_addr_i;
     wire            mem_req_load_i;
+    wire [4:0]      mem_load_packaged_i;
 
     // ============================================================
     // mem to mem_wb
@@ -181,6 +182,13 @@ module top_riscv(
     wire [31:0]     ex_pred_update_target;
     wire            ex_actual_taken;
     wire            ex_pred_mispredict;
+
+    // forwarding to id_ex
+    wire            fwd_rs1_hit_ex_o;
+    wire            fwd_rs2_hit_ex_o;
+    wire [31:0]     fwd_rs1_data_o;
+    wire [31:0]     fwd_rs2_data_o;
+    wire [31:0]     fwd_ex_rd_data_o;
 
     // ============================================================
     // PC
@@ -236,7 +244,7 @@ module top_riscv(
     hazard HAZARD(
         // from ex
         .ex_waddr_i         (ex_rd_addr_o),
-        .opcode             (ex_hazard_opcode_o),
+        .ex_is_load         (mem_req_load_i),
         .ex_regs_wen_i      (ex_regs_wen_o),
 
         // from id
@@ -346,7 +354,7 @@ module top_riscv(
         .value2_o           (id_value2_o),
         .pred_taken_o       (id_pred_taken_o),
         .pred_pc_o          (id_pred_pc_o),
-        .opcode_packged_o   (id_opcode_packged_o),
+        .inst_packaged_o    (id_inst_packaged_o),
 
         .rs1_addr_o         (id_rs1_addr_o),
         .rs2_addr_o         (id_rs2_addr_o)
@@ -370,15 +378,19 @@ module top_riscv(
         .jump2_i            (id_jump2_o),
         .rd_addr_i          (id_rd_addr_o),
         .regs_wen_i         (id_reg_wen),
-        .rs1_data_i         (id_rs1_data_o),
-        .rs2_data_i         (id_rs2_data_o),
         .rs1_addr_i         (id_rs1_addr_o),
         .rs2_addr_i         (id_rs2_addr_o),
         .value1_i           (id_value1_o),
         .value2_i           (id_value2_o),
         .pred_taken_i       (id_pred_taken_o),
         .pred_pc_i          (id_pred_pc_o),
-        .opcode_packged_i   (id_opcode_packged_o),
+        .inst_packaged_i    (id_inst_packaged_o),
+
+        .fwd_rs1_hit_ex_i   (fwd_rs1_hit_ex_o),
+        .fwd_rs2_hit_ex_i   (fwd_rs2_hit_ex_o),
+        .fwd_rs1_data_i     (fwd_rs1_data_o),
+        .fwd_rs2_data_i     (fwd_rs2_data_o),
+        .fwd_ex_rd_data_i   (fwd_ex_rd_data_o),
 
         .pc_addr_o          (ex_pc_addr_i),
         .inst_o             (ex_inst_i),
@@ -386,16 +398,20 @@ module top_riscv(
         .jump2_o            (ex_jump2_i),
         .rd_addr_o          (ex_rd_addr_i),
         .regs_wen_o         (ex_regs_wen_i),
-        .rs1_data_o         (ex_rs1_data_i),
-        .rs2_data_o         (ex_rs2_data_i),
         .rs1_addr_o         (ex_rs1_addr_i),
         .rs2_addr_o         (ex_rs2_addr_i),
         .value1_o           (ex_value1_i),
         .value2_o           (ex_value2_i),
         .pred_taken_o       (ex_pred_taken_i),
         .pred_pc_o          (ex_pred_pc_i),
-        .opcode_packged_o   (ex_opcode_packged_i),
-        .valid_o            (ex_valid_i)
+        .inst_packaged_o    (ex_inst_packaged_i),
+        .valid_o            (ex_valid_i),
+
+        .fwd_rs1_hit_ex_o   (ex_fwd_rs1_hit_ex_i),
+        .fwd_rs2_hit_ex_o   (ex_fwd_rs2_hit_ex_i),
+        .fwd_rs1_data_o     (ex_fwd_rs1_data_i),
+        .fwd_rs2_data_o     (ex_fwd_rs2_data_i),
+        .fwd_ex_rd_data_o   (ex_fwd_ex_rd_data_i)
     );
 
     // ============================================================
@@ -408,30 +424,16 @@ module top_riscv(
         .jump2_i            (ex_jump2_i),
         .rd_addr_i          (ex_rd_addr_i),
         .regs_wen_i         (ex_regs_wen_i),
-        .rs1_data_i         (ex_rs1_data_i),
-        .rs2_data_i         (ex_rs2_data_i),
-        .rs1_addr_i         (ex_rs1_addr_i),
-        .rs2_addr_i         (ex_rs2_addr_i),
         .value1_i           (ex_value1_i),
         .value2_i           (ex_value2_i),
         .pred_taken_i       (ex_pred_taken_i),
         .pred_pc_i          (ex_pred_pc_i),
-        .opcode_packged_i   (ex_opcode_packged_i),
+        .inst_packaged_i    (ex_inst_packaged_i),
         .valid_i            (ex_valid_i),
-
-        .mem_forward_rd_addr_i  (mem_rd_addr_i),
-        .mem_forward_rd_data_i  (mem_rd_data_i),
-        .mem_forward_regs_wen_i (mem_regs_wen_i),
-        .mem_forward_opcode_i   (mem_inst_i[6:0]),
-
-        .wb_forward_rd_addr_i   (wb_rd_addr_i),
-        .wb_forward_rd_data_i   (wb_rd_data_i),
-        .wb_forward_regs_wen_i  (wb_regs_wen_i),
-
-        .hazard_opcode      (ex_hazard_opcode_o),
 
         .inst_o             (ex_inst_o),
         .regs_wen_o         (ex_regs_wen_o),
+        .load_packaged_o    (ex_load_packaged_o),
 
         .rd_addr_o          (ex_rd_addr_o),
         .rd_data_o          (ex_rd_data_o),
@@ -451,7 +453,13 @@ module top_riscv(
         .dcache_req_store   (dcache_req_store_i),
         .dcache_mask        (dcache_mask_i),
         .dcache_addr        (dcache_addr_i),
-        .dcache_wdata       (dcache_wdata_i)
+        .dcache_wdata       (dcache_wdata_i),
+
+        .fwd_rs1_data_i     (ex_fwd_rs1_data_i),
+        .fwd_rs2_data_i     (ex_fwd_rs2_data_i),
+        .fwd_rs1_hit_ex_i   (ex_fwd_rs1_hit_ex_i),
+        .fwd_rs2_hit_ex_i   (ex_fwd_rs2_hit_ex_i),
+        .fwd_ex_rd_data_i   (ex_fwd_ex_rd_data_i)
     );
 
     // ============================================================
@@ -466,12 +474,14 @@ module top_riscv(
         .rd_data_i          (ex_rd_data_o),
         .regs_wen_i         (ex_regs_wen_o),
         .mem_req_load_i     (ex_req_load_o),
+        .load_packaged_i    (ex_load_packaged_o),
 
         .inst_o             (mem_inst_i),
         .rd_addr_o          (mem_rd_addr_i),
         .rd_data_o          (mem_rd_data_i),
         .regs_wen_o         (mem_regs_wen_i),
-        .mem_req_load_o     (mem_req_load_i)
+        .mem_req_load_o     (mem_req_load_i),
+        .load_packaged_o    (mem_load_packaged_i)
     );
 
     // ============================================================
@@ -483,6 +493,7 @@ module top_riscv(
         .rd_data_i          (mem_rd_data_i),
         .regs_wen           (mem_regs_wen_i),
         .mem_req_load_i     (mem_req_load_i),
+        .load_packaged_i    (mem_load_packaged_i),
 
         .perip_rdata        (dcache_rdata),
 
@@ -574,5 +585,36 @@ module top_riscv(
         .pipe_flush         (pipe_flush),
         .pipe_hold          (pipe_hold)
     );
+
+    // forwarding
+    forwarding FWD(
+        // from id
+        .id_rs1_addr_i      (id_rs1_addr_o),
+        .id_rs2_addr_i      (id_rs2_addr_o),
+        .id_rs1_data_i      (id_rs1_data_o),
+        .id_rs2_data_i      (id_rs2_data_o),
+
+        // from ex
+        .ex_regs_wen_i      (ex_regs_wen_o),
+        .ex_rd_addr_i       (ex_rd_addr_o),
+        .ex_rd_data_i       (ex_rd_data_o),
+
+        // from mem
+        .mem_regs_wen_i     (mem_regs_wen_o),
+        .mem_rd_addr_i      (mem_rd_addr_o),
+        .mem_rd_data_i      (mem_rd_data_o),
+
+        // from wb
+        .wb_regs_wen_i      (wb_regs_wen_i), 
+        .wb_rd_addr_i       (wb_rd_addr_i),
+        .wb_rd_data_i       (wb_rd_data_i),
+
+        // to ex
+        .forwarding_rs1_data_o      (fwd_rs1_data_o),
+        .forwarding_rs2_data_o      (fwd_rs2_data_o),
+        .forwarding_rs1_hit_ex_o    (fwd_rs1_hit_ex_o),
+        .forwarding_rs2_hit_ex_o    (fwd_rs2_hit_ex_o),
+        .forwarding_ex_rd_data_o    (fwd_ex_rd_data_o)
+);
 
 endmodule

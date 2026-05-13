@@ -1,24 +1,65 @@
 `ifndef ALU_DEF
 `define ALU_DEF
 
-`define OP_NUM      9
-`define OP_I        4'd0
-`define OP_R        4'd1
-`define OP_AUIPC    4'd2
-`define OP_LUI      4'd3
-`define OP_JAL      4'd4
-`define OP_JALR     4'd5
-`define OP_BRANCH   4'd6
-`define OP_LOAD     4'd7
-`define OP_STORE    4'd8
+`define OP_INST_NUM     42
 
-`define F3_000      3'd0
-`define F3_001      3'd1
-`define F3_010      3'd2
-`define F3_011      3'd3
-`define F3_100      3'd4
-`define F3_101      3'd5
-`define F3_110      3'd6
-`define F3_111      3'd7
+// opcode
+`define OP_I            0
+`define OP_R            1
+`define OP_AUIPC        2
+`define OP_LUI          3
+`define OP_JAL          4
+`define OP_JALR         5
+`define OP_BRANCH       6
+`define OP_LOAD         7
+`define OP_STORE        8
+
+// I-type
+`define INST_ADDI            9
+`define INST_XORI            10
+`define INST_ORI             11
+`define INST_ANDI            12
+`define INST_SLLI            13
+`define INST_SRLI            14
+`define INST_SRAI            15
+`define INST_SLTI            16
+`define INST_SLTIU           17
+
+// R-type
+`define INST_ADD             18
+`define INST_SUB             19
+`define INST_XOR             20
+`define INST_OR              21
+`define INST_AND             22
+`define INST_SLL             23
+`define INST_SRL             24
+`define INST_SRA             25
+`define INST_SLT             26
+`define INST_SLTU            27
+
+// Load & Store
+`define INST_LB              28
+`define INST_LH              29
+`define INST_LW              30
+`define INST_LBU             31
+`define INST_LHU             32
+`define INST_SB              33
+`define INST_SH              34
+`define INST_SW              35
+
+// Branch
+`define INST_BEQ             36
+`define INST_BNE             37
+`define INST_BLT             38
+`define INST_BGE             39
+`define INST_BLTU            40
+`define INST_BGEU            41
+
+// Load for ex to mem
+`define IS_LB   0
+`define IS_LH   1
+`define IS_LW   2
+`define IS_LBU  3
+`define IS_LHU  4
 
 `endif

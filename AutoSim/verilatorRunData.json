@@ -1,21 +1,21 @@
 {
   "5_LEVEL_CPU_Cache": {
-    "37 INST TEST": "PASS √",
+    "37 INST TEST": "FAIL x",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.518463",
-        "REAL TIME": "10.4001",
-        "ICACHE HIT": "0.992202",
-        "DCACHE HIT": "0.999916",
-        "RUN TIME": "236",
+        "IPC": "0.518634",
+        "REAL TIME": "11.7",
+        "ICACHE HIT": "0.992167",
+        "DCACHE HIT": "0.999917",
+        "RUN TIME": "197",
         "LED": "PASS √"
       },
       "src0": {
-        "IPC": "0.454844",
-        "REAL TIME": "600.505",
-        "ICACHE HIT": "0.975634",
-        "DCACHE HIT": "0.872273",
-        "RUN TIME": "12466",
+        "IPC": "0.434687",
+        "REAL TIME": "712.905",
+        "ICACHE HIT": "0.975624",
+        "DCACHE HIT": "0.872266",
+        "RUN TIME": "10870",
         "LED": "PASS √"
       },
       "src1": {
@@ -40,8 +40,8 @@
     "37 INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.749749",
-        "REAL TIME": "6.90025",
+        "IPC": "0.755332",
+        "REAL TIME": "7.3",
         "RUN TIME": "270",
         "LED": "PASS √"
       },

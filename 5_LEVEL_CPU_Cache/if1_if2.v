@@ -14,6 +14,7 @@ module if1_if2(
     output reg          if2_valid_o,
     output reg [31:0]   pc_o
 );
+
     always @(posedge clk) begin
         if (!rst) begin
             if2_valid_o <= 1'b0;

@@ -21,39 +21,108 @@ module id(
     output reg [31:0]   jump2_o,            // 传入跳转指令地址2
     output reg [4:0]    rd_addr_o,          // 传入指令rd地址
     output reg          reg_wen,            // 寄存器写使能信号
-    output reg [31:0]   rs1_data_o,
-    output reg [31:0]   rs2_data_o,
     output reg [31:0]   value1_o,           // 传入寄存器1的数据
     output reg [31:0]   value2_o,           // 传入寄存器2的数据
     output reg          pred_taken_o,
     output reg [31:0]   pred_pc_o,
-    output reg [`OP_NUM - 1:0] opcode_packged_o,
+    output reg [`OP_INST_NUM - 1:0] inst_packaged_o,
 
-    // to regs & hazard
+    // to regs & hazard & forwarding
     (* max_fanout = 30 *)
     output reg [4:0]    rs1_addr_o,
     (* max_fanout = 30 *)
-    output reg [4:0]    rs2_addr_o
+    output reg [4:0]    rs2_addr_o,
+    output reg [31:0]   rs1_data_o,
+    output reg [31:0]   rs2_data_o
 );  
     // 提取指令
     wire [31:0] data1       = rs1_data_i;
     wire [31:0] data2       = rs2_data_i;
     wire [6:0]  opcode      = inst_i[6:0];              // 传入指令opcode
+    wire [2:0]  funct3      = inst_i[14:12];
+    wire [6:0]  funct7      = inst_i[31:25];
     wire [4:0]  rd_o        = inst_i[11:7];             // 传入指令rd地址
     wire [4:0]  rs1_o       = inst_i[19:15];            // 传入指令rs1地址
     wire [4:0]  rs2_o       = inst_i[24:20];            // 传入指令rs2地址
 
-    // 打包 opcode
+    // opcode
+    wire is_alu_i  = (opcode == `TYPE_I);
+    wire is_alu_r  = (opcode == `TYPE_R);
+    wire is_auipc  = (opcode == `AUIPC);
+    wire is_lui    = (opcode == `LUI);
+    wire is_jal    = (opcode == `JAL);
+    wire is_jalr   = (opcode == `JALR);
+    wire is_branch = (opcode == `TYPE_B);
+    wire is_load   = (opcode == `TYPE_L);
+    wire is_store  = (opcode == `TYPE_S);
+
+    // f3
+    wire f3_000 = (funct3 == 3'b000);
+    wire f3_001 = (funct3 == 3'b001);
+    wire f3_010 = (funct3 == 3'b010);
+    wire f3_011 = (funct3 == 3'b011);
+    wire f3_100 = (funct3 == 3'b100);
+    wire f3_101 = (funct3 == 3'b101);
+    wire f3_110 = (funct3 == 3'b110);
+    wire f3_111 = (funct3 == 3'b111);
+
+    // f7
+    wire f7_0000000 = (funct7 == 7'b0000000);
+    wire f7_0100000 = (funct7 == 7'b0100000);
+
+    // 打包指令
     always @(*) begin
-        opcode_packged_o[`OP_I]       = (opcode == `TYPE_I);
-        opcode_packged_o[`OP_R]       = (opcode == `TYPE_R);
-        opcode_packged_o[`OP_AUIPC]   = (opcode == `AUIPC);
-        opcode_packged_o[`OP_LUI]     = (opcode == `LUI);
-        opcode_packged_o[`OP_JAL]     = (opcode == `JAL);
-        opcode_packged_o[`OP_JALR]    = (opcode == `JALR);
-        opcode_packged_o[`OP_BRANCH]  = (opcode == `TYPE_B);
-        opcode_packged_o[`OP_LOAD]    = (opcode == `TYPE_L);
-        opcode_packged_o[`OP_STORE]   = (opcode == `TYPE_S);
+        // opcode
+        inst_packaged_o[`OP_I]      = is_alu_i;
+        inst_packaged_o[`OP_R]      = is_alu_r;
+        inst_packaged_o[`OP_AUIPC]  = is_auipc;
+        inst_packaged_o[`OP_LUI]    = is_lui;
+        inst_packaged_o[`OP_JAL]    = is_jal;
+        inst_packaged_o[`OP_JALR]   = is_jalr;
+        inst_packaged_o[`OP_BRANCH] = is_branch;
+        inst_packaged_o[`OP_LOAD]   = is_load;
+        inst_packaged_o[`OP_STORE]  = is_store;
+
+        // I-type
+        inst_packaged_o[`INST_ADDI]  = is_alu_i & f3_000;
+        inst_packaged_o[`INST_XORI]  = is_alu_i & f3_100;
+        inst_packaged_o[`INST_ORI]   = is_alu_i & f3_110;
+        inst_packaged_o[`INST_ANDI]  = is_alu_i & f3_111;
+        inst_packaged_o[`INST_SLLI]  = is_alu_i & f3_001;
+        inst_packaged_o[`INST_SRLI]  = is_alu_i & f3_101 & f7_0000000;
+        inst_packaged_o[`INST_SRAI]  = is_alu_i & f3_101 & f7_0100000;
+        inst_packaged_o[`INST_SLTI]  = is_alu_i & f3_010;
+        inst_packaged_o[`INST_SLTIU] = is_alu_i & f3_011;
+
+        // R-type
+        inst_packaged_o[`INST_ADD]  = is_alu_r & f3_000 & f7_0000000;
+        inst_packaged_o[`INST_SUB]  = is_alu_r & f3_000 & f7_0100000;
+        inst_packaged_o[`INST_XOR]  = is_alu_r & f3_100;
+        inst_packaged_o[`INST_OR]   = is_alu_r & f3_110;
+        inst_packaged_o[`INST_AND]  = is_alu_r & f3_111;
+        inst_packaged_o[`INST_SLL]  = is_alu_r & f3_001;
+        inst_packaged_o[`INST_SRL]  = is_alu_r & f3_101 & f7_0000000;
+        inst_packaged_o[`INST_SRA]  = is_alu_r & f3_101 & f7_0100000;
+        inst_packaged_o[`INST_SLT]  = is_alu_r & f3_010;
+        inst_packaged_o[`INST_SLTU] = is_alu_r & f3_011;
+
+        // Load & Store
+        inst_packaged_o[`INST_LB]  = is_load & f3_000;
+        inst_packaged_o[`INST_LH]  = is_load & f3_001;
+        inst_packaged_o[`INST_LW]  = is_load & f3_010;
+        inst_packaged_o[`INST_LBU] = is_load & f3_100;
+        inst_packaged_o[`INST_LHU] = is_load & f3_101;
+        inst_packaged_o[`INST_SB]  = is_store & f3_000;
+        inst_packaged_o[`INST_SH]  = is_store & f3_001;
+        inst_packaged_o[`INST_SW]  = is_store & f3_010;
+
+        // Branch
+        inst_packaged_o[`INST_BEQ]  = is_branch & f3_000;
+        inst_packaged_o[`INST_BNE]  = is_branch & f3_001;
+        inst_packaged_o[`INST_BLT]  = is_branch & f3_100;
+        inst_packaged_o[`INST_BGE]  = is_branch & f3_101;
+        inst_packaged_o[`INST_BLTU] = is_branch & f3_110;
+        inst_packaged_o[`INST_BGEU] = is_branch & f3_111;
     end
 
     always@(*) begin
@@ -71,6 +140,7 @@ module id(
         rd_addr_o       = 5'b0;
         pred_taken_o    = pred_taken_i;
         pred_pc_o       = pred_pc_i;
+
         case(opcode)
             `LUI: begin
                 reg_wen     = 1'b1;             
@@ -113,7 +183,6 @@ module id(
             end
 
             `TYPE_B: begin
-                // 分支比较不要在 ID 做，否则 IF_ID.inst -> REGFILE -> compare -> ID_EX.value1 会变成关键路径。
                 value1_o    = data1;
                 value2_o    = data2;
                 jump1_o     = pc_addr_i;
