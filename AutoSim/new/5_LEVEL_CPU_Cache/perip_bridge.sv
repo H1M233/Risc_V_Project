@@ -1,3 +1,4 @@
+`include "switch.vh"
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
@@ -53,7 +54,7 @@ module perip_bridge(
     logic cnt_enable_cfg;
     
     // delay
-    localparam READ_DELAY = 2'd2;
+    localparam READ_DELAY = `DRAM_READ_DELAY;
     logic [31:0] perip_d_addr [0: READ_DELAY - 1];
     logic        perip_d_wen  [0: READ_DELAY - 1];
 

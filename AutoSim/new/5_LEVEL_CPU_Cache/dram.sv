@@ -1,12 +1,12 @@
 module dram_BRAM(
     input               clk,
 
-    input               dram_en_i,
     input      [31:0]   dram_addr_i,
     input      [3:0]    dram_we_i,
     input               dram_wen_i,
     input      [31:0]   dram_wdata_i,
-    output reg [31:0]   dram_rdata_o
+    output reg [31:0]   dram_rdata_d1_o,
+    output reg [31:0]   dram_rdata_d2_o
 );
 
     // 设置65536个32位空间
@@ -14,8 +14,6 @@ module dram_BRAM(
 
     wire [15:0] dram_word_addr = dram_addr_i[17:2];
     wire [31:0] dram_rdata_raw = ram_mem[dram_word_addr];
-
-    reg [31:0] dram_rdata_delay;
 
     wire [31:0] pre_wdata = {
         dram_we_i[3] ? dram_wdata_i[31:24] : dram_rdata_raw[31:24],
@@ -25,13 +23,13 @@ module dram_BRAM(
     };
     
     always @(posedge clk) begin
-        dram_rdata_delay <= (dram_en_i) ? (dram_wen_i) ? pre_wdata : dram_rdata_raw : 32'b0;
-        dram_rdata_o <= (dram_en_i) ? dram_rdata_delay : 32'b0;
+        dram_rdata_d1_o <= (dram_wen_i) ? pre_wdata : dram_rdata_raw;
+        dram_rdata_d2_o <= dram_rdata_d1_o;
     end
 
 
     always @(posedge clk) begin
-        if(dram_en_i && dram_wen_i) ram_mem[dram_word_addr] <= pre_wdata;
+        if(dram_wen_i) ram_mem[dram_word_addr] <= pre_wdata;
     end
 endmodule
 
@@ -44,12 +42,30 @@ module blk_mem_gen_0(
     input      [3:0]    wea
 );
     dram_BRAM dram_inst(
-        .clk            (clka),
-        .dram_en_i      (1'b1),
-        .dram_addr_i    ({14'b0, addra, 2'b0}),
-        .dram_we_i      (wea),
-        .dram_wen_i     (wea != 4'b0),
-        .dram_wdata_i   (dina),
-        .dram_rdata_o   (douta)
+        .clk                (clka),
+        .dram_addr_i        ({14'b0, addra, 2'b0}),
+        .dram_we_i          (wea),
+        .dram_wen_i         (wea != 4'b0),
+        .dram_wdata_i       (dina),
+        .dram_rdata_d1_o    (),
+        .dram_rdata_d2_o    (douta)
+    );
+endmodule
+
+module DRAM_d1(
+    input      [15:0]   addra,
+    input               clka,
+    input      [31:0]   dina,
+    output reg [31:0]   douta,
+    input      [3:0]    wea
+);
+    dram_BRAM dram_inst(
+        .clk                (clka),
+        .dram_addr_i        ({14'b0, addra, 2'b0}),
+        .dram_we_i          (wea),
+        .dram_wen_i         (wea != 4'b0),
+        .dram_wdata_i       (dina),
+        .dram_rdata_d1_o    (douta),
+        .dram_rdata_d2_o    ()
     );
 endmodule

@@ -42,12 +42,6 @@ int main(int argc, char** argv) {
     // 计算 IPC
     double totalCycle = 0.0;
     double commitCycle = 0.0;
-    
-    // 计算 ICACHE & DCACHE 命中率
-    double icacheReq = 0.0;
-    double icacheHit = 0.0;
-    double dcacheReq = 0.0;
-    double dcacheHit = 0.0;
 
     // 记录函数
     auto step_and_advance = [&](double delta_time_ns) {
@@ -114,14 +108,6 @@ int main(int argc, char** argv) {
             prev_mem_inst = top->mem_inst;
             commitCycle++;
         }
-        if (top->icache_req == 1){
-            icacheReq++;
-            icacheHit += (top->icache_hit);
-        }
-        if (top->dcache_req == 1){
-            dcacheReq++;
-            dcacheHit += (top->dcache_hit);
-        }
         
         // 每 1s 打印一次
         static double last_print_time = 0.0;
@@ -155,13 +141,7 @@ int main(int argc, char** argv) {
                       << std::left << std::setw(13) << " " << std::endl << std::endl << "\033[2K"
                       << "IPC:" 
                       << std::right << std::setw(16) << std::fixed << std::setprecision(4) << commitCycle / totalCycle
-                      << std::left << std::setw(8) << " "
-                      << "ICACHE HIT:" 
-                      << std::right << std::setw(12) << std::fixed << std::setprecision(4) << icacheHit / icacheReq
-                      << std::left << std::setw(10) << " %"
-                      << "DCACHE HIT:" 
-                      << std::right << std::setw(10) << std::fixed << std::setprecision(4) << dcacheHit / dcacheReq
-                      << std::left << std::setw(10) << " %" << std::endl << std::endl << "\033[2K"
+                      << std::left << std::setw(8) << " " << std::endl << std::endl << "\033[2K"
                       << "PC:" 
                       << std::right << std::setw(10) << std::hex << top->func_block_addr << " -> " 
                       << std::right << std::setw(8) << top->pc
@@ -197,8 +177,6 @@ int main(int argc, char** argv) {
     std::ofstream f("software_results.txt");
     f << "IPC=" << commitCycle / totalCycle << std::endl
       << "REAL TIME=" << current_time / 1000.0 << std::endl
-      << "ICACHE HIT=" << icacheHit / icacheReq << std::endl
-      << "DCACHE HIT=" << dcacheHit / dcacheReq << std::endl
       << "RUN TIME=" << std::hex << SEG_getTime << std::dec << std::endl
       << "LED=" << (isTick ? "PASS √" : "FAIL x");
     f.close();

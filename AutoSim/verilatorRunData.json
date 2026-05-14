@@ -1,21 +1,21 @@
 {
   "5_LEVEL_CPU_Cache": {
-    "37 INST TEST": "PASS √",
+    "37 INST TEST": "FAIL x",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.528614",
-        "REAL TIME": "19.2002",
+        "IPC": "0.548236",
+        "REAL TIME": "19.7003",
         "ICACHE HIT": "0.992835",
         "DCACHE HIT": "0.999915",
-        "RUN TIME": "193",
+        "RUN TIME": "186",
         "LED": "PASS √"
       },
       "src0": {
-        "IPC": "0.500177",
-        "REAL TIME": "999.672",
+        "IPC": "0.644771",
+        "REAL TIME": "726.321",
         "ICACHE HIT": "0.988879",
         "DCACHE HIT": "0.872287",
-        "RUN TIME": "9447",
+        "RUN TIME": "7328",
         "LED": "PASS √"
       },
       "src1": {

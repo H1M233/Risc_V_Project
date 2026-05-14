@@ -1,3 +1,4 @@
+`include "switch.vh"
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
@@ -32,6 +33,7 @@ module dram_driver(
 
     assign dram_addr = perip_addr[17:2];
 
+`ifdef ENABLE_DCACHE
     blk_mem_gen_0 Mem_DRAM (
         .addra      (dram_addr),
         .clka       (clk),
@@ -39,4 +41,13 @@ module dram_driver(
         .douta      (perip_rdata),
         .wea        (perip_we)
     );
+`else
+    DRAM_d1 Mem_DRAM(
+        .addra      (dram_addr),
+        .clka       (clk),
+        .dina       (perip_wdata),
+        .douta      (perip_rdata),
+        .wea        (perip_we)
+    );
+`endif
 endmodule

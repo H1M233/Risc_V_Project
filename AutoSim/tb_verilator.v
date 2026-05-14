@@ -7,10 +7,6 @@ module tb_verilator_software(
 
     output [31:0] seg,
     output [31:0] mem_inst,
-    output        icache_req,
-    output        icache_hit,
-    output        dcache_req,
-    output        dcache_hit,
     output [31:0] pc,
     output reg [31:0] func_block_addr,
     output [31:0] LED
@@ -34,10 +30,6 @@ module tb_verilator_software(
         assign mem_inst = tb_verilator_software.uut.student_top_inst.Core_cpu.MEM.inst_i;
         assign pc = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.pc_addr_i;
 
-        assign icache_req = (tb_verilator_software.uut.student_top_inst.Core_cpu.ICACHE.pipe_hold == 1'd0);
-        assign icache_hit = tb_verilator_software.uut.student_top_inst.Core_cpu.ICACHE.hit;
-        assign dcache_req = (tb_verilator_software.uut.student_top_inst.Core_cpu.DCACHE.state == 3'd1);
-        assign dcache_hit = tb_verilator_software.uut.student_top_inst.Core_cpu.DCACHE.hit;
         wire ex_is_jal = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.is_jal;
         wire ex_is_jalr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.is_jalr;
         wire ex_is_branch = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.is_branch;
@@ -59,10 +51,6 @@ module tb_verilator_software(
         assign mem_inst = tb_verilator_software.uut.student_top_inst.Core_cpu.MEM.inst_i;
         assign pc = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.pc_addr_i;
 
-        assign icache_req = 1'b1;
-        assign icache_hit = 1'b0;
-        assign dcache_req = 1'b1;
-        assign dcache_hit = 1'b0;
         always @(posedge clk_cpu) begin
             if (tb_verilator_software.uut.student_top_inst.Core_cpu.EX.jump_en)
                 func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.jump_addr_o;
