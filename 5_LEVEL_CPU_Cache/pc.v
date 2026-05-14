@@ -10,9 +10,9 @@ module pc(
     // from hazard
     input               hazard_en,
 
-    // from jump
-    input      [31:0]   jump_addr_i,
-    input               jump_en,
+    // from ex
+    input               pred_flush_en,
+    input      [31:0]   pred_flush_pc,
 
     // to if
     (* max_fanout = 30 *)
@@ -26,8 +26,8 @@ module pc(
         if(!rst) begin
             pc_addr_o <= 32'h8000_0000;
         end
-        else if(jump_en) begin
-            pc_addr_o <= jump_addr_i;
+        else if(pred_flush_en) begin
+            pc_addr_o <= pred_flush_pc;
         end
         else if(hazard_en) begin
             pc_addr_o <= pc_addr_o;

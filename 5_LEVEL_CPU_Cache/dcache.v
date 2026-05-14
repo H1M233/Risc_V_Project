@@ -22,6 +22,7 @@ module dcache#(
     (* max_fanout = 20 *)
     input      [31:0]   cpu_wdata,
     output reg [31:0]   cpu_rdata,
+    (* max_fanout = 20 *)
     output              stall,
 
     // external DROM side

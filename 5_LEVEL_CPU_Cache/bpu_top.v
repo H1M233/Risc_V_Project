@@ -37,9 +37,8 @@ module bpu_top #(
     input      [31:0]   update_pc,          // ex阶段返回更新的指令地址
     input      [31:0]   update_target,      // ex阶段返回的实际跳转地址
     input               actual_taken,       // ex阶段判断跳转为真
-    input               pred_mispredict,    // ex阶段判断预测错误
 
-    input               pipe_flush,
+    input               pred_flush_r,
     input               pipe_hold
     
 );
@@ -48,12 +47,11 @@ module bpu_top #(
     wire                    gshare_pred_taken_o;
     wire                    gshare_prev_b_i;
     wire [BHR_WIDTH - 1:0]  gshare_ghr_o;
-    wire [BHR_WIDTH - 1:0]  gshare_ghr_d2_o;
+    wire [BHR_WIDTH - 1:0]  gshare_ghr_update_o;
 
     wire                    gshare_update_en_i;
     wire [BHR_WIDTH - 1:0]  gshare_update_pht_index_i;
     wire                    gshare_actual_taken_i;
-    wire                    gshare_pred_mispredict_i;
 
     // connect ras with bpu_controller
     wire                    ras_push_en_i;
@@ -100,23 +98,21 @@ module bpu_top #(
         .update_pc                  (update_pc),
         .update_target              (update_target),
         .actual_taken               (actual_taken),
-        .pred_mispredict            (pred_mispredict),
 
-        .pipe_flush                 (pipe_flush),
         .pipe_hold                  (pipe_hold),
+        .pred_flush_en_r            (pred_flush_r),
 
         // Gshare - 查询
         .gshare_pht_index           (gshare_pht_index_i),
         .gshare_prev_b              (gshare_prev_b_i),
         .gshare_pred_taken          (gshare_pred_taken_o),
         .gshare_ghr                 (gshare_ghr_o),
-        .gshare_ghr_d2              (gshare_ghr_d2_o),
+        .gshare_ghr_update          (gshare_ghr_update_o),
 
         // Gshare - 更新
         .gshare_update_en           (gshare_update_en_i),
         .gshare_update_pht_index    (gshare_update_pht_index_i),
         .gshare_actual_taken        (gshare_actual_taken_i),
-        .gshare_pred_mispredict     (gshare_pred_mispredict_i),
 
         // ras - to bpu_controller
         .ras_push_en                (ras_push_en_i),
@@ -147,19 +143,19 @@ module bpu_top #(
     ) GSHARE(
         .clk                        (clk),
         .rst                        (rst),
+        .pipe_hold                  (pipe_hold),
     
         // 查询
         .pht_index_i                (gshare_pht_index_i),
         .prev_b                     (gshare_prev_b_i),
         .pred_taken_o               (gshare_pred_taken_o),
         .gshare_ghr_o               (gshare_ghr_o),
-        .gshare_ghr_d2_o            (gshare_ghr_d2_o),
+        .gshare_ghr_update_o        (gshare_ghr_update_o),
 
         // 更新
         .update_en_i                (gshare_update_en_i),
         .update_pht_index_i         (gshare_update_pht_index_i),
-        .actual_taken_i             (gshare_actual_taken_i),
-        .pred_mispredict_i          (gshare_pred_mispredict_i)
+        .actual_taken_i             (gshare_actual_taken_i)
     );
 
     ras #(

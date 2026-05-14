@@ -26,7 +26,7 @@ module ras #(
 
     assign isempty_o    = (ptr == 0);
     assign isfull_o     = (ptr == DEPTH);
-    assign pop_addr_o   = (pop_en_i && ptr != 0) ? stack_mem[ptr - 1] : 32'b0;
+    assign pop_addr_o   = (ptr != 0) ? stack_mem[ptr - 1] : 32'b0;      // 始终输出栈顶
 
     integer i;
     initial begin

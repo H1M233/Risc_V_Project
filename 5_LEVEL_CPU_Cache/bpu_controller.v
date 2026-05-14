@@ -33,7 +33,7 @@ module bpu_controller #(
     (* max_fanout = 30 *)
     output reg [31:0]               pred_pc,            // 向 if 输出预测的地址
     (* max_fanout = 30 *)
-    output reg                      pred_taken,         // 从 PHT 中读取的计数器高位值
+    output                          pred_taken,         // 从 PHT 中读取的计数器高位值
 
     // from ex
     input                           update_btb_en,      // ex 阶段返回的 BTB 更新使能
@@ -41,23 +41,21 @@ module bpu_controller #(
     input      [31:0]               update_pc,          // ex 阶段返回更新的指令地址
     input      [31:0]               update_target,      // ex 阶段返回的实际跳转地址
     input                           actual_taken,       // ex 阶段判断跳转为真
-    input                           pred_mispredict,    // ex 阶段判断预测错误
 
-    input                           pipe_flush,
     input                           pipe_hold,
+    input                           pred_flush_en_r,
 
     // Gshare - 查询
     output     [BHR_WIDTH - 1:0]    gshare_pht_index,
     output reg                      gshare_prev_b,
     input                           gshare_pred_taken,
     input      [BHR_WIDTH - 1:0]    gshare_ghr,
-    input      [BHR_WIDTH - 1:0]    gshare_ghr_d2,
+    input      [BHR_WIDTH - 1:0]    gshare_ghr_update,
 
     // Gshare - 更新
     output reg                      gshare_update_en,
     output reg [BHR_WIDTH - 1:0]    gshare_update_pht_index,
     output reg                      gshare_actual_taken,
-    output reg                      gshare_pred_mispredict,
 
     // ras - to bpu_controller
     (* max_fanout = 30 *)
@@ -112,37 +110,38 @@ module bpu_controller #(
     wire    [31:0]  pc_add_JAL  = pc_reg + JAL_imm;
     wire    [31:0]  pc_add_B    = pc_reg + B_imm;
 
+    // 更新状态寄存
+    reg update_btb_en_r;
+    reg update_gshare_en_r;
+    reg [31:0] update_pc_r;
+    reg [31:0] update_target_r;
+    reg actual_taken_r;
+
     // Gshare索引：取PC中间位与BHR异或
     wire [BHR_WIDTH - 1:0]  pht_index           = pc_addr[BHR_WIDTH + 1:2] ^ gshare_ghr;
-    (* max_fanout = 50 *)
-    wire [BHR_WIDTH - 1:0]  update_pht_index    = update_pc[BHR_WIDTH + 1:2] ^ gshare_ghr_d2;
+    wire [BHR_WIDTH - 1:0]  update_pht_index    = update_pc_r[BHR_WIDTH + 1:2] ^ gshare_ghr_update;
 
     // BTB索引和tag（tag取pc高位，用于区分映射到同一索引的不同地址）
     wire [BTB_INDEX_WIDTH - 1:0]        btb_query_index_w   = pc_addr[BTB_INDEX_WIDTH + 1:2];
     wire [31 - BTB_INDEX_WIDTH - 2:0]   btb_query_tag_w     = pc_addr[31:BTB_INDEX_WIDTH + 2];
-    wire [BTB_INDEX_WIDTH - 1:0]        btb_update_index_w  = update_pc[BTB_INDEX_WIDTH + 1:2];
-    wire [31 - BTB_INDEX_WIDTH - 2:0]   btb_update_tag_w    = update_pc[31:BTB_INDEX_WIDTH + 2];
+    wire [BTB_INDEX_WIDTH - 1:0]        btb_update_index_w  = update_pc_r[BTB_INDEX_WIDTH + 1:2];
+    wire [31 - BTB_INDEX_WIDTH - 2:0]   btb_update_tag_w    = update_pc_r[31:BTB_INDEX_WIDTH + 2];
 
     // 查询
-    assign gshare_pht_index = (pipe_flush | !rst) ? 0 : pht_index;
+    reg pred_taken_raw; // 用于屏蔽冲刷（预测错误）时的预测结果
+    assign gshare_pht_index = (pred_taken_raw) ? 0 : pht_index;     // 预测跳转后屏蔽查询入口
     always@(posedge clk) begin
         if (!rst) begin
             // PC
             pc_reg              <= 0;
 
-            // TYPE_B
-            // gshare_pht_index    <= 0;
-
             // JALR
             btb_query_index     <= 0;
             btb_query_tag       <= 0;
         end
-        else if (pipe_flush) begin       // 冲刷查询入口 避免下一个错误地址进入
+        else if (pred_taken_raw) begin
             // PC
             pc_reg              <= 0;
-
-            // TYPE_B
-            // gshare_pht_index    <= 0;
 
             // JALR
             btb_query_index     <= 0;
@@ -152,52 +151,12 @@ module bpu_controller #(
             // PC
             pc_reg              <= pc_addr;
 
-            // TYPE_B
-            // gshare_pht_index    <= pht_index;
-
             // JALR
             btb_query_index     <= btb_query_index_w;
             btb_query_tag       <= btb_query_tag_w;
         end
     end
-    
-    // 预测结果
-    always @(posedge clk) begin
-        if (!rst) begin
-            pred_taken      <= 0;
-            pred_pc         <= 0;
-        end
-        else if (pipe_hold) begin           // 暂停优先
-            pred_taken      <= pred_taken;
-            pred_pc         <= pred_pc;
-        end
-        else if (pipe_flush) begin
-            pred_taken      <= 0;
-            pred_pc         <= 0;
-        end
-        else begin
-            if (is_ras_pop) begin
-                pred_taken  <= 1'b1;
-                pred_pc     <= ras_pop_addr;
-            end
-            else if (is_B_type) begin
-                pred_taken  <= gshare_pred_taken;
-                pred_pc     <= pc_add_B;
-            end
-            else if (is_JALR) begin
-                pred_taken  <= btb_hit;
-                pred_pc     <= btb_target_pc;
-            end
-            else if (is_JAL) begin
-                pred_taken  <= 1'b1;
-                pred_pc     <= pc_add_JAL;
-            end
-            else begin
-                pred_taken  <= 1'b0;
-                pred_pc     <= pc_add_4;
-            end
-        end
-    end
+
     always @(posedge clk) begin
         if (!rst) begin
             // RAS
@@ -208,51 +167,95 @@ module bpu_controller #(
             // Gshare
             gshare_prev_b   <= 0;
         end
-        else begin
-            if (pipe_flush) begin
-                // RAS - 弹栈入栈只能一个周期
-                ras_pop_en      <= 0;
-                ras_push_en     <= 0;
-            end
-            else if (!pipe_hold) begin
-                // RAS
-                ras_pop_en      <= is_ras_pop;
-                ras_push_en     <= is_ras_push;
-                ras_push_addr   <= pc_add_4;
+        else if (pred_taken_raw) begin
+            // RAS - 弹栈入栈只能一个周期
+            ras_pop_en      <= 0;
+            ras_push_en     <= 0;
+        end
+        else if (!pipe_hold) begin
+            // RAS
+            ras_pop_en      <= is_ras_pop;
+            ras_push_en     <= is_ras_push;
+            ras_push_addr   <= pc_add_4;
 
-                // Gshare
-                gshare_prev_b   <= is_B_type;
-            end
+            // Gshare
+            gshare_prev_b   <= is_B_type;
+        end
+    end
+    
+    // 预测结果
+    assign pred_taken = pred_taken_raw & !pred_flush_en_r;
+
+    always @(posedge clk) begin
+        if (!rst) begin
+            pred_taken_raw  <= 0;
+            pred_pc         <= 0;
+        end
+        else if (pipe_hold) begin
+            pred_taken_raw  <= pred_taken_raw;
+            pred_pc         <= pred_pc;
+        end
+        else if (pred_taken_raw | pred_flush_en_r) begin  // 避免重复预测
+            pred_taken_raw  <= 0;
+            pred_pc         <= 0;
+        end
+        else begin
+            (* parallel_case, full_case *)
+            case (1'b1)
+                is_ras_pop: begin
+                    pred_taken_raw  <= 1'b1;
+                    pred_pc         <= ras_pop_addr;
+                end
+                is_B_type: begin
+                    pred_taken_raw  <= gshare_pred_taken;
+                    pred_pc         <= pc_add_B;
+                end
+                is_JALR: begin
+                    pred_taken_raw  <= btb_hit;
+                    pred_pc         <= btb_target_pc;
+                end
+                is_JAL: begin
+                    pred_taken_raw  <= 1'b1;
+                    pred_pc         <= pc_add_JAL;
+                end
+                default: begin
+                    pred_taken_raw  <= 1'b0;
+                    pred_pc         <= pc_add_4;
+                end
+            endcase
         end
     end
 
+    // 更新寄存打拍
+    always @(posedge clk) begin
+        update_btb_en_r     <= update_btb_en;
+        update_gshare_en_r  <= update_gshare_en;
+        update_pc_r         <= update_pc;
+        update_target_r     <= update_target;
+        actual_taken_r      <= actual_taken;
+    end
+
     // 更新
+    always @(*) begin
+        // Gshare更新
+        gshare_update_en         = update_gshare_en_r;
+        gshare_update_pht_index  = update_pht_index;
+        gshare_actual_taken      = actual_taken_r;
+    end
+
     always@(posedge clk) begin
         if(!rst) begin
-            // BTB更新
             btb_update_en               <= 0;
             btb_update_index            <= 0;
             btb_update_tag              <= 0;
             btb_update_target           <= 0;
-
-            // Gshare更新
-            gshare_update_en            <= 0;
-            gshare_update_pht_index     <= 0;
-            gshare_actual_taken         <= 0;
-            gshare_pred_mispredict      <= 0;
         end
         else begin
             // BTB更新
-            btb_update_en               <= update_btb_en;
+            btb_update_en               <= update_btb_en_r;
             btb_update_index            <= btb_update_index_w;
             btb_update_tag              <= btb_update_tag_w;
-            btb_update_target           <= update_target;
-            
-            // Gshare更新
-            gshare_update_en            <= update_gshare_en;
-            gshare_update_pht_index     <= update_pht_index;
-            gshare_actual_taken         <= actual_taken;
-            gshare_pred_mispredict      <= pred_mispredict;
+            btb_update_target           <= update_target_r;
         end
     end
 endmodule

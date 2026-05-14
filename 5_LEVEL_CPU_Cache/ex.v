@@ -44,18 +44,17 @@ module ex(
 
     // to jump
     (* max_fanout = 20 *)
-    output reg [31:0]   jump_addr_o,
+    output reg          pred_flush_en,
     (* max_fanout = 20 *)
-    output reg          jump_en,
+    output reg [31:0]   pred_flush_pc,
 
     // to bpu
-    output reg          update_btb_en,
-    output reg          update_gshare_en,
+    output reg          update_btb_en_o,
+    output reg          update_gshare_en_o,
     (* max_fanout = 20 *)
-    output reg [31:0]   pc_addr_o,
-    output reg [31:0]   update_target,
-    output reg          actual_taken,
-    output reg          pred_mispredict,
+    output reg [31:0]   update_pc_o,
+    output reg [31:0]   update_target_o,
+    output reg          actual_taken_o,
 
     // to dcache
     output reg          dcache_req_load,
@@ -119,9 +118,9 @@ module ex(
 
     // Branch/JALR 正确性由 hazard 显式 stall 保证。
     // 不在分支比较链路上再接复杂 EX/MEM/WB 转发，避免关键路径变长。
-    wire [31:0] branch_rs1_data = value1_i;
-    wire [31:0] branch_rs2_data = value2_i;
-    wire [31:0] jalr_rs1_data   = jump1_i;
+    wire [31:0] branch_rs1_data = value1_eff;
+    wire [31:0] branch_rs2_data = value2_eff;
+    wire [31:0] jalr_rs1_data   = value1_eff;
 
     // 前推选择
     (* max_fanout = 15 *) wire [31:0] rs1_data_fwd = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
@@ -245,40 +244,37 @@ module ex(
     end
 
     // 跳转
-    always @(*) begin: ALU_Branch_CTRL
-        jump_en             = 1'b0;
-        jump_addr_o         = 32'b0;
-        update_btb_en       = 1'b0;
-        update_gshare_en    = 1'b0;
-        update_target       = 32'b0;
-        actual_taken        = 1'b0;
-        pred_mispredict     = 1'b0;
+    always @(*) begin: ALU_JUMP_CTRL
+        update_btb_en_o     = is_jalr;
+        update_gshare_en_o  = is_branch;
+        update_pc_o         = pc_addr_i;
+        update_target_o     = jalr_target;
+        actual_taken_o      = branch_taken;
 
-        // 分支 控制
-        if (is_branch) begin
-            update_gshare_en = valid_i;
-            actual_taken     = branch_taken;
-            pred_mispredict  = branch_pred_mispredict;
-            jump_en          = branch_pred_mispredict;
-            jump_addr_o      = branch_jump_addr;
-        end
-
-        // 跳转 / 返回 控制
-        if (is_jalr) begin
-            update_btb_en   = valid_i;
-            update_target   = jalr_target;
-            pred_mispredict = jalr_pred_mispredict;
-            jump_en         = jalr_pred_mispredict;
-            jump_addr_o     = jalr_target;
-        end
+        // 分支控制
+        (* parallel_case, full_case *)
+        case (1'b1)
+            is_branch: begin
+                pred_flush_en  = branch_pred_mispredict;
+                pred_flush_pc  = branch_jump_addr;
+            end
+            is_jalr: begin
+                pred_flush_en  = jalr_pred_mispredict;
+                pred_flush_pc  = jalr_target;
+            end
+            default: begin
+                pred_flush_en  = 1'b0;
+                pred_flush_pc  = 32'b0;
+            end
+        endcase
     end
 
     // 跳转 & 读写
     always @(*) begin: ALU_WB
         // 数据穿透
-        pc_addr_o           = pc_addr_i;
         inst_o              = (valid_i) ? inst_i : `NOP;
 
+        // 寄存器写入
         regs_wen_o          = (valid_i) ? regs_wen_i : 1'b0;
         rd_data_o           = 32'b0;
         rd_addr_o           = rd_addr_i;

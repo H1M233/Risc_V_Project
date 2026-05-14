@@ -66,11 +66,13 @@ module icache #(
 
     (* max_fanout = 20 *)
     wire [ARRAY_DEPTH - 1:0] array_raddr = `ARRAY_ADDR(index, hit_way_idx);
+        (* max_fanout = 20 *)
+        wire [31:0] data_rdata = data_array[array_raddr];
 
     always @(posedge clk) begin
         if (!pipe_hold) begin
             if (hit) begin
-                cpu_inst <= data_array[array_raddr];
+                cpu_inst <= data_rdata;
             end
             else begin
                 cpu_inst <= mem_inst;
@@ -90,7 +92,7 @@ module icache #(
     end
 
     // LUT as Memory
-    (* max_fanout = 30 *)   
+    (* max_fanout = 30 *)
     reg [31:0] mem_inst_reg;
     reg miss_reg;
     reg [ARRAY_WIDTH - 1:0] miss_addr;

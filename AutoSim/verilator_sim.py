@@ -94,9 +94,8 @@ def sim(sim_type, stdout=True, env=os.environ.copy()):
         return result.stdout
 
 
-def prj_ch():
-    ch = None
-    while(ch == None):
+def prj_ch(ch=[]):
+    while not ch:
         print("\r[1] 5_LEVEL_CPU_Cache  [2] 5_LEVEL_CPU_improved:  [3] 5_LEVEL_CPU_ooo ", end='', flush=True)
         prj_name_ask = getch()
         if prj_name_ask == '1':
@@ -112,8 +111,7 @@ def prj_ch():
     return ch
 
 
-def mem_ch():
-    ch = []
+def mem_ch(ch=[]):
     isAll = False
     isInst = False
     ret = False
@@ -244,13 +242,16 @@ def softwareTest(prj_name, mem_list):
             print('=' * 40)
 
 
-def instTest(prj_name):
+def instTest(prj_name, test_all=False):
     while True:
-        print('\r\033[2KINST Name (Press Enter or ALL): ', end='')
-        inst_name = input().lower()
+        if not test_all:
+            print('\r\033[2KINST Name (Press Enter or ALL): ', end='')
+            inst_name = input().lower()
+
         # 获取路径下所有bin文件
-        if inst_name == 'all':
+        if inst_name == 'all' or test_all:
             all_bin_files = [str(p) for p in Path(AutoSim_dir / 'generated').rglob('*.bin')]
+            break
         else:
             all_bin_files = [str(p) for p in Path(AutoSim_dir / 'generated').rglob(f'*{inst_name}.bin')]
             if all_bin_files:
@@ -314,7 +315,7 @@ if __name__ == '__main__':
             if isInst:
                 instTest(prj_name)
             elif isAll:
-                instTest(prj_name)
+                instTest(prj_name, test_all=True)
                 softwareTest(prj_name, mem_list)
             else:
                 softwareTest(prj_name, mem_list)

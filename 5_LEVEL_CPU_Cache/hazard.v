@@ -2,7 +2,7 @@
 
 module hazard(
     input      [4:0]    ex_waddr_i,
-    input      [6:0]    ex_is_load,
+    input               ex_is_load,
     input               ex_regs_wen_i,
 
     input      [6:0]    id_opcode_i,
@@ -12,6 +12,7 @@ module hazard(
     input      [4:0]    mem_waddr_i,
     input               mem_regs_wen_i,
 
+    (* max_fanout = 30 *)
     output reg          hazard_en
 );
 
@@ -45,12 +46,13 @@ module hazard(
                           (mem_waddr_i != 5'b0) &&
                           (mem_waddr_i == id_rs2_raddr_i);
 
-    assign ctrl_dep_wait =
+    assign ctrl_dep_wait = 0 &
             (id_is_branch && (rs1_wait_ex || rs2_wait_ex || rs1_wait_mem || rs2_wait_mem)) ||
             (id_is_jalr   && (rs1_wait_ex || rs1_wait_mem));
 
     always @(*) begin
-        hazard_en = (ex_is_load && (rs1_hit_ex || rs2_hit_ex)) || ctrl_dep_wait;
+        // hazard_en = (ex_is_load && (rs1_hit_ex || rs2_hit_ex)) || ctrl_dep_wait;
+        hazard_en = (ex_is_load & (rs1_hit_ex | rs2_hit_ex));
     end
 
 endmodule

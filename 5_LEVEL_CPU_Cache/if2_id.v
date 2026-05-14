@@ -11,7 +11,6 @@ module if2_id(
     input      [31:0]   inst_i,
     input      [31:0]   pc_i,
 
-    input               jump_en,
     input               pred_taken,
 
     // to id
@@ -21,10 +20,6 @@ module if2_id(
 );
     always @(posedge clk) begin
         if (!rst) begin
-            pc_o    <= 32'b0;
-            inst_o  <= `NOP;
-        end
-        else if (jump_en) begin
             pc_o    <= 32'b0;
             inst_o  <= `NOP;
         end

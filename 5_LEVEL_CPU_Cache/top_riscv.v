@@ -24,10 +24,12 @@ module top_riscv(
     wire [31:0]     icache_inst;
 
     // ============================================================
-    // jump
+    // pred_flusher
     // ============================================================
-    wire            jump_jump_en_o;
-    wire [31:0]     jump_jump_addr_o;
+    (* max_fanout = 30 *)
+    wire            pred_flush_en_r;
+    (* max_fanout = 30 *)
+    wire [31:0]     pred_flush_pc_r;
 
     // ============================================================
     // hazard / stall
@@ -111,8 +113,10 @@ module top_riscv(
     // ============================================================
     // ex to jump
     // ============================================================
-    wire            ex_jump_en_o;
-    wire [31:0]     ex_jump_addr_o;
+    (* max_fanout = 30 *)
+    wire            ex_pred_flush_en_o;
+    (* max_fanout = 30 *)
+    wire [31:0]     ex_pred_flush_pc_o;
 
     // ============================================================
     // ex to ex_mem
@@ -170,18 +174,25 @@ module top_riscv(
     wire            bpu_pred_taken;
 
     // 流水线暂停条件
-    wire pipe_hold = dcache_stall | hazard_hazard_en;
-    wire pipe_flush = jump_jump_en_o | bpu_pred_taken;
+    (* max_fanout = 30 *)
+    wire pipe_hold_icache = dcache_stall | hazard_hazard_en;
+    (* max_fanout = 30 *)
+    wire pipe_hold_if1_if2 = dcache_stall | hazard_hazard_en;
+    (* max_fanout = 30 *)
+    wire pipe_hold_if2_id = dcache_stall | hazard_hazard_en;
+    (* max_fanout = 30 *)
+    wire pipe_hold_pred_flusher = dcache_stall | hazard_hazard_en;
+    (* max_fanout = 30 *)
+    wire pipe_hold_bpu = dcache_stall | hazard_hazard_en;
 
     // ============================================================
     // ex to bpu
     // ============================================================
     wire            ex_pred_update_btb_en;
     wire            ex_pred_update_gshare_en;
-    wire [31:0]     ex_pc_addr_o;
+    wire [31:0]     ex_pred_update_pc_o;
     wire [31:0]     ex_pred_update_target;
     wire            ex_actual_taken;
-    wire            ex_pred_mispredict;
 
     // forwarding to id_ex
     wire            fwd_rs1_hit_ex_o;
@@ -201,8 +212,8 @@ module top_riscv(
 
         .hazard_en          (hazard_hazard_en),
 
-        .jump_addr_i        (jump_jump_addr_o),
-        .jump_en            (jump_jump_en_o),
+        .pred_flush_en      (pred_flush_en_r),
+        .pred_flush_pc      (pred_flush_pc_r),
 
         .pc_addr_o          (pc_pc_addr_o),
 
@@ -219,17 +230,26 @@ module top_riscv(
 
         .cpu_pc             (if1_pc_o),
         .cpu_inst           (icache_inst),
-        .pipe_hold          (pipe_hold),
+        .pipe_hold          (pipe_hold_icache),
 
         .mem_addr           (irom_addr),
         .mem_inst           (irom_data)
     );
 
     // ============================================================
-    // Jump
+    // Pred_flusher
     // ============================================================
-    assign jump_jump_addr_o = ex_jump_addr_o;
-    assign jump_jump_en_o   = ex_jump_en_o;
+    pred_flusher PRED_FLUSHER(
+        .clk                (cpu_clk),
+        .rst                (cpu_rst),
+        .pipe_hold          (pipe_hold_pred_flusher),
+
+        .pred_flush_en_i    (ex_pred_flush_en_o),
+        .pred_flush_pc_i    (ex_pred_flush_pc_o),
+
+        .pred_flush_en_r_o  (pred_flush_en_r),
+        .pred_flush_pc_r_o  (pred_flush_pc_r)
+    );
 
     // ============================================================
     // Hazard
@@ -244,7 +264,7 @@ module top_riscv(
     hazard HAZARD(
         // from ex
         .ex_waddr_i         (ex_rd_addr_o),
-        .ex_is_load         (mem_req_load_i),
+        .ex_is_load         (ex_req_load_o),
         .ex_regs_wen_i      (ex_regs_wen_o),
 
         // from id
@@ -283,6 +303,7 @@ module top_riscv(
     // ============================================================
     if1 IF1(
         .pc_i               (pc_pc_addr_o),
+        .pred_flush         (pred_flush_en_r),
 
         .pc_o               (if1_pc_o)
     );
@@ -291,8 +312,9 @@ module top_riscv(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
 
-        .pipe_flush         (pipe_flush),
-        .pipe_hold          (pipe_hold),
+        .pred_taken         (bpu_pred_taken),
+        .pred_flush         (pred_flush_en_r),
+        .pipe_hold          (pipe_hold_if1_if2),
 
         .pc_i               (if1_pc_o),
 
@@ -302,6 +324,7 @@ module top_riscv(
 
     if2 IF2(
         .inst_i             (icache_inst),
+        .pred_flush_r       (pred_flush_en_r),
 
         .if2_valid_i        (if2_valid_i),
         .pc_i               (if2_pc_i),
@@ -317,12 +340,11 @@ module top_riscv(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
 
-        .pipe_hold          (pipe_hold),
+        .pipe_hold          (pipe_hold_if2_id),
 
         .inst_i             (if2_inst_o),
         .pc_i               (if2_pc_o),
 
-        .jump_en            (jump_jump_en_o),
         .pred_taken         (bpu_pred_taken),
 
         .inst_o             (id_inst_i),
@@ -369,7 +391,8 @@ module top_riscv(
 
         .dcache_stall       (dcache_stall),
 
-        .jump_en            (jump_jump_en_o),
+        .pred_flush         (ex_pred_flush_en_o),
+        .pred_flush_r       (pred_flush_en_r),
         .hazard_en          (hazard_hazard_en),
 
         .pc_addr_i          (id_pc_addr_o),
@@ -439,15 +462,14 @@ module top_riscv(
         .rd_data_o          (ex_rd_data_o),
         .mem_req_load_o     (ex_req_load_o),
 
-        .jump_en            (ex_jump_en_o),
-        .jump_addr_o        (ex_jump_addr_o),
+        .pred_flush_en      (ex_pred_flush_en_o),
+        .pred_flush_pc      (ex_pred_flush_pc_o),
 
-        .update_btb_en      (ex_pred_update_btb_en),
-        .update_gshare_en   (ex_pred_update_gshare_en),
-        .pc_addr_o          (ex_pc_addr_o),
-        .update_target      (ex_pred_update_target),
-        .actual_taken       (ex_actual_taken),
-        .pred_mispredict    (ex_pred_mispredict),
+        .update_btb_en_o    (ex_pred_update_btb_en),
+        .update_gshare_en_o (ex_pred_update_gshare_en),
+        .update_pc_o        (ex_pred_update_pc_o),
+        .update_target_o    (ex_pred_update_target),
+        .actual_taken_o     (ex_actual_taken),
 
         .dcache_req_load    (dcache_req_load_i),
         .dcache_req_store   (dcache_req_store_i),
@@ -577,13 +599,12 @@ module top_riscv(
 
         .update_btb_en      (ex_pred_update_btb_en),
         .update_gshare_en   (ex_pred_update_gshare_en),
-        .update_pc          (ex_pc_addr_o),
+        .update_pc          (ex_pred_update_pc_o),
         .update_target      (ex_pred_update_target),
         .actual_taken       (ex_actual_taken),
-        .pred_mispredict    (ex_pred_mispredict),
 
-        .pipe_flush         (pipe_flush),
-        .pipe_hold          (pipe_hold)
+        .pipe_hold          (pipe_hold_bpu),
+        .pred_flush_r       (pred_flush_en_r)
     );
 
     // forwarding
