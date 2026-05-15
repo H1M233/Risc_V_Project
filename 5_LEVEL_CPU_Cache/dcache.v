@@ -1,4 +1,5 @@
 `include "rv32I.vh"
+`include "switch.vh"
 
 // 实现：
 // load_miss: 暂停 3 个周期，向 DRAM 请求数据 -> 根据 plur 选择路并更新 plur -> 等待数据 -> 转发并更新 DCACHE
@@ -34,7 +35,9 @@ module dcache#(
 
     output reg          mem_ack
 );
+    `ifdef ENABLE_DCACHE
     localparam LINE_NUM = 2 ** INDEX_WIDTH;
+    `define ARRAY_ADDR(index, way) ((index) * WAYS + way)
 
     // 存储结构：
     localparam ARRAY_DEPTH = LINE_NUM * WAYS;   // vivado 不会推断二维数组为 memory
@@ -42,7 +45,6 @@ module dcache#(
     (* ram_style = "distributed" *) reg [TAG_WIDTH:0] tagv_array[0:ARRAY_DEPTH - 1];
     reg plru_state [0:LINE_NUM - 1];                // 每组的访问历史（用于选择替换哪一路）
 
-    `define ARRAY_ADDR(index, way) ((index) * WAYS + way)
 
     // 提取索引
     (* max_fanout = 30 *) reg [INDEX_WIDTH - 1:0] index;
@@ -69,9 +71,10 @@ module dcache#(
     
     // DCACHE 输出缓存
     reg [31:0] cache_rdata_reg [0:1];
+    wire [INDEX_WIDTH - 1:0] pred_index = cpu_addr[INDEX_WIDTH + 1:2];
     always @(posedge clk) begin
-        cache_rdata_reg[0] <= data_array[`ARRAY_ADDR(index, 0)];
-        cache_rdata_reg[1] <= data_array[`ARRAY_ADDR(index, 1)];
+        cache_rdata_reg[0] <= data_array[`ARRAY_ADDR(pred_index, 0)];
+        cache_rdata_reg[1] <= data_array[`ARRAY_ADDR(pred_index, 1)];
     end
 
     // 状态
@@ -81,17 +84,14 @@ module dcache#(
     localparam LOAD_HIT_OUTPUT = 3'd2;
     localparam LOAD_MISS_WAIT = 3'd3;
     localparam LOAD_MISS_OUTPUT = 3'd4;
-    localparam STORE_HIT = 3'd5;
-    localparam STORE_MISS = 3'd6;
 
     // 数据传递寄存器
-    wire cpu_req = (cpu_req_load | cpu_req_store);
     reg cpu_req_load_reg;
     reg cpu_req_store_reg;
     (* max_fanout = 20 *)
     reg [31:0] cpu_wdata_reg, cpu_wdata_reg_reg;
     reg [1:0] cpu_addr_low_r, cpu_addr_low_r2;
-    reg [1:0]  cpu_mask_reg, cpu_mask_reg_reg;
+    reg [1:0]  cpu_mask_r, cpu_mask_r2;
     reg [INDEX_WIDTH - 1:0] index_reg;
     reg [TAG_WIDTH - 1:0]   tag_reg;
     reg hit_way_idx;
@@ -104,9 +104,10 @@ module dcache#(
     reg [1:0] miss_mask;
 
     // 冻结流水线条件
-    assign stall = cpu_req & (state == QUERY_AND_LOAD | state == HIT_BRANCH | state == LOAD_MISS_WAIT);
+    assign stall = (cpu_req_load & state == QUERY_AND_LOAD) | (cpu_req_load_reg & !hit) | (cpu_req_store & state == QUERY_AND_LOAD);
 
     wire [1:0] cpu_addr_low = cpu_addr[1:0];
+    reg store_hit;
 
     // LUT as Logic
     integer i;
@@ -117,7 +118,7 @@ module dcache#(
         for (i = 0; i < LINE_NUM; i = i + 1) plru_state[i] = 1'b0;
     end
     always @(posedge clk) begin
-        if(!rst) begin
+        if (!rst) begin
             state       <= QUERY_AND_LOAD;
             cpu_rdata   <= 32'b0;
 
@@ -126,10 +127,11 @@ module dcache#(
             mem_we      <= 4'b0;
             mem_wen     <= 1'b0;
             mem_ack     <= 1'b0;
+            store_hit   <= 1'b0;
         end
         else begin  
             // 传输 DRAM
-            mem_addr    <= (cpu_req) ? cpu_addr : 32'b0;
+            mem_addr    <= cpu_addr;
             mem_wdata   <= store_merge(32'b0, cpu_wdata, cpu_addr_low, cpu_mask);
             mem_we      <= (cpu_req_store & state == QUERY_AND_LOAD) ? unmask(cpu_mask, cpu_addr_low) : 4'b0;
             mem_wen     <= cpu_req_store & state == QUERY_AND_LOAD;
@@ -139,19 +141,20 @@ module dcache#(
             cpu_req_store_reg   <= cpu_req_store;
             cpu_wdata_reg       <= cpu_wdata;
             cpu_addr_low_r      <= cpu_addr_low;
-            cpu_mask_reg        <= cpu_mask;
+            cpu_mask_r          <= cpu_mask;
             cpu_wdata_reg_reg   <= cpu_wdata_reg;
             cpu_addr_low_r2     <= cpu_addr_low_r;
-            cpu_mask_reg_reg    <= cpu_mask_reg;
+            cpu_mask_r2         <= cpu_mask_r;
             index_reg           <= index;
             tag_reg             <= tag;
 
-            mem_ack             <= (state == LOAD_HIT_OUTPUT | state == LOAD_MISS_OUTPUT | state == STORE_HIT | state == STORE_MISS);
+            mem_ack             <= (state == LOAD_HIT_OUTPUT | state == LOAD_MISS_OUTPUT);
 
             hit_way_idx         <= ~hit_way[0];     // 由于只有两路直接优化判断 way0 是否命中，已有 hit 在外层做判断
 
             case(state)
                 QUERY_AND_LOAD: begin
+                    store_hit <= 1'b0;
                     // 状态判断
                     if (cpu_req_load | cpu_req_store) begin
                         state <= HIT_BRANCH;
@@ -161,24 +164,21 @@ module dcache#(
                 HIT_BRANCH: begin
                     if (cpu_req_load_reg) begin
                         if (hit) begin
-                            state <= LOAD_HIT_OUTPUT;
+                            cpu_rdata <= load_shift(cache_rdata_reg[hit_way_idx], cpu_addr_low_r, cpu_mask_r);
+                            state <= QUERY_AND_LOAD;
                         end
                         else begin
                             state <= LOAD_MISS_WAIT;
                         end
                     end
                     else if (cpu_req_store_reg) begin
-                        if (hit) begin
-                            state <= STORE_HIT;
-                        end
-                        else begin
-                            state <= STORE_MISS;
-                        end
+                        state <= QUERY_AND_LOAD;
+                        store_hit   <= hit;
                     end
                 end
 
                 LOAD_HIT_OUTPUT: begin
-                    cpu_rdata <= load_shift(cache_rdata_reg[hit_way_idx], cpu_addr_low_r2, cpu_mask_reg_reg);
+                    cpu_rdata <= load_shift(cache_rdata_reg[hit_way_idx], cpu_addr_low_r2, cpu_mask_r2);
                     state <= QUERY_AND_LOAD;
                 end
 
@@ -187,7 +187,7 @@ module dcache#(
                     miss_index              <= index_reg;   
                     miss_tag                <= tag_reg;
                     miss_addr_low           <= cpu_addr_low_r2;
-                    miss_mask               <= cpu_mask_reg_reg;
+                    miss_mask               <= cpu_mask_r2;
 
                     plru_state[index_reg]   <= ~plru_state[index_reg];
                     state                   <= LOAD_MISS_OUTPUT;
@@ -197,16 +197,6 @@ module dcache#(
                     cpu_rdata <= load_shift(mem_rdata, miss_addr_low, miss_mask);
                     state <= QUERY_AND_LOAD;
                 end
-
-                STORE_HIT: begin
-                    state <= QUERY_AND_LOAD;
-                end
-
-                STORE_MISS: begin
-                    // BRAM 存储也需要停顿 可引入 store_buffer 解决
-                    state <= QUERY_AND_LOAD;
-                end
-
             default: begin
                 state <= QUERY_AND_LOAD;
             end
@@ -216,24 +206,45 @@ module dcache#(
 
     // LUT as Memory
     always @(posedge clk) begin
-        case (state)
-            LOAD_MISS_OUTPUT: begin
-                data_array[`ARRAY_ADDR(miss_index, miss_way)] <= mem_rdata;
-                tagv_array[`ARRAY_ADDR(miss_index, miss_way)] <= {1'b1, miss_tag};
-            end
-            STORE_HIT: begin
-                data_array[`ARRAY_ADDR(index_reg, hit_way_idx)] <= store_merge(
-                    cache_rdata_reg[hit_way_idx],
-                    cpu_wdata_reg_reg,
-                    cpu_addr_low_r2,
-                    cpu_mask_reg_reg
-                );
-            end
-            default: begin
-                // ...
-            end
-        endcase
+        if (state == LOAD_MISS_OUTPUT) begin
+            data_array[`ARRAY_ADDR(miss_index, miss_way)] <= mem_rdata;
+            tagv_array[`ARRAY_ADDR(miss_index, miss_way)] <= {1'b1, miss_tag};
+        end
+        else if (store_hit) begin
+            data_array[`ARRAY_ADDR(index_reg, hit_way_idx)] <= store_merge(
+                cache_rdata_reg[hit_way_idx],
+                cpu_wdata_reg_reg,
+                cpu_addr_low_r2,
+                cpu_mask_r2
+            );
+        end
     end
+    `else
+        wire [1:0] addr_low = cpu_addr[1:0];
+        reg [1:0] mask_r, mask_r2;
+        reg [1:0] addr_low_r, addr_low_r2;
+        reg cpu_req_load_r;
+        reg [31:0] mem_rdata_r;
+        always @(posedge clk) begin
+            mask_r          <= cpu_mask;
+            addr_low_r      <= addr_low;
+            mask_r2         <= mask_r;
+            addr_low_r2     <= addr_low_r;
+            mem_rdata_r     <= mem_rdata;
+            cpu_req_load_r  <= cpu_req_load;
+        end
+
+        assign stall = 1'b0;
+
+        always @(*) begin
+            mem_ack   = 1'b1;
+            mem_addr  = cpu_addr;
+            mem_we    = cpu_req_store ? unmask(cpu_mask, addr_low) : 4'b0;
+            mem_wen   = cpu_req_store;
+            mem_wdata = store_merge(32'b0, cpu_wdata, addr_low, cpu_mask);
+            cpu_rdata = load_shift(mem_rdata_r, addr_low_r2, mask_r2);
+        end
+    `endif
 
     // 函数：
     // 将 mask 转为按位

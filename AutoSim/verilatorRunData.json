@@ -1,37 +1,39 @@
 {
   "5_LEVEL_CPU_Cache": {
-    "37 INST TEST": "FAIL x",
+    "37 INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.548236",
-        "REAL TIME": "19.7003",
+        "IPC": "0.917982",
+        "REAL TIME": "8.9",
         "ICACHE HIT": "0.992835",
         "DCACHE HIT": "0.999915",
-        "RUN TIME": "186",
-        "LED": "PASS √"
+        "RUN TIME": "173",
+        "LED": "PASS √",
+        "BPU ACCURACY": "0.873264"
       },
       "src0": {
-        "IPC": "0.644771",
-        "REAL TIME": "726.321",
+        "IPC": "0.898639",
+        "REAL TIME": "416.202",
         "ICACHE HIT": "0.988879",
         "DCACHE HIT": "0.872287",
-        "RUN TIME": "7328",
-        "LED": "PASS √"
+        "RUN TIME": "8023",
+        "LED": "PASS √",
+        "BPU ACCURACY": "0.761853"
       },
       "src1": {
-        "IPC": "0.379655",
-        "REAL TIME": "741.806",
+        "IPC": "0.60226",
+        "REAL TIME": "455.804",
         "ICACHE HIT": "0.953877",
         "DCACHE HIT": "0.903863",
-        "RUN TIME": "11448",
+        "RUN TIME": "7217",
         "LED": "PASS √"
       },
       "src2": {
-        "IPC": "0.493341",
-        "REAL TIME": "1292.32",
+        "IPC": "0.596285",
+        "REAL TIME": "601.906",
         "ICACHE HIT": "0.995896",
         "DCACHE HIT": "0.906889",
-        "RUN TIME": "12493",
+        "RUN TIME": "10335",
         "LED": "PASS √"
       }
     }

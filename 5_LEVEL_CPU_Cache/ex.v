@@ -32,7 +32,6 @@ module ex(
     input      [31:0]   fwd_ex_rd_data_i,
 
     // to ex_mem
-    output reg [31:0]   inst_o,
     output reg          regs_wen_o,
     output reg [4:0]    load_packaged_o,
 
@@ -229,6 +228,12 @@ module ex(
 
     // Dcache 控制
     always @(*) begin: ALU_Dcache
+        // 转发 D-cache
+        dcache_req_load     = is_load;
+        dcache_req_store    = is_store;
+        dcache_addr         = mem_addr_calc;
+        dcache_wdata        = rs2_data_fwd;
+        
         (* parallel_case, full_case *)
         case (1'b1)
             sel_lb:  dcache_mask = 2'b00;
@@ -271,20 +276,11 @@ module ex(
 
     // 跳转 & 读写
     always @(*) begin: ALU_WB
-        // 数据穿透
-        inst_o              = (valid_i) ? inst_i : `NOP;
-
         // 寄存器写入
         regs_wen_o          = (valid_i) ? regs_wen_i : 1'b0;
         rd_data_o           = 32'b0;
         rd_addr_o           = rd_addr_i;
         mem_req_load_o      = is_load;
-
-        // 转发 D-cache
-        dcache_req_load     = is_load;
-        dcache_req_store    = is_store;
-        dcache_addr         = mem_addr_calc;
-        dcache_wdata        = rs2_data_fwd;
 
         // 打包 Load
         load_packaged_o[`IS_LB]   = sel_lb;

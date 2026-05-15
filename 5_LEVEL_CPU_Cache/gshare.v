@@ -27,7 +27,7 @@ module gshare #(
     input                           actual_taken_i          // ex 阶段判断跳转为真
 );
     reg     [BHR_WIDTH - 1:0]   ghr;                        // GHR全局历史寄存器：用于投机更新
-    reg     [BHR_WIDTH - 1:0]   ghr_d1;                     // ID阶段时的GHR
+    reg     [BHR_WIDTH - 1:0]   ghr_d1;                     // EX阶段时的GHR
     reg     [BHR_WIDTH - 1:0]   ghr_d2;                     // EX阶段时的GHR
     reg     [BHR_WIDTH - 1:0]   ghr_d3;                     // 寄存更新后的GHR
     reg     [BHR_WIDTH - 1:0]   ghr_d4;                     // 寄存更新后的GHR
@@ -40,7 +40,8 @@ module gshare #(
     reg [BHR_WIDTH - 1:0] pht_index_update_r;
     assign gshare_ghr_o         = ghr;
     assign gshare_ghr_update_o  = ghr_d4;
-    assign pred_taken_o         = pht_reg[1];
+    wire   pred_taken           = pht_reg[1];
+    assign pred_taken_o         = pred_taken;
 
     // Block RAM
     integer i;
@@ -67,23 +68,26 @@ module gshare #(
             2'b01:      pht_update_new = (actual_taken_update_r) ? 2'b10 : 2'b00;
             2'b10:      pht_update_new = (actual_taken_update_r) ? 2'b11 : 2'b01;
             2'b11:      pht_update_new = (actual_taken_update_r) ? 2'b11 : 2'b10;
-            default:    pht_update_new = 2'b00;
+            default:    pht_update_new = 2'b01;
         endcase
     end
 
     // GHR - 流水线延迟
+    reg pred_taken_r;
     always@(posedge clk) begin: gshare_ghr_ctrl
         if(!rst) begin
             ghr_d1  <= 0;
             ghr_d2  <= 0;
             ghr_d3  <= 0;
             ghr_d4  <= 0;
+            pred_taken_r <= 0;
         end
         else if (!pipe_hold) begin
             ghr_d1  <= ghr;
             ghr_d2  <= ghr_d1;
             ghr_d3  <= ghr_d2;
             ghr_d4  <= ghr_d3;
+            pred_taken_r <= pred_taken;
         end
     end
 
@@ -93,13 +97,10 @@ module gshare #(
             actual_taken_update_r  <= 0;
             pht_index_update_r     <= 0;
         end
-        else if (!pipe_hold) begin
-            pht_update_en_r  <= update_en_i;
-
-            if (update_en_i) begin  // 锁存更新内容
-                actual_taken_update_r  <= actual_taken_i;
-                pht_index_update_r     <= update_pht_index_i;
-            end
+        else begin
+            pht_update_en_r         <= update_en_i;
+            actual_taken_update_r   <= actual_taken_i;
+            pht_index_update_r      <= update_pht_index_i;
         end
     end
     
@@ -108,9 +109,9 @@ module gshare #(
         if (!rst) begin
             ghr     <= 0;
         end
-        else if (!pipe_hold) begin
+        else begin
             if      (update_en_i)       ghr <= {ghr_d4[BHR_WIDTH - 2:0], actual_taken_i};    // 预测错误回退GHR
-            else if (prev_b)            ghr <= {ghr[BHR_WIDTH - 2:0], pred_taken_o};         // 预测投机更新GHR
+            else if (prev_b)            ghr <= {ghr[BHR_WIDTH - 2:0], pred_taken_r};         // 预测投机更新GHR
         end
     end
 endmodule

@@ -243,6 +243,7 @@ def softwareTest(prj_name, mem_list):
 
 
 def instTest(prj_name, test_all=False):
+    inst_name = ' '
     while True:
         if not test_all:
             print('\r\033[2KINST Name (Press Enter or ALL): ', end='')

@@ -43,6 +43,14 @@ int main(int argc, char** argv) {
     double totalCycle = 0.0;
     double commitCycle = 0.0;
 
+    // 计算预测准确率
+    double predTotal = 0.0;
+    double predMiss = 0.0;
+    double predMissB = 0.0;
+    double predMissJr = 0.0;
+    double predTotalB = 0.0;
+    double predTotalJr = 0.0;
+
     // 记录函数
     auto step_and_advance = [&](double delta_time_ns) {
         contextp->time(sim_time_ns * 1000);
@@ -93,6 +101,21 @@ int main(int argc, char** argv) {
             next_clk_CPU_edge = sim_time_ns + CLK_CPU_HALF_PERIOD;
             top->clk_cpu = !top->clk_cpu;  // 翻转 CPU 时钟
             totalCycle += 0.5;
+
+            // 在上升沿统计
+            if (top->clk_cpu == 1) {
+                if (top->commit == 1) {
+                    commitCycle++;
+                }
+                if (top->pred_total == 1) {
+                    predTotal++;
+                    if (top->pred_miss == 1) predMiss++;
+                    if (top->pred_total_b) predTotalB++;
+                    if (top->pred_total_jr) predTotalJr++;
+                    if (top->pred_miss_b) predMissB++;
+                    if (top->pred_miss_jr) predMissJr++;
+                }
+            }
         }
         
         // 找到下一个事件时间
@@ -101,13 +124,6 @@ int main(int argc, char** argv) {
         
         // 执行到下一个事件
         step_and_advance(next_event_time - sim_time_ns);
-
-        // 在上升沿统计
-        static double prev_mem_inst = 0x0000'0013;
-        if (top->clk_cpu == 1 && top->mem_inst != 0x0000'0013 && top->mem_inst != prev_mem_inst) {
-            prev_mem_inst = top->mem_inst;
-            commitCycle++;
-        }
         
         // 每 1s 打印一次
         static double last_print_time = 0.0;
@@ -141,12 +157,17 @@ int main(int argc, char** argv) {
                       << std::left << std::setw(13) << " " << std::endl << std::endl << "\033[2K"
                       << "IPC:" 
                       << std::right << std::setw(16) << std::fixed << std::setprecision(4) << commitCycle / totalCycle
-                      << std::left << std::setw(8) << " " << std::endl << std::endl << "\033[2K"
+                      << std::left << std::setw(8) << " "
+                      << "BPU accuracy:"
+                      << std::right << std::setw(10) << (predTotal - predMiss) / predTotal
+                      << std::left << std::setw(8) << " %" 
+                      << "Branch:  " << (predTotal - predMissB) / predTotal << " %  "
+                      << "JALR:  " << (predTotal - predMissJr) / predTotal << " %  "
+                      << std::endl << std::endl << "\033[2K"
                       << "PC:" 
                       << std::right << std::setw(10) << std::hex << top->func_block_addr << " -> " 
-                      << std::right << std::setw(8) << top->pc
+                      << std::right << std::setw(8) << top->pc << std::dec 
 
-                      << std::dec 
                       << std::flush;
         }
     }
@@ -178,6 +199,7 @@ int main(int argc, char** argv) {
     f << "IPC=" << commitCycle / totalCycle << std::endl
       << "REAL TIME=" << current_time / 1000.0 << std::endl
       << "RUN TIME=" << std::hex << SEG_getTime << std::dec << std::endl
+      << "BPU ACCURACY=" << (predTotal - predMiss) / predTotal << std::endl
       << "LED=" << (isTick ? "PASS √" : "FAIL x");
     f.close();
 

@@ -1,4 +1,5 @@
 `include "rv32I.vh"
+`include "switch.vh"
 
 module icache #(
     parameter INDEX_WIDTH   = 6,        // 索引宽度
@@ -18,6 +19,7 @@ module icache #(
     output     [31:0]   mem_addr,
     input      [31:0]   mem_inst
 );
+    `ifdef ENABLE_ICACHE
     assign mem_addr = cpu_pc;
 
     localparam LINE_NUM    = 2 ** INDEX_WIDTH;  // 组数
@@ -128,4 +130,16 @@ module icache #(
             end
         end
     end
+    `else
+        assign mem_addr = cpu_pc;
+
+        always @(posedge clk) begin
+            if (!rst) begin
+                cpu_inst <= `NOP;
+            end
+            else if (!pipe_hold) begin
+                cpu_inst <= mem_inst;
+            end
+        end
+    `endif
 endmodule

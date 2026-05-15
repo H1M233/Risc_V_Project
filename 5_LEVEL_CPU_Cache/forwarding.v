@@ -10,10 +10,15 @@ module forwarding(
     input [4:0]     ex_rd_addr_i,
     input [31:0]    ex_rd_data_i,
 
-    // from mem
-    input           mem_regs_wen_i,
-    input [4:0]     mem_rd_addr_i,
-    input [31:0]    mem_rd_data_i,
+    // from mem1
+    input [4:0]     mem1_rd_addr_i,
+    input [31:0]    mem1_rd_data_i,
+    input           mem1_regs_wen_i,
+
+    // from mem2
+    input [4:0]     mem2_rd_addr_i,
+    input [31:0]    mem2_rd_data_i,
+    input           mem2_regs_wen_i,
 
     // from wb
     input           wb_regs_wen_i,
@@ -35,20 +40,27 @@ module forwarding(
     wire rs1_addr_write_available = (id_rs1_addr_i != 5'b0);
     wire rs2_addr_write_available = (id_rs2_addr_i != 5'b0);
 
-    wire forwarding_rs1_ex  = (id_rs1_addr_i == ex_rd_addr_i) & ex_regs_wen_i & rs1_addr_write_available;
-    wire forwarding_rs1_mem = (id_rs1_addr_i == mem_rd_addr_i) & mem_regs_wen_i & rs1_addr_write_available;
-    wire forwarding_rs1_wb  = (id_rs1_addr_i == wb_rd_addr_i) & wb_regs_wen_i & rs1_addr_write_available;
+    wire forwarding_rs1_ex   = (id_rs1_addr_i == ex_rd_addr_i) & ex_regs_wen_i & rs1_addr_write_available;
+    wire forwarding_rs1_mem1 = (id_rs1_addr_i == mem1_rd_addr_i) & mem1_regs_wen_i;
+    wire forwarding_rs1_mem2 = (id_rs1_addr_i == mem2_rd_addr_i) & mem2_regs_wen_i;
+    wire forwarding_rs1_wb   = (id_rs1_addr_i == wb_rd_addr_i) & wb_regs_wen_i;
 
-    wire forwarding_rs2_ex  = (id_rs2_addr_i == ex_rd_addr_i) & ex_regs_wen_i & rs2_addr_write_available;
-    wire forwarding_rs2_mem = (id_rs2_addr_i == mem_rd_addr_i) & mem_regs_wen_i & rs2_addr_write_available;
-    wire forwarding_rs2_wb  = (id_rs2_addr_i == wb_rd_addr_i) & wb_regs_wen_i & rs2_addr_write_available;
+    wire forwarding_rs2_ex   = (id_rs2_addr_i == ex_rd_addr_i) & ex_regs_wen_i & rs2_addr_write_available;
+    wire forwarding_rs2_mem1 = (id_rs2_addr_i == mem1_rd_addr_i) & mem1_regs_wen_i;
+    wire forwarding_rs2_mem2 = (id_rs2_addr_i == mem2_rd_addr_i) & mem2_regs_wen_i;
+    wire forwarding_rs2_wb   = (id_rs2_addr_i == wb_rd_addr_i) & wb_regs_wen_i;
 
-    wire [31:0] forwarding_rs1_data_comb =  (forwarding_rs1_mem) ? mem_rd_data_i :
+    wire [31:0] forwarding_rs1_data_hit =   (forwarding_rs1_mem1) ? mem1_rd_data_i :
+                                            (forwarding_rs1_mem2) ? mem2_rd_data_i :
                                             (forwarding_rs1_wb) ? wb_rd_data_i :
                                             id_rs1_data_i;
-    wire [31:0] forwarding_rs2_data_comb =  (forwarding_rs2_mem) ? mem_rd_data_i :
+    wire [31:0] forwarding_rs2_data_hit =   (forwarding_rs2_mem1) ? mem1_rd_data_i :
+                                            (forwarding_rs2_mem2) ? mem2_rd_data_i :
                                             (forwarding_rs2_wb) ? wb_rd_data_i :
                                             id_rs2_data_i;
+
+    wire [31:0] forwarding_rs1_data_comb = (rs1_addr_write_available) ? forwarding_rs1_data_hit : 32'b0;
+    wire [31:0] forwarding_rs2_data_comb = (rs2_addr_write_available) ? forwarding_rs2_data_hit : 32'b0;
 
     always @(*) begin
         forwarding_rs1_hit_ex_o = forwarding_rs1_ex;
