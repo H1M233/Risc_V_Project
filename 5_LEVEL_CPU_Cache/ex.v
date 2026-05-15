@@ -20,20 +20,15 @@ module ex(
     input                       valid_i,
 
     // from fowarding - fanout set
-    (* max_fanout = 15 *)
     input      [31:0]   fwd_rs1_data_i,
-    (* max_fanout = 15 *)
     input      [31:0]   fwd_rs2_data_i,
-    (* max_fanout = 20 *)
     input               fwd_rs1_hit_ex_i,
-    (* max_fanout = 20 *)
     input               fwd_rs2_hit_ex_i,
-    (* max_fanout = 20 *)
     input      [31:0]   fwd_ex_rd_data_i,
 
     // to ex_mem
     output reg          regs_wen_o,
-    output reg [4:0]    load_packaged_o,
+    // output reg [4:0]    load_packaged_o,
 
     // to ex_mem & hazard   
     output reg [4:0]    rd_addr_o,
@@ -58,9 +53,11 @@ module ex(
     // to dcache
     output reg          dcache_req_load,
     output reg          dcache_req_store,
-    output reg [1:0]    dcache_mask,
+    output reg [2:0]    dcache_mask,
     output reg [31:0]   dcache_addr,
-    output reg [31:0]   dcache_wdata
+    output reg [3:0]    dcache_addr_offset,
+    output reg [31:0]   dcache_wdata,
+    output reg          dcache_is_signed
 );
 
     // 主操作码独热
@@ -69,10 +66,10 @@ module ex(
     (* max_fanout = 20 *) wire is_auipc  = inst_packaged_i[`OP_AUIPC];
     (* max_fanout = 20 *) wire is_lui    = inst_packaged_i[`OP_LUI];
     (* max_fanout = 20 *) wire is_jal    = inst_packaged_i[`OP_JAL];
-    (* max_fanout = 20 *) wire is_jalr   = inst_packaged_i[`OP_JALR];
-    (* max_fanout = 20 *) wire is_branch = inst_packaged_i[`OP_BRANCH];
-    (* max_fanout = 20 *) wire is_load   = inst_packaged_i[`OP_LOAD];
-    (* max_fanout = 20 *) wire is_store  = inst_packaged_i[`OP_STORE];
+    (* max_fanout = 20 *) wire is_jalr   = inst_packaged_i[`OP_JALR] & valid_i;
+    (* max_fanout = 20 *) wire is_branch = inst_packaged_i[`OP_BRANCH] & valid_i;
+    (* max_fanout = 20 *) wire is_load   = inst_packaged_i[`OP_LOAD] & valid_i;
+    (* max_fanout = 20 *) wire is_store  = inst_packaged_i[`OP_STORE] & valid_i;
 
     // I-type
     (* max_fanout = 20 *) wire sel_addi  = inst_packaged_i[`INST_ADDI];
@@ -115,12 +112,6 @@ module ex(
     (* max_fanout = 20 *) wire sel_bltu = inst_packaged_i[`INST_BLTU];
     (* max_fanout = 20 *) wire sel_bgeu = inst_packaged_i[`INST_BGEU];
 
-    // Branch/JALR 正确性由 hazard 显式 stall 保证。
-    // 不在分支比较链路上再接复杂 EX/MEM/WB 转发，避免关键路径变长。
-    wire [31:0] branch_rs1_data = value1_eff;
-    wire [31:0] branch_rs2_data = value2_eff;
-    wire [31:0] jalr_rs1_data   = value1_eff;
-
     // 前推选择
     (* max_fanout = 15 *) wire [31:0] rs1_data_fwd = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
     (* max_fanout = 15 *) wire [31:0] rs2_data_fwd = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
@@ -159,12 +150,15 @@ module ex(
     wire [31:0] add_res_nrs = value1_i + value2_i;
 
     // 地址计算
-    wire [31:0] mem_addr_calc = value1_eff + value2_i;
-    wire [31:0] branch_target = jump1_i + jump2_i;
-    wire [31:0] jalr_target   = jalr_rs1_data + jump2_i;
-    wire [31:0] pc_plus4      = pc_addr_i + 32'd4;
+    wire [31:0] mem_addr_calc     = value1_eff + value2_i;
+    wire [1:0]  mem_addr_calc_low = mem_addr_calc[1:0]; 
+    wire [31:0] branch_target     = jump1_i;
+    wire [31:0] jalr_target       = rs1_data_fwd + jump2_i;
+    wire [31:0] pc_plus4          = pc_addr_i + 32'd4;
 
     // 分支计算
+    wire [31:0] branch_rs1_data = rs1_data_fwd;
+    wire [31:0] branch_rs2_data = rs2_data_fwd;
     wire branch_eq_res    = (branch_rs1_data == branch_rs2_data);
     wire branch_ltu_res   = (branch_rs1_data < branch_rs2_data);
     wire branch_sign_diff = (branch_rs1_data[31] ^ branch_rs2_data[31]);
@@ -185,8 +179,8 @@ module ex(
         endcase
     end
 
-    wire branch_pred_mispredict  = is_branch && (pred_taken_i != branch_taken);
-    wire jalr_pred_mispredict    = is_jalr && ((!pred_taken_i) || (pred_pc_i != jalr_target));
+    wire branch_pred_mispredict  = (pred_taken_i != branch_taken); // without is_branch
+    wire jalr_pred_mispredict    = ((!pred_taken_i) | (pred_pc_i != jalr_target)); // without is_jalr
     wire [31:0] branch_jump_addr = branch_taken ? branch_target : pc_plus4;
 
     // 分指令返回
@@ -229,29 +223,46 @@ module ex(
     // Dcache 控制
     always @(*) begin: ALU_Dcache
         // 转发 D-cache
-        dcache_req_load     = is_load;
-        dcache_req_store    = is_store;
+        dcache_req_load     = is_load;          // dcache 读使能
+        dcache_req_store    = is_store;         // dcache 写使能
         dcache_addr         = mem_addr_calc;
         dcache_wdata        = rs2_data_fwd;
+
+        (* parallel_case, full_case *)
+        case (1'b1)
+            sel_lb:  dcache_is_signed = 1'b1;
+            sel_lh:  dcache_is_signed = 1'b1;
+            sel_lw:  dcache_is_signed = 1'b1;
+            sel_lbu: dcache_is_signed = 1'b0;
+            sel_lhu: dcache_is_signed = 1'b0;
+            default: dcache_is_signed = 1'b0;
+        endcase
         
         (* parallel_case, full_case *)
         case (1'b1)
-            sel_lb:  dcache_mask = 2'b00;
-            sel_lh:  dcache_mask = 2'b01;
-            sel_lw:  dcache_mask = 2'b10;
-            sel_lbu: dcache_mask = 2'b00;
-            sel_lhu: dcache_mask = 2'b01;
-            sel_sb:  dcache_mask = 2'b00;
-            sel_sh:  dcache_mask = 2'b01;
-            sel_sw:  dcache_mask = 2'b10;
-            default: dcache_mask = 2'b00;
+            sel_lb:  dcache_mask = 3'b001;
+            sel_lh:  dcache_mask = 3'b010;
+            sel_lw:  dcache_mask = 3'b100;
+            sel_lbu: dcache_mask = 3'b001;
+            sel_lhu: dcache_mask = 3'b010;
+            sel_sb:  dcache_mask = 3'b001;
+            sel_sh:  dcache_mask = 3'b010;
+            sel_sw:  dcache_mask = 3'b100;
+            default: dcache_mask = 3'b000;
+        endcase
+        (* parallel_case, full_case *)
+        case (mem_addr_calc_low)
+            2'b00: dcache_addr_offset = 4'b0001;
+            2'b01: dcache_addr_offset = 4'b0010;
+            2'b10: dcache_addr_offset = 4'b0100;
+            2'b11: dcache_addr_offset = 4'b1000;
         endcase
     end
 
     // 跳转
     always @(*) begin: ALU_JUMP_CTRL
-        update_btb_en_o     = is_jalr;
-        update_gshare_en_o  = is_branch;
+        update_btb_en_o     = is_jalr & jalr_pred_mispredict;      // btb 更新使能
+        update_gshare_en_o  = is_branch & branch_pred_mispredict;    // gshare 更新使能
         update_pc_o         = pc_addr_i;
         update_target_o     = jalr_target;
         actual_taken_o      = branch_taken;
@@ -277,19 +288,16 @@ module ex(
     // 跳转 & 读写
     always @(*) begin: ALU_WB
         // 寄存器写入
-        regs_wen_o          = (valid_i) ? regs_wen_i : 1'b0;
-        rd_data_o           = 32'b0;
+        regs_wen_o          = valid_i & regs_wen_i; // regs 写使能
         rd_addr_o           = rd_addr_i;
+        rd_data_o           = alu_result;
         mem_req_load_o      = is_load;
 
-        // 打包 Load
-        load_packaged_o[`IS_LB]   = sel_lb;
-        load_packaged_o[`IS_LH]   = sel_lh;
-        load_packaged_o[`IS_LW]   = sel_lw;
-        load_packaged_o[`IS_LBU]  = sel_lbu;
-        load_packaged_o[`IS_LHU]  = sel_lhu;
-        
-        // 写回寄存器
-        rd_data_o = alu_result;
+        // // 打包 Load - mem1 -> wb 的 load 使能
+        // load_packaged_o[`IS_LB]   = sel_lb;
+        // load_packaged_o[`IS_LH]   = sel_lh;
+        // load_packaged_o[`IS_LW]   = sel_lw;
+        // load_packaged_o[`IS_LBU]  = sel_lbu;
+        // load_packaged_o[`IS_LHU]  = sel_lhu;
     end
 endmodule

@@ -55,29 +55,41 @@ module perip_bridge(
     
     // delay
     localparam READ_DELAY = `DRAM_READ_DELAY;
-    logic [31:0] perip_d_addr [0: READ_DELAY - 1];
-    logic        perip_d_wen  [0: READ_DELAY - 1];
+    logic [31:0] perip_addr_d [0: READ_DELAY - 1];
+    logic        perip_wen_d  [0: READ_DELAY - 1];
 
     // assign       dram_ready        = (|{dram_en, perip_d[0].en, perip_d[1].en}) ? 1'b0 : 1'b1;
     logic [31:0] perip_addr_delay;
     logic [3:0]  perip_wen_delay;
-    assign perip_addr_delay = perip_d_addr[READ_DELAY - 1];
-    assign perip_wen_delay = perip_d_wen[READ_DELAY - 1];
+    logic        perip_hit_dram;
+    logic        perip_hit_mmio;
+    logic        perip_hit_cnt;
+    assign perip_addr_delay = perip_addr_d[READ_DELAY - 1];
+    assign perip_wen_delay = perip_wen_d[READ_DELAY - 1];
     
     always_ff @(posedge clk) begin
         if (rst) begin
             for (int i = 0; i < READ_DELAY; i++) begin
-                perip_d_addr[i] <= 0;
-                perip_d_wen[i]  <= 0;  
+                perip_addr_d[i] <= 0;
+                perip_wen_d[i]  <= 0;  
             end
+            perip_hit_dram  <= 0;
+            perip_hit_mmio  <= 0;
+            perip_hit_cnt   <= 0;
         end
         else begin
-            perip_d_addr[0] <= perip_addr;
-            perip_d_wen[0]  <= perip_wen;
+            perip_addr_d[0] <= perip_addr;
+            perip_wen_d[0]  <= perip_wen;
+            perip_hit_dram  <= (perip_addr_d[0] >= DRAM_ADDR_START && perip_addr_d[0] < DRAM_ADDR_END);
+            perip_hit_mmio  <=  (perip_addr_d[0] == SW0_ADDR) | 
+                                (perip_addr_d[0] == SW1_ADDR) | 
+                                (perip_addr_d[0] == KEY_ADDR) | 
+                                (perip_addr_d[0] == SEG_ADDR);
+            perip_hit_cnt   <=  (perip_addr_d[0] == CNT_ADDR);
 
             for (int i = 1; i < READ_DELAY; i++) begin
-                perip_d_addr[i] <= perip_d_addr[i-1];
-                perip_d_wen[i]  <= perip_d_wen[i-1];
+                perip_addr_d[i]     <= perip_addr_d[i-1];
+                perip_wen_d[i]      <= perip_wen_d[i-1];
             end
         end
     end
@@ -105,17 +117,17 @@ module perip_bridge(
     end
 
     // read process: in one cycle
-    always_comb begin
-        if (~perip_wen_delay) begin
-            case (perip_addr_delay)
-                SW0_ADDR:  mmio_rdata = virtual_sw_input[31:0];
-                SW1_ADDR:  mmio_rdata = virtual_sw_input[63:32];
-                KEY_ADDR:  mmio_rdata = {24'd0, virtual_key_input};
-                SEG_ADDR:  mmio_rdata = seg_wdata;
-                default:   mmio_rdata = 32'hDEAD_BEEF;
+    always_ff @(posedge clk) begin
+        if (~perip_wen_d[0]) begin
+            case (perip_addr_d[0])
+                SW0_ADDR:  mmio_rdata <= virtual_sw_input[31:0];
+                SW1_ADDR:  mmio_rdata <= virtual_sw_input[63:32];
+                KEY_ADDR:  mmio_rdata <= {24'd0, virtual_key_input};
+                SEG_ADDR:  mmio_rdata <= seg_wdata;
+                default:   mmio_rdata <= 32'hDEAD_BEEF;
             endcase
         end else begin
-            mmio_rdata = 32'h0;
+            mmio_rdata <= 32'h0;
         end
     end
 
@@ -157,12 +169,9 @@ module perip_bridge(
         .perip_rdata		(cnt_rdata)
     );
 
-    assign perip_rdata = {32{perip_addr_delay == SW0_ADDR}} & mmio_rdata |
-                        {32{perip_addr_delay == SW1_ADDR}} & mmio_rdata |
-                        {32{perip_addr_delay == KEY_ADDR}} & mmio_rdata |
-                        {32{perip_addr_delay == SEG_ADDR}} & mmio_rdata |
-                        {32{perip_addr_delay >= DRAM_ADDR_START && perip_addr_delay < DRAM_ADDR_END}} & dram_rdata |
-                        {32{perip_addr_delay == CNT_ADDR}} & cnt_rdata;
+    assign perip_rdata =    (perip_hit_dram)    ? dram_rdata :
+                            (perip_hit_mmio)    ? mmio_rdata :
+                            (perip_hit_cnt)     ? cnt_rdata : 32'b0;
     
     assign virtual_led_output = LED;
     assign virtual_seg_output = seg_output;

@@ -10,15 +10,13 @@
 // 数据冒险发生时 hazard_en 的暂停对预测器同样生效 以避免预测错位
 module bpu_controller #(
     // 分支预测
-    parameter BHR_WIDTH = 10,
-    parameter PHT_SIZE  = 1024,
+    parameter BHR_WIDTH = 16,
 
     // BTB
     parameter BTB_INDEX_WIDTH = 4,
 
     // RAS
-    parameter RAS_DEPTH = 8,
-    parameter PTR_WIDTH = $clog2(RAS_DEPTH)
+    parameter RAS_DEPTH = 8
 )(
     input                           clk,
     input                           rst,
@@ -133,52 +131,50 @@ module bpu_controller #(
     always@(posedge clk) begin
         if (!rst) begin
             // PC
-            pc_reg              <= 0;
+            pc_reg          <= 0;
 
-            // JALR
-            btb_query_index     <= 0;
-            btb_query_tag       <= 0;
-        end
-        else if (pred_taken_raw) begin
-            // PC
-            pc_reg              <= 0;
-
-            // JALR
-            btb_query_index     <= 0;
-            btb_query_tag       <= 0;
-        end
-        else if (!pipe_hold) begin
-            // PC
-            pc_reg              <= pc_addr;
-
-            // JALR
-            btb_query_index     <= btb_query_index_w;
-            btb_query_tag       <= btb_query_tag_w;
-        end
-    end
-
-    always @(posedge clk) begin
-        if (!rst) begin
             // RAS
             ras_pop_en      <= 0;
             ras_push_en     <= 0;
             ras_push_addr   <= 0;
 
-            // Gshare
-            gshare_prev_b   <= 0;
+            // JALR
+            btb_query_index <= 0;
+            btb_query_tag   <= 0;
         end
         else if (pred_taken_raw) begin
+            // PC
+            pc_reg          <= 0;
+
             // RAS - 弹栈入栈只能一个周期
             ras_pop_en      <= 0;
             ras_push_en     <= 0;
+
+            // JALR
+            btb_query_index <= 0;
+            btb_query_tag   <= 0;
         end
         else if (!pipe_hold) begin
+            // PC
+            pc_reg          <= pc_addr;
+
             // RAS
             ras_pop_en      <= is_ras_pop;
             ras_push_en     <= is_ras_push;
             ras_push_addr   <= pc_add_4;
 
-            // Gshare
+            // JALR
+            btb_query_index <= btb_query_index_w;
+            btb_query_tag   <= btb_query_tag_w;
+        end
+    end
+
+    // Gshare
+    always @(posedge clk) begin
+        if (!rst) begin
+            gshare_prev_b   <= 0;
+        end
+        else begin
             gshare_prev_b   <= is_B_type;
         end
     end

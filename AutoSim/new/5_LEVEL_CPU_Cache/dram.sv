@@ -1,3 +1,5 @@
+`include "switch.vh"
+
 module dram_BRAM(
     input               clk,
 
@@ -65,7 +67,7 @@ module DRAM_d1(
         .dram_we_i          (wea),
         .dram_wen_i         (wea != 4'b0),
         .dram_wdata_i       (dina),
-        .dram_rdata_d1_o    (douta),
-        .dram_rdata_d2_o    ()
+        .dram_rdata_d1_o    (),
+        .dram_rdata_d2_o    (douta)
     );
 endmodule

@@ -4,8 +4,8 @@
 // 即根据地址的部分位建立的历史记录表 2 路可以提升准确率
 
 module btb #(
-    parameter INDEX_WIDTH = 4,      // 截取地址长度
-    parameter TAG_WIDTH   = 26,     // tag 宽度
+    parameter INDEX_WIDTH = 4,                  // 截取地址长度
+    parameter TAG_WIDTH = (30 - INDEX_WIDTH),   // tag 宽度
     parameter WAYS = 2
 )(
     input   clk,

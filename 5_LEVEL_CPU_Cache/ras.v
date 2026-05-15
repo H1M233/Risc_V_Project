@@ -4,7 +4,7 @@
 // 就是一个物理栈
 
 module ras #(
-    parameter DEPTH     = 8,
+    parameter DEPTH = 8,
     parameter PTR_WIDTH = $clog2(DEPTH)
 )(
     input               clk,

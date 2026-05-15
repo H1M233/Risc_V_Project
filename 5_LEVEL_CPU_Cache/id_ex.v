@@ -27,13 +27,6 @@ module id_ex(
     input      [31:0]   pred_pc_i,
     input      [`OP_INST_NUM - 1:0] inst_packaged_i,
 
-    // from forwarding
-    input               fwd_rs1_hit_ex_i,
-    input               fwd_rs2_hit_ex_i,
-    input      [31:0]   fwd_rs1_data_i,
-    input      [31:0]   fwd_rs2_data_i,
-    input      [31:0]   fwd_ex_rd_data_i,
-
     // to ex
     output reg [31:0]   pc_addr_o,
     output reg [31:0]   inst_o,
@@ -50,12 +43,7 @@ module id_ex(
     output reg [31:0]   pred_pc_o,
     (* max_fanout = 20 *)
     output reg [`OP_INST_NUM - 1:0] inst_packaged_o,
-    output reg          valid_o,
-    output reg          fwd_rs1_hit_ex_o,
-    output reg          fwd_rs2_hit_ex_o,
-    output reg [31:0]   fwd_rs1_data_o,
-    output reg [31:0]   fwd_rs2_data_o,
-    output reg [31:0]   fwd_ex_rd_data_o
+    output reg          valid_o
 );
     wire flush_id_ex = pred_flush_r | pred_flush | hazard_en;
     always @(posedge clk) begin
@@ -72,14 +60,8 @@ module id_ex(
             rs2_addr_o          <= 5'b0;
             pred_taken_o        <= 1'b0;
             pred_pc_o           <= 32'b0;
-            inst_packaged_o   <= {`OP_INST_NUM{1'b0}};
+            inst_packaged_o     <= {`OP_INST_NUM{1'b0}};
             valid_o             <= 1'b0;
-
-            fwd_rs1_hit_ex_o    <= 1'b0;
-            fwd_rs2_hit_ex_o    <= 1'b0;
-            fwd_rs1_data_o      <= 32'b0;
-            fwd_rs2_data_o      <= 32'b0;
-            fwd_ex_rd_data_o    <= 32'b0;
         end
         else if(!dcache_stall) begin
             // ¹Ø¼üµã£º
@@ -97,14 +79,8 @@ module id_ex(
             rs2_addr_o          <= rs2_addr_i;
             pred_taken_o        <= pred_taken_i;
             pred_pc_o           <= pred_pc_i;
-            inst_packaged_o     <= inst_packaged_i & {`OP_INST_NUM{~flush_id_ex}};
+            inst_packaged_o     <= inst_packaged_i;
             valid_o             <= ~flush_id_ex;
-
-            fwd_rs1_hit_ex_o    <= fwd_rs1_hit_ex_i;
-            fwd_rs2_hit_ex_o    <= fwd_rs2_hit_ex_i;
-            fwd_rs1_data_o      <= fwd_rs1_data_i;
-            fwd_rs2_data_o      <= fwd_rs2_data_i;
-            fwd_ex_rd_data_o    <= fwd_ex_rd_data_i;
         end
     end
 endmodule

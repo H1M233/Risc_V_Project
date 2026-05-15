@@ -29,7 +29,8 @@ module tb_verilator_software(
         end
         assign seg = tb_verilator_software.uut.student_top_inst.bridge_inst.seg_driver.s;
         wire hazard_en = tb_verilator_software.uut.student_top_inst.Core_cpu.hazard_hazard_en;
-        assign commit = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.valid_i & tb_verilator_software.uut.student_top_inst.Core_cpu.EX.inst_packaged_i != 0;
+        wire ex_valid = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.valid_i;
+        assign commit = ex_valid & tb_verilator_software.uut.student_top_inst.Core_cpu.EX.inst_packaged_i != 0;
 
         assign pc = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.pc_addr_i;
         wire ex_is_jal = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.is_jal;
@@ -39,8 +40,8 @@ module tb_verilator_software(
         assign pred_total = ex_is_jal | ex_is_jalr | ex_is_branch;
         assign pred_total_b = ex_is_branch;
         assign pred_total_jr = ex_is_jalr;
-        assign pred_miss_b = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.branch_pred_mispredict;
-        assign pred_miss_jr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.jalr_pred_mispredict;
+        assign pred_miss_b = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.update_gshare_en_o;
+        assign pred_miss_jr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.update_btb_en_o;
 
         always @(posedge clk_cpu) begin
             if (ex_is_jal)

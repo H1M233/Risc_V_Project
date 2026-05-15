@@ -185,8 +185,7 @@ module id(
             `TYPE_B: begin
                 value1_o    = data1;
                 value2_o    = data2;
-                jump1_o     = pc_addr_i;
-                jump2_o     = {{20{inst_i[31]}}, inst_i[7], inst_i[30:25], inst_i[11:8], 1'b0};
+                jump1_o     = pc_addr_i + {{20{inst_i[31]}}, inst_i[7], inst_i[30:25], inst_i[11:8], 1'b0};
                 rs1_addr_o  = rs1_o;            
                 rs2_addr_o  = rs2_o;  
                 rd_addr_o   = 5'b0;

@@ -9,9 +9,9 @@ module pred_flusher(
     input      [31:0]   pred_flush_pc_i,    // 来自控制单元的跳转地址输入
 
     // to if_id, id_ex, pc
-    (* max_fanout = 30 *)
+    (* max_fanout = 10 *)
     output reg          pred_flush_en_r_o,  // 传递给各模块的跳转使能信号
-    (* max_fanout = 30 *)
+    (* max_fanout = 10 *)
     output reg [31:0]   pred_flush_pc_r_o   // 传递给PC模块的跳转地址输入
 );
     always @(posedge clk) begin: Pred_Flusher

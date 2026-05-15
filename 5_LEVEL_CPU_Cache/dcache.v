@@ -18,10 +18,12 @@ module dcache#(
     // CPU/MEM side
     input               cpu_req_load,
     input               cpu_req_store,
-    input      [1:0]    cpu_mask,
+    input      [2:0]    cpu_mask,
     input      [31:0]   cpu_addr,
+    input      [3:0]    cpu_addr_offset,
     (* max_fanout = 20 *)
     input      [31:0]   cpu_wdata,
+    input               cpu_is_signed,
     output reg [31:0]   cpu_rdata,
     (* max_fanout = 20 *)
     output              stall,
@@ -220,132 +222,115 @@ module dcache#(
         end
     end
     `else
-        wire [1:0] addr_low = cpu_addr[1:0];
-        reg [1:0] mask_r, mask_r2;
-        reg [1:0] addr_low_r, addr_low_r2;
-        reg cpu_req_load_r;
-        reg [31:0] mem_rdata_r;
+        reg [2:0] mask_r, mask_r2, mask_r3;
+        reg [3:0] addr_offset_r, addr_offset_r2, addr_offset_r3;
+        reg is_signed_r, is_signed_r2, is_signed_r3;
+        reg cpu_req_load_r, cpu_req_store_r;
+        reg [31:0] cpu_waddr_r, cpu_wdata_r;
         always @(posedge clk) begin
             mask_r          <= cpu_mask;
-            addr_low_r      <= addr_low;
             mask_r2         <= mask_r;
-            addr_low_r2     <= addr_low_r;
-            mem_rdata_r     <= mem_rdata;
+            mask_r3         <= mask_r2;
+            addr_offset_r   <= cpu_addr_offset;
+            addr_offset_r2  <= addr_offset_r;
+            addr_offset_r3  <= addr_offset_r2;
+            is_signed_r     <= cpu_is_signed;
+            is_signed_r2    <= is_signed_r;
+            is_signed_r3    <= is_signed_r2;
             cpu_req_load_r  <= cpu_req_load;
+            cpu_req_store_r <= cpu_req_store;
+            cpu_waddr_r     <= cpu_addr;
+            cpu_wdata_r     <= cpu_wdata;
+
+            mem_ack     <= 1'b1;
+            mem_addr    <= cpu_addr;
+            mem_we      <= (cpu_req_store) ? toWe(cpu_mask, cpu_addr_offset) : 4'b0;
+            mem_wen     <= (cpu_req_store);
+            mem_wdata   <= store_merge(cpu_wdata, cpu_mask, cpu_addr_offset);
+        end
+        always @(*) begin
+            cpu_rdata = load_shift(mem_rdata, mask_r3, addr_offset_r3, is_signed_r3);
         end
 
         assign stall = 1'b0;
-
-        always @(*) begin
-            mem_ack   = 1'b1;
-            mem_addr  = cpu_addr;
-            mem_we    = cpu_req_store ? unmask(cpu_mask, addr_low) : 4'b0;
-            mem_wen   = cpu_req_store;
-            mem_wdata = store_merge(32'b0, cpu_wdata, addr_low, cpu_mask);
-            cpu_rdata = load_shift(mem_rdata_r, addr_low_r2, mask_r2);
-        end
     `endif
 
     // 函数：
-    // 将 mask 转为按位
-    function [3:0] unmask;
-        input [1:0] mask;
-        input [1:0] addr_low;
-        begin
-            case (mask)
-                2'b00: begin
-                    case (addr_low)
-                        2'b00: unmask = 4'b0001;
-                        2'b01: unmask = 4'b0010;
-                        2'b10: unmask = 4'b0100;
-                        2'b11: unmask = 4'b1000;
+    function [3:0] toWe;
+        input [2:0] mask;
+        input [3:0] addr_offset;
+        begin 
+            toWe = 4'b0000;
+            (* parallel_case, full_case *)
+            case (1'b1)
+                mask[0]: 
+                    (* parallel_case, full_case *)
+                    case (1'b1)
+                        addr_offset[0]: toWe = 4'b0001;
+                        addr_offset[1]: toWe = 4'b0010;
+                        addr_offset[2]: toWe = 4'b0100;
+                        addr_offset[3]: toWe = 4'b1000;
                     endcase
-                end
-                2'b01: begin
-                    case (addr_low[1])
-                        1'b0: unmask = 4'b0011;
-                        1'b1: unmask = 4'b1100;
+                mask[1]: 
+                    (* parallel_case, full_case *)
+                    case (1'b1)
+                        addr_offset[0]: toWe = 4'b0011;
+                        addr_offset[2]: toWe = 4'b1100;
                     endcase
-                end
-                2'b10: unmask = 4'b1111;
+                mask[2]: toWe = 4'b1111;
             endcase
         end
     endfunction
 
-
-    // 把完整 word 根据 addr[1:0] 和 mask 移到低位
     function [31:0] load_shift;
         input [31:0] word;
-        input [1:0]  addr_low;
-        input [1:0]  mask;
-        begin
-            case(mask)
-                // byte
-                2'b00: begin
-                    case(addr_low)
-                        2'b00: load_shift = {24'b0, word[7:0]};
-                        2'b01: load_shift = {24'b0, word[15:8]};
-                        2'b10: load_shift = {24'b0, word[23:16]};
-                        2'b11: load_shift = {24'b0, word[31:24]};
+        input [2:0]  mask;
+        input [3:0]  addr_offset;
+        input        is_signed;
+        begin 
+            load_shift = 32'b0;
+            (* parallel_case, full_case *)
+            case (1'b1)
+                mask[0]: 
+                    (* parallel_case, full_case *)
+                    case (1'b1)
+                        addr_offset[0]: load_shift = {{24{word[7] & is_signed}}, word[7:0]};
+                        addr_offset[1]: load_shift = {{24{word[15] & is_signed}}, word[15:8]};
+                        addr_offset[2]: load_shift = {{24{word[23] & is_signed}}, word[23:16]};
+                        addr_offset[3]: load_shift = {{24{word[31] & is_signed}}, word[31:24]};
                     endcase
-                end
-
-                // half word
-                2'b01: begin
-                    if(addr_low[1])
-                        load_shift = {16'b0, word[31:16]};
-                    else
-                        load_shift = {16'b0, word[15:0]};
-                end
-
-                // word
-                2'b10: begin
-                    load_shift = word;
-                end
-
-                default: begin
-                    load_shift = word;
-                end
+                mask[1]: 
+                    (* parallel_case, full_case *) 
+                    case (1'b1)
+                        addr_offset[0]: load_shift = {{16{word[15] & is_signed}}, word[15:0]};
+                        addr_offset[2]: load_shift = {{16{word[31] & is_signed}}, word[31:16]};
+                    endcase
+                mask[2]: load_shift = word;
             endcase
         end
     endfunction
 
-    // store hit 时更新 cache 里的旧 word
     function [31:0] store_merge;
-        input [31:0] old_word;
-        input [31:0] wdata;
-        input [1:0]  addr_low;
-        input [1:0]  mask;
-        begin
-            store_merge = old_word;
-
-            case(mask)
-                // SB
-                2'b00: begin
-                    case(addr_low)
-                        2'b00: store_merge[7:0]   = wdata[7:0];
-                        2'b01: store_merge[15:8]  = wdata[7:0];
-                        2'b10: store_merge[23:16] = wdata[7:0];
-                        2'b11: store_merge[31:24] = wdata[7:0];
+        input [31:0] word;
+        input [2:0]  mask;
+        input [3:0]  addr_offset;
+        begin 
+            store_merge = 32'b0;
+            (* parallel_case, full_case *)
+            case (1'b1)
+                mask[0]: (* parallel_case, full_case *)
+                    case (1'b1)
+                        addr_offset[0]: store_merge = {24'b0, word[7:0]};
+                        addr_offset[1]: store_merge = {16'b0, word[7:0], 8'b0};
+                        addr_offset[2]: store_merge = {8'b0, word[7:0], 16'b0};
+                        addr_offset[3]: store_merge = {word[7:0], 24'b0};
                     endcase
-                end
-
-                // SH
-                2'b01: begin
-                    if(addr_low[1])
-                        store_merge[31:16] = wdata[15:0];
-                    else
-                        store_merge[15:0]  = wdata[15:0];
-                end
-
-                // SW
-                2'b10: begin
-                    store_merge = wdata;
-                end
-
-                default: begin
-                    store_merge = old_word;
-                end
+                mask[1]: (* parallel_case, full_case *)
+                    case (1'b1)
+                        addr_offset[0]: store_merge = {16'b0, word[15:0]};
+                        addr_offset[2]: store_merge = {word[15:0], 16'b0};
+                    endcase
+                mask[2]: store_merge = word;
             endcase
         end
     endfunction
