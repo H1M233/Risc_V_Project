@@ -5,7 +5,7 @@ module if1_if2(
     input               rst,
 
     input               pred_taken,
-    input               pred_flush,
+    input               pred_flush_r,
     input               pipe_hold,
 
     // from if1
@@ -21,7 +21,7 @@ module if1_if2(
             if2_valid_o <= 1'b0;
             pc_o        <= 32'h0;
         end
-        else if (pred_taken | pred_flush) begin
+        else if (pred_taken | pred_flush_r) begin
             if2_valid_o <= 1'b0;
             pc_o        <= 32'h0;
         end

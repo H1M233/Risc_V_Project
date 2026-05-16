@@ -8,7 +8,6 @@ module id_ex(
     // from D-cache stall
     input               dcache_stall,
 
-    input               pred_flush,
     input               pred_flush_r,
     input               hazard_en,
 
@@ -45,7 +44,7 @@ module id_ex(
     output reg [`OP_INST_NUM - 1:0] inst_packaged_o,
     output reg          valid_o
 );
-    wire flush_id_ex = pred_flush_r | pred_flush | hazard_en;
+    wire flush_id_ex = pred_flush_r | hazard_en;
     always @(posedge clk) begin
         if(!rst) begin
             pc_addr_o           <= 32'b0;
@@ -79,7 +78,7 @@ module id_ex(
             rs2_addr_o          <= rs2_addr_i;
             pred_taken_o        <= pred_taken_i;
             pred_pc_o           <= pred_pc_i;
-            inst_packaged_o     <= inst_packaged_i;
+            inst_packaged_o     <= inst_packaged_i & {`OP_INST_NUM{~flush_id_ex}};
             valid_o             <= ~flush_id_ex;
         end
     end

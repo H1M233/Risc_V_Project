@@ -25,15 +25,15 @@ module forwarding(
     input           mem2_regs_wen_i,
 
     // to id_ex
-    (* max_fanout = 10 *)
+    (* max_fanout = 5 *)
     output reg        forwarding_rs1_hit_ex_o,      // ex 寄存后转发，在 ex 内部再做判断
-    (* max_fanout = 10 *)
+    (* max_fanout = 5 *)
     output reg        forwarding_rs2_hit_ex_o,
-    (* max_fanout = 10 *)
+    (* max_fanout = 5 *)
     output reg [31:0] forwarding_rs1_data_o,
-    (* max_fanout = 10 *)
+    (* max_fanout = 5 *)
     output reg [31:0] forwarding_rs2_data_o,
-    (* max_fanout = 10 *)
+    (* max_fanout = 5 *)
     output reg [31:0] forwarding_ex_rd_data_o
 );
     wire rs1_addr_write_available = (id_rs1_addr_i != 5'b0);

@@ -11,7 +11,7 @@ module pc(
     input               hazard_en,
 
     // from ex
-    input               pred_flush_en,
+    input               pred_flush_r,
     input      [31:0]   pred_flush_pc,
 
     // to if
@@ -26,7 +26,7 @@ module pc(
         if(!rst) begin
             pc_addr_o <= 32'h8000_0000;
         end
-        else if(pred_flush_en) begin
+        else if(pred_flush_r) begin
             pc_addr_o <= pred_flush_pc;
         end
         else if(hazard_en) begin

@@ -169,9 +169,9 @@ module perip_bridge(
         .perip_rdata		(cnt_rdata)
     );
 
-    assign perip_rdata =    (perip_hit_dram)    ? dram_rdata :
-                            (perip_hit_mmio)    ? mmio_rdata :
-                            (perip_hit_cnt)     ? cnt_rdata : 32'b0;
+    assign perip_rdata =    {32{perip_hit_dram}} & dram_rdata |
+                            {32{perip_hit_mmio}} & mmio_rdata |
+                            {32{perip_hit_cnt}}  & cnt_rdata;
     
     assign virtual_led_output = LED;
     assign virtual_seg_output = seg_output;

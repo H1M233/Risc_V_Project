@@ -3,22 +3,22 @@
     "37 INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.922891",
-        "REAL TIME": "8.50007",
+        "IPC": "0.944722",
+        "REAL TIME": "9.3001",
         "ICACHE HIT": "0.992835",
         "DCACHE HIT": "0.999915",
-        "RUN TIME": "169",
+        "RUN TIME": "170",
         "LED": "PASS √",
-        "BPU ACCURACY": "0.909838"
+        "BPU ACCURACY": "0.904401"
       },
       "src0": {
-        "IPC": "0.722805",
-        "REAL TIME": "471.228",
+        "IPC": "0.728715",
+        "REAL TIME": "471.205",
         "ICACHE HIT": "0.988879",
         "DCACHE HIT": "0.872287",
-        "RUN TIME": "8363",
+        "RUN TIME": "8649",
         "LED": "PASS √",
-        "BPU ACCURACY": "0.919499"
+        "BPU ACCURACY": "0.805951"
       },
       "src1": {
         "IPC": "0.58048",

@@ -83,28 +83,17 @@ module id(
         inst_packaged_o[`OP_LOAD]   = is_load;
         inst_packaged_o[`OP_STORE]  = is_store;
 
-        // I-type
-        inst_packaged_o[`INST_ADDI]  = is_alu_i & f3_000;
-        inst_packaged_o[`INST_XORI]  = is_alu_i & f3_100;
-        inst_packaged_o[`INST_ORI]   = is_alu_i & f3_110;
-        inst_packaged_o[`INST_ANDI]  = is_alu_i & f3_111;
-        inst_packaged_o[`INST_SLLI]  = is_alu_i & f3_001;
-        inst_packaged_o[`INST_SRLI]  = is_alu_i & f3_101 & f7_0000000;
-        inst_packaged_o[`INST_SRAI]  = is_alu_i & f3_101 & f7_0100000;
-        inst_packaged_o[`INST_SLTI]  = is_alu_i & f3_010;
-        inst_packaged_o[`INST_SLTIU] = is_alu_i & f3_011;
-
-        // R-type
-        inst_packaged_o[`INST_ADD]  = is_alu_r & f3_000 & f7_0000000;
-        inst_packaged_o[`INST_SUB]  = is_alu_r & f3_000 & f7_0100000;
-        inst_packaged_o[`INST_XOR]  = is_alu_r & f3_100;
-        inst_packaged_o[`INST_OR]   = is_alu_r & f3_110;
-        inst_packaged_o[`INST_AND]  = is_alu_r & f3_111;
-        inst_packaged_o[`INST_SLL]  = is_alu_r & f3_001;
-        inst_packaged_o[`INST_SRL]  = is_alu_r & f3_101 & f7_0000000;
-        inst_packaged_o[`INST_SRA]  = is_alu_r & f3_101 & f7_0100000;
-        inst_packaged_o[`INST_SLT]  = is_alu_r & f3_010;
-        inst_packaged_o[`INST_SLTU] = is_alu_r & f3_011;
+        // IR-type
+        inst_packaged_o[`INST_IR_ADD]  = (is_alu_r & f3_000 & f7_0000000) | (is_alu_i & f3_000);
+        inst_packaged_o[`INST_R_SUB]   = is_alu_r & f3_000 & f7_0100000;
+        inst_packaged_o[`INST_IR_XOR]  = (is_alu_r | is_alu_i) & f3_100;
+        inst_packaged_o[`INST_IR_OR]   = (is_alu_r | is_alu_i) & f3_110;
+        inst_packaged_o[`INST_IR_AND]  = (is_alu_r | is_alu_i) & f3_111;
+        inst_packaged_o[`INST_IR_SLL]  = (is_alu_r | is_alu_i) & f3_001;
+        inst_packaged_o[`INST_IR_SRL]  = (is_alu_r | is_alu_i) & f3_101 & f7_0000000;
+        inst_packaged_o[`INST_IR_SRA]  = (is_alu_r | is_alu_i) & f3_101 & f7_0100000;
+        inst_packaged_o[`INST_IR_SLT]  = (is_alu_r | is_alu_i) & f3_010;
+        inst_packaged_o[`INST_IR_SLTU] = (is_alu_r | is_alu_i) & f3_011;
 
         // Load & Store
         inst_packaged_o[`INST_LB]  = is_load & f3_000;
@@ -123,6 +112,9 @@ module id(
         inst_packaged_o[`INST_BGE]  = is_branch & f3_101;
         inst_packaged_o[`INST_BLTU] = is_branch & f3_110;
         inst_packaged_o[`INST_BGEU] = is_branch & f3_111;
+
+        // 纯数值计算独热
+        inst_packaged_o[`REQUEST_VALUE_ONLY] = is_auipc | is_lui | is_jal | is_jalr;
     end
 
     always@(*) begin
@@ -152,9 +144,9 @@ module id(
             end
 
             `AUIPC: begin
-                reg_wen     = 1'b1;             
-                value1_o    = pc_addr_i;                
-                value2_o    = {inst_i[31:12], 12'b0};
+                reg_wen     = 1'b1;
+                value1_o    = pc_addr_i + {inst_i[31:12], 12'b0};
+                value2_o    = 32'b0;
                 rs1_addr_o  = 5'b0;            
                 rs2_addr_o  = 5'b0;  
                 rd_addr_o   = rd_o;  
@@ -162,8 +154,8 @@ module id(
 
             `JAL: begin
                 reg_wen     = 1'b1;              
-                value1_o    = pc_addr_i;          
-                value2_o    = 32'd4;             
+                value1_o    = pc_addr_i + 32'd4;          
+                value2_o    = 32'b0;             
                 jump1_o     = pc_addr_i;   
                 jump2_o     = {{12{inst_i[31]}}, inst_i[19:12], inst_i[20], inst_i[30:21], 1'b0};
                 rs1_addr_o  = 5'b0;            
@@ -173,8 +165,8 @@ module id(
 
             `JALR: begin
                 reg_wen     = 1'b1;              
-                value1_o    = pc_addr_i;          
-                value2_o    = 32'd4;             
+                value1_o    = pc_addr_i + 32'd4;          
+                value2_o    = 32'b0;             
                 jump1_o     = data1;   
                 jump2_o     = {{20{inst_i[31]}}, inst_i[31:20]};
                 rs1_addr_o  = rs1_o;            
