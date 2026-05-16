@@ -120,79 +120,61 @@ module id(
     always@(*) begin
         pc_addr_o       = pc_addr_i;
         inst_o          = inst_i;
-        rs1_data_o      = data1;        
-        rs2_data_o      = data2;  
-        value1_o        = 32'b0;
-        value2_o        = 32'b0;
-        jump1_o         = 32'b0;
-        jump2_o         = 32'b0;
-        reg_wen         = 1'b0;
-        rs1_addr_o      = 5'b0;            
-        rs2_addr_o      = 5'b0; 
-        rd_addr_o       = 5'b0;
+        rs1_data_o      = data1;
+        rs2_data_o      = data2;
         pred_taken_o    = pred_taken_i;
         pred_pc_o       = pred_pc_i;
 
-        case(opcode)
-            `LUI: begin
-                reg_wen     = 1'b1;             
-                value1_o    = {inst_i[31:12], 12'b0};   
-                value2_o    = 32'd0;
-                rs1_addr_o  = 5'b0;            
-                rs2_addr_o  = 5'b0; 
+        case(1'b1)
+            is_lui: begin
+                reg_wen     = (rd_o != 5'b0);
+                value1_o    = {inst_i[31:12], 12'b0};
                 rd_addr_o   = rd_o;
             end
 
-            `AUIPC: begin
-                reg_wen     = 1'b1;
+            is_auipc: begin
+                reg_wen     = (rd_o != 5'b0);
                 value1_o    = pc_addr_i + {inst_i[31:12], 12'b0};
-                value2_o    = 32'b0;
-                rs1_addr_o  = 5'b0;            
-                rs2_addr_o  = 5'b0;  
-                rd_addr_o   = rd_o;  
+                rd_addr_o   = rd_o;
             end
 
-            `JAL: begin
-                reg_wen     = 1'b1;              
-                value1_o    = pc_addr_i + 32'd4;          
-                value2_o    = 32'b0;             
-                jump1_o     = pc_addr_i;   
+            is_jal: begin
+                reg_wen     = (rd_o != 5'b0);
+                value1_o    = pc_addr_i + 32'd4;                  
+                jump1_o     = pc_addr_i;
                 jump2_o     = {{12{inst_i[31]}}, inst_i[19:12], inst_i[20], inst_i[30:21], 1'b0};
-                rs1_addr_o  = 5'b0;            
-                rs2_addr_o  = 5'b0;  
                 rd_addr_o   = rd_o;
             end
 
-            `JALR: begin
-                reg_wen     = 1'b1;              
-                value1_o    = pc_addr_i + 32'd4;          
-                value2_o    = 32'b0;             
-                jump1_o     = data1;   
+            is_jalr: begin
+                reg_wen     = (rd_o != 5'b0);
+                value1_o    = pc_addr_i + 32'd4;
+                jump1_o     = data1;
                 jump2_o     = {{20{inst_i[31]}}, inst_i[31:20]};
-                rs1_addr_o  = rs1_o;            
-                rs2_addr_o  = 5'b0;  
+                rs1_addr_o  = rs1_o;
                 rd_addr_o   = rd_o;
             end
 
-            `TYPE_B: begin
+            is_branch: begin
+                reg_wen     = 1'b0;
                 value1_o    = data1;
                 value2_o    = data2;
                 jump1_o     = pc_addr_i + {{20{inst_i[31]}}, inst_i[7], inst_i[30:25], inst_i[11:8], 1'b0};
-                rs1_addr_o  = rs1_o;            
-                rs2_addr_o  = rs2_o;  
-                rd_addr_o   = 5'b0;
+                jump2_o     = pc_addr_i + 32'd4;
+                rs1_addr_o  = rs1_o;
+                rs2_addr_o  = rs2_o;
             end
 
-            `TYPE_L: begin
-                reg_wen     = 1'b1;
+            is_load: begin
+                reg_wen     = (rd_o != 5'b0);
                 value1_o    = data1;
                 value2_o    = {{20{inst_i[31]}}, inst_i[31:20]};
-                rs1_addr_o  = rs1_o;            
-                rs2_addr_o  = 5'b0;  
+                rs1_addr_o  = rs1_o; 
                 rd_addr_o   = rd_o;
             end
 
-            `TYPE_S: begin
+            is_store: begin
+                reg_wen     = 1'b0;
                 value1_o    = data1;
                 value2_o    = {{20{inst_i[31]}}, inst_i[31:25], inst_i[11:7]};
                 rs1_addr_o  = rs1_o;            
@@ -200,17 +182,16 @@ module id(
                 rd_addr_o   = 5'b0;
             end
 
-            `TYPE_I: begin
-                reg_wen     = 1'b1;
+            is_alu_i: begin
+                reg_wen     = (rd_o != 5'b0);
                 value1_o    = data1;
                 value2_o    = {{20{inst_i[31]}}, inst_i[31:20]};
                 rs1_addr_o  = rs1_o;
-                rs2_addr_o  = 5'b0;
                 rd_addr_o   = rd_o;
             end
 
-            `TYPE_R: begin
-                reg_wen     = 1'b1;
+            is_alu_r: begin
+                reg_wen     = (rd_o != 5'b0);
                 value1_o    = data1;
                 value2_o    = data2;
                 rs1_addr_o  = rs1_o;

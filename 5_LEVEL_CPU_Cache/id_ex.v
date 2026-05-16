@@ -40,7 +40,6 @@ module id_ex(
     output reg [31:0]   value2_o,
     output reg          pred_taken_o,
     output reg [31:0]   pred_pc_o,
-    (* max_fanout = 20 *)
     output reg [`OP_INST_NUM - 1:0] inst_packaged_o,
     output reg          valid_o
 );

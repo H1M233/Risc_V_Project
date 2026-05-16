@@ -37,7 +37,9 @@ module bpu_top #(
     input      [31:0]   update_target,      // ex阶段返回的实际跳转地址
     input               actual_taken,       // ex阶段判断跳转为真
 
+    (* max_fanout = 30 *)
     input               pred_flush_r,
+    (* max_fanout = 20 *)
     input               pipe_hold
     
 );

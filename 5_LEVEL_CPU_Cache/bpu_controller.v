@@ -1,4 +1,5 @@
 `include "rv32I.vh"
+`include "switch.vh"
 
 // 预测器控制模块
 // 用来让预测分为两个阶段进行：
@@ -31,7 +32,7 @@ module bpu_controller #(
     (* max_fanout = 30 *)
     output reg [31:0]               pred_pc,            // 向 if 输出预测的地址
     (* max_fanout = 30 *)
-    output                          pred_taken,         // 从 PHT 中读取的计数器高位值
+    output reg                      pred_taken,         // 从 PHT 中读取的计数器高位值
 
     // from ex
     input                           update_btb_en,      // ex 阶段返回的 BTB 更新使能
@@ -40,7 +41,9 @@ module bpu_controller #(
     input      [31:0]               update_target,      // ex 阶段返回的实际跳转地址
     input                           actual_taken,       // ex 阶段判断跳转为真
 
+    (* max_fanout = 20 *)
     input                           pipe_hold,
+    (* max_fanout = 30 *)
     input                           pred_flush_en_r,
 
     // Gshare - 查询
@@ -126,8 +129,8 @@ module bpu_controller #(
     wire [31 - BTB_INDEX_WIDTH - 2:0]   btb_update_tag_w    = update_pc_r[31:BTB_INDEX_WIDTH + 2];
 
     // 查询
-    reg pred_taken_raw; // 用于屏蔽冲刷（预测错误）时的预测结果
-    assign gshare_pht_index = (pred_taken_raw) ? 0 : pht_index;     // 预测跳转后屏蔽查询入口
+    (* max_fanout = 30 *)
+    assign gshare_pht_index = (pred_taken) ? 0 : pht_index;     // 预测跳转后屏蔽查询入口
     always@(posedge clk) begin
         if (!rst) begin
             // PC
@@ -138,19 +141,7 @@ module bpu_controller #(
             ras_push_en     <= 0;
             ras_push_addr   <= 0;
 
-            // JALR
-            btb_query_index <= 0;
-            btb_query_tag   <= 0;
-        end
-        else if (pred_taken_raw) begin
-            // PC
-            pc_reg          <= 0;
-
-            // RAS - 弹栈入栈只能一个周期
-            ras_pop_en      <= 0;
-            ras_push_en     <= 0;
-
-            // JALR
+            // BTB
             btb_query_index <= 0;
             btb_query_tag   <= 0;
         end
@@ -159,11 +150,11 @@ module bpu_controller #(
             pc_reg          <= pc_addr;
 
             // RAS
-            ras_pop_en      <= is_ras_pop;
-            ras_push_en     <= is_ras_push;
+            ras_pop_en      <= is_ras_pop & !pred_taken;
+            ras_push_en     <= is_ras_push & !pred_taken;
             ras_push_addr   <= pc_add_4;
 
-            // JALR
+            // BTB
             btb_query_index <= btb_query_index_w;
             btb_query_tag   <= btb_query_tag_w;
         end
@@ -175,50 +166,57 @@ module bpu_controller #(
             gshare_prev_b   <= 0;
         end
         else begin
-            gshare_prev_b   <= is_B_type;
+            gshare_prev_b   <= is_B_type & !pred_flush_en_r;
         end
     end
     
     // 预测结果
-    assign pred_taken = pred_taken_raw & !pred_flush_en_r;
+    `ifdef USE_CASE
+        reg sel_pred_taken;
+        reg [31:0] sel_pred_pc;
+        always @(*) begin
+            case (1'b1)
+                is_ras_pop: begin
+                    sel_pred_taken  = 1'b1;
+                    sel_pred_pc     = ras_pop_addr;
+                end
+                is_B_type: begin
+                    sel_pred_taken  = gshare_pred_taken;
+                    sel_pred_pc     = pc_add_B;
+                end
+                is_JALR: begin
+                    sel_pred_taken  = btb_hit;
+                    sel_pred_pc     = btb_target_pc;
+                end
+                is_JAL: begin
+                    sel_pred_taken  = 1'b1;
+                    sel_pred_pc     = pc_add_JAL;
+                end
+                default: begin
+                    sel_pred_taken  = 1'b0;
+                    sel_pred_pc     = pc_add_4;
+                end
+            endcase
+        end
+    `else
+        wire sel_pred_taken     =   (is_ras_pop) |
+                                    (is_B_type & gshare_pred_taken) |
+                                    (is_JALR & btb_hit) |
+                                    (is_JAL);
+        wire [31:0] sel_pred_pc =   ({32{is_ras_pop}} & ras_pop_addr) |
+                                    ({32{is_B_type}}  & pc_add_B) |
+                                    ({32{is_JALR}}    & btb_target_pc) |
+                                    ({32{is_JAL}}     & pc_add_JAL);
+    `endif
 
     always @(posedge clk) begin
         if (!rst) begin
-            pred_taken_raw  <= 0;
-            pred_pc         <= 0;
+            pred_taken  <= 0;
+            pred_pc     <= 0;
         end
-        else if (pipe_hold) begin
-            pred_taken_raw  <= pred_taken_raw;
-            pred_pc         <= pred_pc;
-        end
-        else if (pred_taken_raw | pred_flush_en_r) begin  // 避免重复预测
-            pred_taken_raw  <= 0;
-            pred_pc         <= 0;
-        end
-        else begin
-            (* parallel_case, full_case *)
-            case (1'b1)
-                is_ras_pop: begin
-                    pred_taken_raw  <= 1'b1;
-                    pred_pc         <= ras_pop_addr;
-                end
-                is_B_type: begin
-                    pred_taken_raw  <= gshare_pred_taken;
-                    pred_pc         <= pc_add_B;
-                end
-                is_JALR: begin
-                    pred_taken_raw  <= btb_hit;
-                    pred_pc         <= btb_target_pc;
-                end
-                is_JAL: begin
-                    pred_taken_raw  <= 1'b1;
-                    pred_pc         <= pc_add_JAL;
-                end
-                default: begin
-                    pred_taken_raw  <= 1'b0;
-                    pred_pc         <= pc_add_4;
-                end
-            endcase
+        else if (!pipe_hold) begin  // 当暂停时预测器的结果需要保存
+            pred_taken  <= sel_pred_taken & !pred_taken & !pred_flush_en_r; // 避免重复预测 & 错误预测冲刷
+            pred_pc     <= sel_pred_pc;
         end
     end
 

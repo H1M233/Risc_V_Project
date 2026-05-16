@@ -27,15 +27,17 @@ module top_riscv(
     // ============================================================
     // pred_flusher
     // ============================================================
-    (* max_fanout = 30 *)
+    (* max_fanout = 20 *)
     wire            pred_flush_r;
-    (* max_fanout = 30 *)
+    (* max_fanout = 20 *)
     wire [31:0]     pred_flush_pc_r;
 
     // ============================================================
     // hazard / stall
     // ============================================================
+    (* max_fanout = 30 *)
     wire            hazard_hazard_en;
+    (* max_fanout = 30 *)
     wire            dcache_stall;
     wire            mem1_is_load_o;
 
@@ -51,6 +53,7 @@ module top_riscv(
     wire [31:0]     if1_pc_o;
     wire [31:0]     if2_pc_i;
     wire            if2_valid_i;
+    (* max_fanout = 30 *)
     wire [31:0]     if2_inst_o;
     wire [31:0]     if2_pc_o;
 
@@ -111,9 +114,7 @@ module top_riscv(
     // ============================================================
     // ex to jump
     // ============================================================
-    (* max_fanout = 30 *)
     wire            ex_pred_flush_en_o;
-    (* max_fanout = 30 *)
     wire [31:0]     ex_pred_flush_pc_o;
 
     // ============================================================
@@ -198,15 +199,14 @@ module top_riscv(
     wire            ex_actual_taken;
 
     // forwarding to ex
-    (* max_fanout = 5 *)
+    (* max_fanout = 30 *)
     wire            fwd_rs1_hit_ex_o;
-    (* max_fanout = 5 *)
+    (* max_fanout = 30 *)
     wire            fwd_rs2_hit_ex_o;
-    (* max_fanout = 5 *)
+    (* max_fanout = 20 *)
     wire [31:0]     fwd_rs1_data_o;
-    (* max_fanout = 5 *)
+    (* max_fanout = 20 *)
     wire [31:0]     fwd_rs2_data_o;
-    (* max_fanout = 5 *)
     wire [31:0]     fwd_ex_rd_data_o;
 
     // ============================================================
@@ -311,7 +311,6 @@ module top_riscv(
     // ============================================================
     if1 IF1(
         .pc_i               (pc_pc_addr_o),
-        .pred_flush_r       (pred_flush_r),
 
         .pc_o               (if1_pc_o)
     );
@@ -628,14 +627,19 @@ module top_riscv(
         .ex_rd_data_i       (ex_rd_data_o),
 
         // from mem1
-        .mem1_rd_addr_i      (mem1_rd_addr_o),
-        .mem1_rd_data_i      (mem1_rd_data_o),
-        .mem1_regs_wen_i     (mem1_regs_wen_o),
+        .mem1_rd_addr_i     (mem1_rd_addr_o),
+        .mem1_rd_data_i     (mem1_rd_data_o),
+        .mem1_regs_wen_i    (mem1_regs_wen_o),
 
         // from mem2
-        .mem2_rd_addr_i      (mem2_rd_addr_o),
-        .mem2_rd_data_i      (mem2_rd_data_o),
-        .mem2_regs_wen_i     (mem2_regs_wen_o),
+        .mem2_rd_addr_i     (mem2_rd_addr_o),
+        .mem2_rd_data_i     (mem2_rd_data_o),
+        .mem2_regs_wen_i    (mem2_regs_wen_o),
+
+        // from wb
+        .wb_rd_addr_i       (wb_rd_addr_o),
+        .wb_rd_data_i       (wb_rd_data_o),
+        .wb_regs_wen_i      (wb_regs_wen_o),
 
         // to ex
         .forwarding_rs1_data_o      (fwd_rs1_data_o),
