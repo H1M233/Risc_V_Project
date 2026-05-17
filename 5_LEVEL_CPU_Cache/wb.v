@@ -14,6 +14,8 @@ module wb(
     output reg [4:0]    rd_addr_o,
     output reg [31:0]   rd_data_o,
     output reg          regs_wen_o,
+
+    // to pc
     output reg          ecall_o,
     output reg          mret_o,
     // from dcache
