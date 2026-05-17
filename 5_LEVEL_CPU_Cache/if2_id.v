@@ -12,6 +12,9 @@ module if2_id(
     input      [31:0]   pc_i,
 
     input               pred_taken,
+    // from wb
+    input               ecall_flush,
+    input               mret_flush,
 
     // to id
     output reg [31:0]   inst_o,
@@ -20,6 +23,10 @@ module if2_id(
 );
     always @(posedge clk) begin
         if (!rst) begin
+            pc_o    <= 32'b0;
+            inst_o  <= `NOP;
+        end
+        else if (ecall_flush | mret_flush) begin
             pc_o    <= 32'b0;
             inst_o  <= `NOP;
         end

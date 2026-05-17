@@ -10,6 +10,8 @@ module mem(
     input      [31:0]   rd_data_i,
     input               regs_wen,
     input               mem_req_load_i,
+    input               ecall_i,
+    input               mret_i,
     
     // to hazard & wb
     output              mem1_is_load_o,
@@ -23,7 +25,9 @@ module mem(
     // to mem_wb & forwarding
     output reg [4:0]    mem2_rd_addr_o,
     output reg [31:0]   mem2_rd_data_o,
-    output reg          mem2_regs_wen_o
+    output reg          mem2_regs_wen_o,
+    output              ecall_o,
+    output              mret_o
 );  
     reg        mem1_req_load_o;
     reg [4:0]  mem1_rd_addr_oo;
@@ -71,4 +75,6 @@ module mem(
         mem2_regs_wen_o      = mem2_regs_wen_i;
         mem2_is_load_o       = mem2_req_load_i;
     end
+    assign ecall_o = ecall_i;
+    assign mret_o  = mret_i;
 endmodule

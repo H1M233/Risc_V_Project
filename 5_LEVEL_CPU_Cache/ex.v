@@ -19,6 +19,8 @@ module ex(
     (* max_fanout = 20 *)
     input                       valid_i,
     input                       pred_flush_r,
+    input                       ecall_i,
+    input                       mret_i,
 
     // from fowarding - fanout set
     input      [31:0]   fwd_rs1_data_i,
@@ -29,8 +31,14 @@ module ex(
     input               fwd_rs2_hit_ex_i,
     input      [31:0]   fwd_ex_rd_data_i,
 
+    //from csr_regs
+    input      [31:0]   csr_rdata,
+
+
     // to ex_mem
     output reg          regs_wen_o,
+    output              ecall_o,
+    output              mret_o,
     // output reg [4:0]    load_packaged_o,
 
     // to ex_mem & hazard   
@@ -61,7 +69,12 @@ module ex(
     output reg [31:0]   dcache_addr,
     output reg [3:0]    dcache_addr_offset,
     output reg [31:0]   dcache_wdata,
-    output reg          dcache_is_signed
+    output reg          dcache_is_signed,
+
+    //to csr_regs
+    output reg          csr_wen_o,
+    //output reg [31:0]   csr_addr_o,
+    output reg [31:0]   csr_wdata_o
 );
     // 主操作码独热
     (* max_fanout = 20 *) wire is_alu_i  = inst_packaged_i[`OP_I];
@@ -73,6 +86,7 @@ module ex(
     (* max_fanout = 20 *) wire is_branch = inst_packaged_i[`OP_BRANCH] & ~pred_flush_r;
     (* max_fanout = 20 *) wire is_load   = inst_packaged_i[`OP_LOAD] & ~pred_flush_r;
     (* max_fanout = 20 *) wire is_store  = inst_packaged_i[`OP_STORE] & ~pred_flush_r;
+    (* max_fanout = 20 *) wire is_zicsr  = inst_packaged_i[`OP_Zicsr] & ~pred_flush_r;
 
     // IR-type
     (* max_fanout = 20 *) wire sel_add   = inst_packaged_i[`INST_IR_ADD];
@@ -97,12 +111,22 @@ module ex(
     (* max_fanout = 20 *) wire sel_sw    = inst_packaged_i[`INST_SW];
 
     // Branch
-    (* max_fanout = 20 *) wire sel_beq  = inst_packaged_i[`INST_BEQ];
-    (* max_fanout = 20 *) wire sel_bne  = inst_packaged_i[`INST_BNE];
-    (* max_fanout = 20 *) wire sel_blt  = inst_packaged_i[`INST_BLT];
-    (* max_fanout = 20 *) wire sel_bge  = inst_packaged_i[`INST_BGE];
-    (* max_fanout = 20 *) wire sel_bltu = inst_packaged_i[`INST_BLTU];
-    (* max_fanout = 20 *) wire sel_bgeu = inst_packaged_i[`INST_BGEU];
+    (* max_fanout = 20 *) wire sel_beq   = inst_packaged_i[`INST_BEQ];
+    (* max_fanout = 20 *) wire sel_bne   = inst_packaged_i[`INST_BNE];
+    (* max_fanout = 20 *) wire sel_blt   = inst_packaged_i[`INST_BLT];
+    (* max_fanout = 20 *) wire sel_bge   = inst_packaged_i[`INST_BGE];
+    (* max_fanout = 20 *) wire sel_bltu  = inst_packaged_i[`INST_BLTU];
+    (* max_fanout = 20 *) wire sel_bgeu  = inst_packaged_i[`INST_BGEU];
+    
+    // CSR
+    (* max_fanout = 20 *) wire sel_csrrw  = inst_packaged_i[`INST_CSRRW];
+    (* max_fanout = 20 *) wire sel_csrrs  = inst_packaged_i[`INST_CSRRS];
+    (* max_fanout = 20 *) wire sel_csrrc  = inst_packaged_i[`INST_CSRRC];
+    (* max_fanout = 20 *) wire sel_csrrwi = inst_packaged_i[`INST_CSRRWI];
+    (* max_fanout = 20 *) wire sel_csrrsi = inst_packaged_i[`INST_CSRRSI];
+    (* max_fanout = 20 *) wire sel_csrrci = inst_packaged_i[`INST_CSRRCI];
+    (* max_fanout = 20 *) wire sel_ecall  = inst_packaged_i[`INST_ECALL];
+    (* max_fanout = 20 *) wire sel_mret   = inst_packaged_i[`INST_MRET];
 
     // 纯数值计算独热
     (* max_fanout = 20 *) wire request_value_only = inst_packaged_i[`REQUEST_VALUE_ONLY];
@@ -124,6 +148,12 @@ module ex(
     wire [31:0] sll_res     = value1_eff << shamt;
     wire [31:0] srl_res     = value1_eff >> shamt;
     wire [31:0] sra_res     = $signed(value1_eff) >>> shamt;
+
+    //csr 计算
+    wire [31:0] csr_value1  = (inst_i[14]) ? value1_i : value1_eff; // CSR 写数据选择
+    wire [31:0] rw_res      = csr_value1; // 读写结果，写入 CSR 的值或原 CSR 值
+    wire [31:0] rs_res      = csr_rdata | csr_value1; // 读-置位结果
+    wire [31:0] rc_res      = csr_rdata & ~csr_value1; // 读-清零结果 
 
     `ifndef ALU_USE_FAST_COMPARATOR
         wire ltu_res = value1_eff < value2_eff;
@@ -269,4 +299,24 @@ module ex(
         // load_packaged_o[`IS_LBU]  = sel_lbu;
         // load_packaged_o[`IS_LHU]  = sel_lhu;
     end
+
+    // CSR 控制
+    always @(*) begin: ALU_CSR_CTRL
+        csr_wen_o = valid_i & ~pred_flush_r & is_zicsr; // CSR 写使能
+        csr_wdata_o = (sel_csrrw)  ? rw_res :
+                      (sel_csrrs)  ? rs_res :
+                      (sel_csrrc)  ? rc_res :
+                      (sel_csrrwi) ? rw_res :
+                      (sel_csrrsi) ? rs_res :
+                      (sel_csrrci) ? rc_res :
+                                      32'b0;               // CSR 写数据
+        // csr_addr_o = value2_i;   // CSR 地址来自立即数
+        regs_wen_o = valid_i & ~pred_flush_r & is_zicsr & regs_wen_i; // regs 写使能，CSR 指令需要写回寄存器
+        rd_addr_o  = rd_addr_i;   // rd 地址来自指令
+        rd_data_o  = csr_rdata;   // rd 数据来自 CSR
+    end 
+    
+    assign ecall_o = ecall_i;
+    assign mret_o  = mret_i;
 endmodule
+    

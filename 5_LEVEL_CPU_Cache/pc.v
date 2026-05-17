@@ -14,6 +14,13 @@ module pc(
     input               pred_flush_r,
     input      [31:0]   pred_flush_pc,
 
+    // from wb
+    input               wb_ecall,
+    input               wb_mret,
+
+    // from csr_regs
+    input      [31:0]   ecall_mret_addr,
+
     // to if
     (* max_fanout = 30 *)
     output reg [31:0]   pc_addr_o,
@@ -25,6 +32,12 @@ module pc(
     always @(posedge clk) begin
         if(!rst) begin
             pc_addr_o <= 32'h8000_0000;
+        end
+        else if(wb_ecall) begin
+            pc_addr_o <= ecall_mret_addr;   // ecall 处理，跳转到 ecall 处理函数
+        end
+        else if(wb_mret) begin
+            pc_addr_o <= ecall_mret_addr;   // mret 处理，跳转到 mret 处理函数
         end
         else if(pred_flush_r) begin
             pc_addr_o <= pred_flush_pc;

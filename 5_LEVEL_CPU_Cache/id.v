@@ -33,7 +33,12 @@ module id(
     (* max_fanout = 30 *)
     output reg [4:0]    rs2_addr_o,
     output reg [31:0]   rs1_data_o,
-    output reg [31:0]   rs2_data_o
+    output reg [31:0]   rs2_data_o,
+
+    //ecall, mret
+    output reg          ecall,
+    output reg          mret
+
 );  
     // 提取指令
     wire [31:0] data1       = rs1_data_i;
@@ -55,6 +60,7 @@ module id(
     wire is_branch = (opcode == `TYPE_B);
     wire is_load   = (opcode == `TYPE_L);
     wire is_store  = (opcode == `TYPE_S);
+    wire is_zicsr  = (opcode == `TYPE_Zicsr);
 
     // f3
     wire f3_000 = (funct3 == 3'b000);
@@ -70,6 +76,10 @@ module id(
     wire f7_0000000 = (funct7 == 7'b0000000);
     wire f7_0100000 = (funct7 == 7'b0100000);
 
+    //区分ecall和mret
+    wire is_ecall = (inst_i[31:20] == 12'b000000000000);
+    wire is_mret  = (inst_i[31:20] == 12'b001100000010);
+
     // 打包指令
     always @(*) begin
         // opcode
@@ -82,7 +92,7 @@ module id(
         inst_packaged_o[`OP_BRANCH] = is_branch;
         inst_packaged_o[`OP_LOAD]   = is_load;
         inst_packaged_o[`OP_STORE]  = is_store;
-
+        inst_packaged_o[`OP_ZICSR]  = is_zicsr;
         // IR-type
         inst_packaged_o[`INST_IR_ADD]  = (is_alu_r & f3_000 & f7_0000000) | (is_alu_i & f3_000);
         inst_packaged_o[`INST_R_SUB]   = is_alu_r & f3_000 & f7_0100000;
@@ -113,6 +123,16 @@ module id(
         inst_packaged_o[`INST_BLTU] = is_branch & f3_110;
         inst_packaged_o[`INST_BGEU] = is_branch & f3_111;
 
+        // CSR
+        inst_packaged_o[`INST_CSRRW]  = is_zicsr & f3_001;
+        inst_packaged_o[`INST_CSRRS]  = is_zicsr & f3_010;
+        inst_packaged_o[`INST_CSRRC]  = is_zicsr & f3_011;
+        inst_packaged_o[`INST_CSRRWI] = is_zicsr & f3_101;
+        inst_packaged_o[`INST_CSRRSI] = is_zicsr & f3_110;
+        inst_packaged_o[`INST_CSRRCI] = is_zicsr & f3_111;
+        inst_packaged_o[`INST_ECALL]  = is_zicsr & f3_000 & is_ecall;
+        inst_packaged_o[`INST_MRET]   = is_zicsr & f3_000 & is_mret;
+
         // 纯数值计算独热
         inst_packaged_o[`REQUEST_VALUE_ONLY] = is_auipc | is_lui | is_jal | is_jalr;
     end
@@ -132,6 +152,8 @@ module id(
         rd_addr_o       = 5'b0;
         pred_taken_o    = pred_taken_i;
         pred_pc_o       = pred_pc_i;
+        ecall            = 1'b0;
+        mret             = 1'b0;
 
         case(opcode)
             `LUI: begin
@@ -216,6 +238,37 @@ module id(
                 rs1_addr_o  = rs1_o;
                 rs2_addr_o  = rs2_o;
                 rd_addr_o   = rd_o;
+            end
+
+            `TYPE_Zicsr: begin
+                case(funct3)
+                    `CSRRW,`CSRRS,`CSRRC: begin
+                        reg_wen     = 1'b1;
+                        value1_o    = data1;
+                        value2_o    = {{20{inst_i[31]}}, inst_i[31:20]};
+                        rs1_addr_o  = rs1_o;
+                        rs2_addr_o  = 5'b0;
+                        rd_addr_o   = rd_o;
+                    end
+                    `CSRRWI,`CSRRSI,`CSRRCI: begin
+                        reg_wen     = 1'b1;
+                        value1_o    = inst_i[19:15]; // zicsr立即数在rs1地址位
+                        value2_o    = {{20{inst_i[31]}}, inst_i[31:20]};
+                        rs1_addr_o  = rs1_o;
+                        rs2_addr_o  = 5'b0;
+                        rd_addr_o   = rd_o;
+                    end
+                    `INST_ECALL, `INST_MRET: begin
+                        reg_wen     = 1'b0; // ecall和mret不写寄存器
+                        value1_o    = 32'b0;
+                        value2_o    = 32'b0;
+                        rs1_addr_o  = 5'b0;
+                        rs2_addr_o  = 5'b0;
+                        rd_addr_o   = 5'b0;
+                        ecall       = (is_ecall) ? 1'b1 : 1'b0; // ecall信号
+                        mret        = (is_mret)  ? 1'b1 : 1'b0; // mret信号
+                    end
+                endcase
             end
 
             default: begin
