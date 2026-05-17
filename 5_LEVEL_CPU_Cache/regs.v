@@ -23,27 +23,8 @@ module regs(
 
     // 读寄存器
     always@(*) begin
-        if(!rst) begin
-            rs1_data_o  = 32'b0;
-        end 
-        else if((rs1_addr_i == rd_addr_i) && regs_wen && (rd_addr_i != 0)) begin
-            rs1_data_o  = rd_data_i;    // 数据转发，解决数据冒险
-        end
-        else begin
-            rs1_data_o  = regs[rs1_addr_i];
-        end
-    end
-
-    always@(*) begin
-        if(!rst) begin
-            rs2_data_o  = 32'b0;
-        end 
-        else if((rs2_addr_i == rd_addr_i) && regs_wen && (rd_addr_i != 0)) begin
-            rs2_data_o  = rd_data_i;    // 数据转发，解决数据冒险
-        end
-        else begin
-            rs2_data_o  = regs[rs2_addr_i];
-        end
+        rs1_data_o  = regs[rs1_addr_i];
+        rs2_data_o  = regs[rs2_addr_i];
     end
 
     integer i;
@@ -54,8 +35,8 @@ module regs(
         end
     end
     always @(posedge clk) begin
-        if (rst && regs_wen && (rd_addr_i != 0))  begin
-            regs[rd_addr_i] <= rd_data_i;       // 写入数据到指定寄存器，x0寄存器不可写
+        if (rst && regs_wen)  begin
+            regs[rd_addr_i] <= rd_data_i;
         end
     end
 endmodule

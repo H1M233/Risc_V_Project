@@ -5,6 +5,7 @@ module if2_id(
     input               rst,
 
     // from hazard
+    (* max_fanout = 30 *)
     input               pipe_hold,
 
     // from if
@@ -17,6 +18,7 @@ module if2_id(
     input               mret_flush,
 
     // to id
+    (* max_fanout = 30 *)
     output reg [31:0]   inst_o,
     output reg [31:0]   pc_o
 

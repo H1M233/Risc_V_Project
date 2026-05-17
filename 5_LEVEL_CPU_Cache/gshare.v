@@ -6,6 +6,7 @@ module gshare #(
 ) (
     input                           clk,
     input                           rst,
+    (* max_fanout = 20 *)
     input                           pipe_hold,
     
     // 查询

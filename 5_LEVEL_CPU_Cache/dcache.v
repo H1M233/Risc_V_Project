@@ -225,7 +225,6 @@ module dcache#(
         reg [2:0] mask_r, mask_r2, mask_r3;
         reg [3:0] addr_offset_r, addr_offset_r2, addr_offset_r3;
         reg is_signed_r, is_signed_r2, is_signed_r3;
-        reg cpu_req_load_r, cpu_req_store_r;
         reg [31:0] cpu_waddr_r, cpu_wdata_r;
         always @(posedge clk) begin
             mask_r          <= cpu_mask;
@@ -237,8 +236,6 @@ module dcache#(
             is_signed_r     <= cpu_is_signed;
             is_signed_r2    <= is_signed_r;
             is_signed_r3    <= is_signed_r2;
-            cpu_req_load_r  <= cpu_req_load;
-            cpu_req_store_r <= cpu_req_store;
             cpu_waddr_r     <= cpu_addr;
             cpu_wdata_r     <= cpu_wdata;
 
@@ -260,25 +257,14 @@ module dcache#(
         input [2:0] mask;
         input [3:0] addr_offset;
         begin 
-            toWe = 4'b0000;
-            (* parallel_case, full_case *)
-            case (1'b1)
-                mask[0]: 
-                    (* parallel_case, full_case *)
-                    case (1'b1)
-                        addr_offset[0]: toWe = 4'b0001;
-                        addr_offset[1]: toWe = 4'b0010;
-                        addr_offset[2]: toWe = 4'b0100;
-                        addr_offset[3]: toWe = 4'b1000;
-                    endcase
-                mask[1]: 
-                    (* parallel_case, full_case *)
-                    case (1'b1)
-                        addr_offset[0]: toWe = 4'b0011;
-                        addr_offset[2]: toWe = 4'b1100;
-                    endcase
-                mask[2]: toWe = 4'b1111;
-            endcase
+            toWe =  ({4{mask[0] & addr_offset[0]}} & 4'b0001) |
+                    ({4{mask[0] & addr_offset[1]}} & 4'b0010) |
+                    ({4{mask[0] & addr_offset[2]}} & 4'b0100) |
+                    ({4{mask[0] & addr_offset[3]}} & 4'b1000) |
+                    ({4{mask[1] & addr_offset[0]}} & 4'b0011) |
+                    ({4{mask[1] & addr_offset[2]}} & 4'b1100) |
+                    ({4{mask[2] & addr_offset[0]}} & 4'b1111) |
+                    4'b0;
         end
     endfunction
 
@@ -288,25 +274,14 @@ module dcache#(
         input [3:0]  addr_offset;
         input        is_signed;
         begin 
-            load_shift = 32'b0;
-            (* parallel_case, full_case *)
-            case (1'b1)
-                mask[0]: 
-                    (* parallel_case, full_case *)
-                    case (1'b1)
-                        addr_offset[0]: load_shift = {{24{word[7] & is_signed}}, word[7:0]};
-                        addr_offset[1]: load_shift = {{24{word[15] & is_signed}}, word[15:8]};
-                        addr_offset[2]: load_shift = {{24{word[23] & is_signed}}, word[23:16]};
-                        addr_offset[3]: load_shift = {{24{word[31] & is_signed}}, word[31:24]};
-                    endcase
-                mask[1]: 
-                    (* parallel_case, full_case *) 
-                    case (1'b1)
-                        addr_offset[0]: load_shift = {{16{word[15] & is_signed}}, word[15:0]};
-                        addr_offset[2]: load_shift = {{16{word[31] & is_signed}}, word[31:16]};
-                    endcase
-                mask[2]: load_shift = word;
-            endcase
+            load_shift =    ({32{mask[0] & addr_offset[0]}} & {{24{word[7] & is_signed}}, word[7:0]}) |
+                            ({32{mask[0] & addr_offset[1]}} & {{24{word[15] & is_signed}}, word[15:8]}) |
+                            ({32{mask[0] & addr_offset[2]}} & {{24{word[23] & is_signed}}, word[23:16]}) |
+                            ({32{mask[0] & addr_offset[3]}} & {{24{word[31] & is_signed}}, word[31:24]}) |
+                            ({32{mask[1] & addr_offset[0]}} & {{16{word[15] & is_signed}}, word[15:0]}) |
+                            ({32{mask[1] & addr_offset[2]}} & {{16{word[31] & is_signed}}, word[31:16]}) |
+                            ({32{mask[2] & addr_offset[0]}} & word) |
+                            32'b0;
         end
     endfunction
 
@@ -315,23 +290,14 @@ module dcache#(
         input [2:0]  mask;
         input [3:0]  addr_offset;
         begin 
-            store_merge = 32'b0;
-            (* parallel_case, full_case *)
-            case (1'b1)
-                mask[0]: (* parallel_case, full_case *)
-                    case (1'b1)
-                        addr_offset[0]: store_merge = {24'b0, word[7:0]};
-                        addr_offset[1]: store_merge = {16'b0, word[7:0], 8'b0};
-                        addr_offset[2]: store_merge = {8'b0, word[7:0], 16'b0};
-                        addr_offset[3]: store_merge = {word[7:0], 24'b0};
-                    endcase
-                mask[1]: (* parallel_case, full_case *)
-                    case (1'b1)
-                        addr_offset[0]: store_merge = {16'b0, word[15:0]};
-                        addr_offset[2]: store_merge = {word[15:0], 16'b0};
-                    endcase
-                mask[2]: store_merge = word;
-            endcase
+            store_merge =   ({32{mask[0] & addr_offset[0]}} & {24'b0, word[7:0]}) |
+                            ({32{mask[0] & addr_offset[1]}} & {16'b0, word[7:0], 8'b0}) |
+                            ({32{mask[0] & addr_offset[2]}} & {8'b0, word[7:0], 16'b0}) |
+                            ({32{mask[0] & addr_offset[3]}} & {word[7:0], 24'b0}) |
+                            ({32{mask[1] & addr_offset[0]}} & {16'b0, word[15:0]}) |
+                            ({32{mask[1] & addr_offset[2]}} & {word[15:0], 16'b0}) |
+                            ({32{mask[2] & addr_offset[0]}} & word) |
+                            32'b0;
         end
     endfunction
 endmodule

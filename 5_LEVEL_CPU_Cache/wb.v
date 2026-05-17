@@ -10,7 +10,7 @@ module wb(
     input               ecall_i,
     input               mret_i,
 
-    // to wb_regs
+    // to regs
     output reg [4:0]    rd_addr_o,
     output reg [31:0]   rd_data_o,
     output reg          regs_wen_o,

@@ -1,6 +1,7 @@
 // `define ENABLE_ICACHE
 // `define ENABLE_DCACHE
 `define ALU_USE_FAST_COMPARATOR
+// `define USE_CASE
 
 
 `define DRAM_READ_DELAY 2
