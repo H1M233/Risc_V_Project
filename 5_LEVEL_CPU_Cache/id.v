@@ -56,7 +56,12 @@ module id(
     output reg [31:0]   fwd_rs1_data_o,
     output reg [31:0]   fwd_rs2_data_o,
     output reg          fwd_rs1_hit_ex_o,
-    output reg          fwd_rs2_hit_ex_o
+    output reg          fwd_rs2_hit_ex_o,
+
+    //ecall, mret
+    output reg          ecall,
+    output reg          mret
+
 );  
     
     // 提取指令
@@ -88,29 +93,34 @@ module id(
                                             rs2_data_i;
 
     // opcode
-    wire is_alu_i  = (opcode == `TYPE_I);
-    wire is_alu_r  = (opcode == `TYPE_R);
-    wire is_auipc  = (opcode == `AUIPC);
-    wire is_lui    = (opcode == `LUI);
-    wire is_jal    = (opcode == `JAL);
-    wire is_jalr   = (opcode == `JALR);
-    wire is_branch = (opcode == `TYPE_B);
-    wire is_load   = (opcode == `TYPE_L);
-    wire is_store  = (opcode == `TYPE_S);
+    (* max_fanout = 30 *) wire is_alu_i  = (opcode == `TYPE_I);
+    (* max_fanout = 30 *) wire is_alu_r  = (opcode == `TYPE_R);
+    (* max_fanout = 30 *) wire is_auipc  = (opcode == `AUIPC);
+    (* max_fanout = 30 *) wire is_lui    = (opcode == `LUI);
+    (* max_fanout = 30 *) wire is_jal    = (opcode == `JAL);
+    (* max_fanout = 30 *) wire is_jalr   = (opcode == `JALR);
+    (* max_fanout = 30 *) wire is_branch = (opcode == `TYPE_B);
+    (* max_fanout = 30 *) wire is_load   = (opcode == `TYPE_L);
+    (* max_fanout = 30 *) wire is_store  = (opcode == `TYPE_S);
+    (* max_fanout = 30 *) wire is_zicsr  = (opcode == `TYPE_Zicsr);
 
     // f3
-    wire f3_000 = (funct3 == 3'b000);
-    wire f3_001 = (funct3 == 3'b001);
-    wire f3_010 = (funct3 == 3'b010);
-    wire f3_011 = (funct3 == 3'b011);
-    wire f3_100 = (funct3 == 3'b100);
-    wire f3_101 = (funct3 == 3'b101);
-    wire f3_110 = (funct3 == 3'b110);
-    wire f3_111 = (funct3 == 3'b111);
+    (* max_fanout = 30 *) wire f3_000 = (funct3 == 3'b000);
+    (* max_fanout = 30 *) wire f3_001 = (funct3 == 3'b001);
+    (* max_fanout = 30 *) wire f3_010 = (funct3 == 3'b010);
+    (* max_fanout = 30 *) wire f3_011 = (funct3 == 3'b011);
+    (* max_fanout = 30 *) wire f3_100 = (funct3 == 3'b100);
+    (* max_fanout = 30 *) wire f3_101 = (funct3 == 3'b101);
+    (* max_fanout = 30 *) wire f3_110 = (funct3 == 3'b110);
+    (* max_fanout = 30 *) wire f3_111 = (funct3 == 3'b111);
 
     // f7
-    wire f7_0000000 = (funct7 == 7'b0000000);
-    wire f7_0100000 = (funct7 == 7'b0100000);
+    (* max_fanout = 30 *) wire f7_0000000 = (funct7 == 7'b0000000);
+    (* max_fanout = 30 *) wire f7_0100000 = (funct7 == 7'b0100000);
+
+    //区分ecall和mret
+    (* max_fanout = 30 *) wire is_ecall = (inst_i[31:20] == 12'b000000000000);
+    (* max_fanout = 30 *) wire is_mret  = (inst_i[31:20] == 12'b001100000010);
 
     // 打包指令
     always @(*) begin
@@ -124,6 +134,7 @@ module id(
         inst_packaged_o[`OP_BRANCH] = is_branch;
         inst_packaged_o[`OP_LOAD]   = is_load;
         inst_packaged_o[`OP_STORE]  = is_store;
+        inst_packaged_o[`OP_ZICSR]  = is_zicsr;
 
         // IR-type
         inst_packaged_o[`INST_IR_ADD]  = (is_alu_r & f3_000 & f7_0000000) | (is_alu_i & f3_000);
@@ -155,6 +166,16 @@ module id(
         inst_packaged_o[`INST_BLTU] = is_branch & f3_110;
         inst_packaged_o[`INST_BGEU] = is_branch & f3_111;
 
+        // CSR
+        inst_packaged_o[`INST_CSRRW]  = is_zicsr & f3_001;
+        inst_packaged_o[`INST_CSRRS]  = is_zicsr & f3_010;
+        inst_packaged_o[`INST_CSRRC]  = is_zicsr & f3_011;
+        inst_packaged_o[`INST_CSRRWI] = is_zicsr & f3_101;
+        inst_packaged_o[`INST_CSRRSI] = is_zicsr & f3_110;
+        inst_packaged_o[`INST_CSRRCI] = is_zicsr & f3_111;
+        inst_packaged_o[`INST_ECALL]  = is_zicsr & f3_000 & is_ecall;
+        inst_packaged_o[`INST_MRET]   = is_zicsr & f3_000 & is_mret;
+
         // 纯数值计算独热
         inst_packaged_o[`REQUEST_VALUE_ONLY] = is_auipc | is_lui | is_jal | is_jalr;
     end
@@ -177,6 +198,8 @@ module id(
         fwd_rs2_data_o   = (is_alu_i) ? {{20{inst_i[31]}}, inst_i[31:20]} : forwarding_rs2_data_hit;
         fwd_rs1_hit_ex_o = forwarding_rs1_ex;
         fwd_rs2_hit_ex_o = forwarding_rs2_ex & !is_alu_i;
+        ecall            = 1'b0;
+        mret             = 1'b0;
 
         (* parallel_case *)
         case(1'b1)
@@ -277,6 +300,37 @@ module id(
                 rs1_addr_o  = rs1_o;
                 rs2_addr_o  = rs2_o;
                 rd_addr_o   = rd_o;
+            end
+
+            is_zicsr: begin
+                case(funct3)
+                    `CSRRW,`CSRRS,`CSRRC: begin
+                        reg_wen     = 1'b1;
+                        value1_o    = 32'b0;
+                        value2_o    = {{20{inst_i[31]}}, inst_i[31:20]};
+                        rs1_addr_o  = rs1_o;
+                        rs2_addr_o  = 5'b0;
+                        rd_addr_o   = rd_o;
+                    end
+                    `CSRRWI,`CSRRSI,`CSRRCI: begin
+                        reg_wen     = 1'b1;
+                        value1_o    = inst_i[19:15]; // zicsr立即数在rs1地址位
+                        value2_o    = {{20{inst_i[31]}}, inst_i[31:20]};
+                        rs1_addr_o  = rs1_o;
+                        rs2_addr_o  = 5'b0;
+                        rd_addr_o   = rd_o;
+                    end
+                    `INST_ECALL, `INST_MRET: begin
+                        reg_wen     = 1'b0; // ecall和mret不写寄存器
+                        value1_o    = 32'b0;
+                        value2_o    = 32'b0;
+                        rs1_addr_o  = 5'b0;
+                        rs2_addr_o  = 5'b0;
+                        rd_addr_o   = 5'b0;
+                        ecall       = (is_ecall) ? 1'b1 : 1'b0; // ecall信号
+                        mret        = (is_mret)  ? 1'b1 : 1'b0; // mret信号
+                    end
+                endcase
             end
 
             default: begin

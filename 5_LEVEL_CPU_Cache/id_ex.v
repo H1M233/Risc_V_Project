@@ -7,6 +7,7 @@ module id_ex(
 
     input               pred_flush,
     input               hazard_en,
+    input               dcache_stall,
 
     // from id
     input      [31:0]   pc_addr_i,
@@ -27,6 +28,12 @@ module id_ex(
     input      [31:0]   fwd_rs2_data_i,
     input               fwd_rs1_hit_ex_i,
     input               fwd_rs2_hit_ex_i,
+    //ecall
+    input               ecall_i,
+    input               mret_i,
+    //form wb
+    input               ecall_flush,
+    input               mret_flush,
 
     // to ex
     output reg [31:0]   pc_addr_o,
@@ -46,7 +53,10 @@ module id_ex(
     output reg [31:0]   fwd_rs1_data_o,
     output reg [31:0]   fwd_rs2_data_o,
     output reg          fwd_rs1_hit_ex_o,
-    output reg          fwd_rs2_hit_ex_o
+    output reg          fwd_rs2_hit_ex_o,
+
+    output reg          ecall_o,
+    output reg          mret_o
 );
     wire flush_id_ex = pred_flush | hazard_en;
     always @(posedge clk) begin
@@ -68,8 +78,31 @@ module id_ex(
             fwd_rs2_data_o      <= 32'b0;
             fwd_rs1_hit_ex_o    <= 1'b0;
             fwd_rs2_hit_ex_o    <= 1'b0;
+            ecall_o             <= 1'b0;
+            mret_o              <= 1'b0;
         end
-        else begin
+        else if(ecall_flush | mret_flush) begin
+            pc_addr_o           <= 32'b0;
+            regs_wen_o          <= 1'b0;
+            inst_o              <= `NOP;
+            value1_o            <= 32'b0;
+            value2_o            <= 32'b0;
+            jump1_o             <= 32'b0;
+            jump2_o             <= 32'b0;
+            rd_addr_o           <= 5'b0;
+            rs1_addr_o          <= 5'b0;
+            rs2_addr_o          <= 5'b0;
+            pred_taken_o        <= 1'b0;
+            inst_packaged_o     <= {`OP_INST_NUM{1'b0}};
+            valid_o             <= 1'b0;
+            fwd_rs1_data_o      <= 32'b0;
+            fwd_rs2_data_o      <= 32'b0;
+            fwd_rs1_hit_ex_o    <= 1'b0;
+            fwd_rs2_hit_ex_o    <= 1'b0;
+            ecall_o             <= 1'b0;
+            mret_o              <= 1'b0;
+        end
+        else if (!dcache_stall) begin
             pc_addr_o           <= pc_addr_i;
             regs_wen_o          <= regs_wen_i;
             inst_o              <= inst_i;
@@ -87,6 +120,8 @@ module id_ex(
             fwd_rs2_data_o      <= fwd_rs2_data_i;
             fwd_rs1_hit_ex_o    <= fwd_rs1_hit_ex_i;
             fwd_rs2_hit_ex_o    <= fwd_rs2_hit_ex_i;
+            ecall_o             <= ecall_i;
+            mret_o              <= mret_i;
         end
     end
 endmodule

@@ -11,6 +11,10 @@ module if1_if2(
     // from if1
     input      [31:0]   pc_i,
 
+    // form wb
+    input               ecall_flush,
+    input               mret_flush,
+
     // to if2
     output reg          if2_valid_o,
     output reg [31:0]   pc_o
@@ -18,6 +22,10 @@ module if1_if2(
 
     always @(posedge clk) begin
         if (!rst) begin
+            if2_valid_o <= 1'b0;
+            pc_o        <= 32'h0;
+        end
+        else if(ecall_flush | mret_flush) begin
             if2_valid_o <= 1'b0;
             pc_o        <= 32'h0;
         end

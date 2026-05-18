@@ -156,7 +156,7 @@ module perip_bridge(
         .clk				(clk),
         .dram_addr			(dram_addr),
         .perip_wdata		(perip_wdata),
-        .perip_we 			(dram_we),
+        .perip_we 			(perip_we),
         .perip_rdata		(dram_rdata)
     );
 

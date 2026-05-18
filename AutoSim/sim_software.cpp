@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
     auto step_and_advance = [&](double delta_time_ns) {
         contextp->time(sim_time_ns * 1000);
         top->eval();
-        // tfp->dump(sim_time_ns * 1000);
+        // if (delta_time_ns > 0 && sim_time_ns > 12 * NS2MS) tfp->dump(sim_time_ns * 1000);
         sim_time_ns += delta_time_ns;
     };
     

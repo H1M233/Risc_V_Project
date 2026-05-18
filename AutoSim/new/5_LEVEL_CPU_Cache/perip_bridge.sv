@@ -152,13 +152,11 @@ module perip_bridge(
     // dram rw
     logic [15:0] dram_addr;
     assign dram_addr = perip_addr[17:2];
-    logic [3:0] dram_we;
-    assign dram_we = (perip_addr >= DRAM_ADDR_START && perip_addr < DRAM_ADDR_END) ? perip_we : 32'b0;
     dram_driver dram_driver_inst (
         .clk				(clk),
         .dram_addr			(dram_addr),
         .perip_wdata		(perip_wdata),
-        .perip_we 			(dram_we),
+        .perip_we 			(perip_we),
         .perip_rdata		(dram_rdata)
     );
 

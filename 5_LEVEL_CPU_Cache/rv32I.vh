@@ -47,6 +47,16 @@
 `define OR       3'b110
 `define AND      3'b111
 
+`define TYPE_Zicsr    7'b1110011
+`define CSRRW    3'b001
+`define CSRRS    3'b010
+`define CSRRC    3'b011
+`define CSRRWI   3'b101
+`define CSRRSI   3'b110
+`define CSRRCI   3'b111
+
+`define ECALL_MRET    3'b000
+
 `define NOP      32'h0000_0013      
 
 `endif

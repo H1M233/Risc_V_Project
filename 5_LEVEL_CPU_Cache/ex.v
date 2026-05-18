@@ -20,6 +20,12 @@ module ex(
     input      [`OP_INST_NUM - 1:0]  inst_packaged_i,
     (* max_fanout = 30 *)
     input                       valid_i,
+    input                       ecall_i,
+    input                       mret_i,
+    
+    output reg [1:0]            mem_load_addr_low,
+    output reg [1:0]            mem_load_mask,
+    output reg                  mem_load_is_signed,
 
     // from fowarding - fanout set
     input      [31:0]   fwd_rs1_data_i,
@@ -28,8 +34,14 @@ module ex(
     input               fwd_rs2_hit_ex_i,
     input      [31:0]   fwd_ex_rd_data_i,
 
+    //from csr_regs
+    input      [31:0]   csr_rdata,
+
+
     // to ex_mem
     output reg          regs_wen_o,
+    output              ecall_o,
+    output              mret_o,
     // output reg [4:0]    load_packaged_o,
 
     // to ex_mem & hazard   
@@ -56,13 +68,16 @@ module ex(
     // to dcache
     output reg          dcache_req_load,
     output reg          dcache_req_store,
-    output reg [1:0]    dcache_mask,
     output reg [31:0]   dcache_addr,
-    output reg [1:0]    dcache_addr_low,
     output reg [31:0]   dcache_wdata,
+    output reg          dcache_write_dram,
     output reg [3:0]    dcache_we,
-    output reg          dcache_is_signed,
-    output reg          dcache_write_dram
+
+    //to csr_regs
+    output reg          csr_wen_o,
+    //output reg [31:0]   csr_addr_o,
+    output reg [31:0]   csr_wdata_o,
+    output     [31:0]   ecall_inst
 );
     // 主操作码独热
     wire is_alu_i  = inst_packaged_i[`OP_I];
@@ -74,6 +89,7 @@ module ex(
     wire is_branch = inst_packaged_i[`OP_BRANCH] & ~pred_flush_en & valid_i;
     wire is_load   = inst_packaged_i[`OP_LOAD] & ~pred_flush_en & valid_i;
     wire is_store  = inst_packaged_i[`OP_STORE] & ~pred_flush_en & valid_i;
+    wire is_zicsr  = inst_packaged_i[`OP_ZICSR];
 
     // IR-type
     wire sel_add   = inst_packaged_i[`INST_IR_ADD];
@@ -98,12 +114,22 @@ module ex(
     wire sel_sw    = inst_packaged_i[`INST_SW];
 
     // Branch
-    wire sel_beq  = inst_packaged_i[`INST_BEQ];
-    wire sel_bne  = inst_packaged_i[`INST_BNE];
-    wire sel_blt  = inst_packaged_i[`INST_BLT];
-    wire sel_bge  = inst_packaged_i[`INST_BGE];
-    wire sel_bltu = inst_packaged_i[`INST_BLTU];
-    wire sel_bgeu = inst_packaged_i[`INST_BGEU];
+    wire sel_beq   = inst_packaged_i[`INST_BEQ];
+    wire sel_bne   = inst_packaged_i[`INST_BNE];
+    wire sel_blt   = inst_packaged_i[`INST_BLT];
+    wire sel_bge   = inst_packaged_i[`INST_BGE];
+    wire sel_bltu  = inst_packaged_i[`INST_BLTU];
+    wire sel_bgeu  = inst_packaged_i[`INST_BGEU];
+    
+    // CSR
+    wire sel_csrrw  = inst_packaged_i[`INST_CSRRW];
+    wire sel_csrrs  = inst_packaged_i[`INST_CSRRS];
+    wire sel_csrrc  = inst_packaged_i[`INST_CSRRC];
+    wire sel_csrrwi = inst_packaged_i[`INST_CSRRWI];
+    wire sel_csrrsi = inst_packaged_i[`INST_CSRRSI];
+    wire sel_csrrci = inst_packaged_i[`INST_CSRRCI];
+    wire sel_ecall  = inst_packaged_i[`INST_ECALL];
+    wire sel_mret   = inst_packaged_i[`INST_MRET];
 
     // 纯数值计算独热 - 已提前至 id 计算
     wire request_value_only = inst_packaged_i[`REQUEST_VALUE_ONLY];
@@ -124,6 +150,12 @@ module ex(
     wire [31:0] sll_res  = value1_eff << shamt;
     wire [31:0] srl_res  = value1_eff >> shamt;
     wire [31:0] sra_res  = $signed(value1_eff) >>> shamt;
+
+    //csr 计算
+    wire [31:0] csr_value1  = (inst_i[14]) ? value1_i : value1_eff; // CSR 写数据选择
+    wire [31:0] rw_res      = csr_value1; // 读写结果，写入 CSR 的值或原 CSR 值
+    wire [31:0] rs_res      = csr_rdata | csr_value1; // 读-置位结果
+    wire [31:0] rc_res      = csr_rdata & ~csr_value1; // 读-清零结果 
 
     `ifndef ALU_USE_FAST_COMPARATOR
         wire ltu_res = value1_eff < value2_eff;
@@ -209,8 +241,6 @@ module ex(
         dcache_req_load   <= is_load & regs_wen_i;   // dcache 读使能
         dcache_req_store  <= is_store;               // dcache 写使能
         dcache_addr       <= mem_addr_calc;
-        dcache_is_signed  <= (sel_lb | sel_lh | sel_lw);
-        dcache_addr_low   <= mem_addr_calc_low;
         dcache_write_dram <= perip_write_dram;
 
         (* parallel_case *)
@@ -264,16 +294,6 @@ module ex(
                 dcache_we    <= 4'b0000;
             end
         endcase
-
-        (* parallel_case *)
-        case (1'b1)
-            sel_lb:  dcache_mask <= 2'b01;
-            sel_lh:  dcache_mask <= 2'b10;
-            sel_lw:  dcache_mask <= 2'b11;
-            sel_lbu: dcache_mask <= 2'b01;
-            sel_lhu: dcache_mask <= 2'b10;
-            default: dcache_mask <= 2'b00;
-        endcase
     end
 
     // 读写
@@ -283,6 +303,18 @@ module ex(
         rd_addr_o           = rd_addr_i;
         rd_data_o           = alu_result;
         mem_req_load_o      = is_load & regs_wen_i; // 判断 x0 寄存器提前到 id 阶段，是 x0 直接不用 Load 请求
+        mem_load_is_signed  = (sel_lb | sel_lh | sel_lw);
+        mem_load_addr_low   = mem_addr_calc_low;
+        
+        (* parallel_case *)
+        case (1'b1)
+            sel_lb:  mem_load_mask = 2'b01;
+            sel_lh:  mem_load_mask = 2'b10;
+            sel_lw:  mem_load_mask = 2'b11;
+            sel_lbu: mem_load_mask = 2'b01;
+            sel_lhu: mem_load_mask = 2'b10;
+            default: mem_load_mask = 2'b00;
+        endcase     
     end
 
     // 跳转
@@ -300,4 +332,23 @@ module ex(
                                 ({32{is_jalr}}   & jalr_target);
     end
 
+    // CSR 控制
+    always @(*) begin: ALU_CSR_CTRL
+        csr_wen_o = valid_i & ~pred_flush_en & is_zicsr; // CSR 写使能
+        csr_wdata_o = (sel_csrrw)  ? rw_res :
+                      (sel_csrrs)  ? rs_res :
+                      (sel_csrrc)  ? rc_res :
+                      (sel_csrrwi) ? rw_res :
+                      (sel_csrrsi) ? rs_res :
+                      (sel_csrrci) ? rc_res :
+                                      32'b0;               // CSR 写数据
+        // csr_addr_o = value2_i;   // CSR 地址来自立即数
+        // regs_wen_o = valid_i & ~pred_flush_en & is_zicsr & regs_wen_i; // regs 写使能，CSR 指令需要写回寄存器
+        // rd_addr_o  = rd_addr_i;   // rd 地址来自指令
+        // rd_data_o  = csr_rdata;   // rd 数据来自 CSR
+    end 
+    
+    assign ecall_o = ecall_i;
+    assign mret_o  = mret_i;
+    assign ecall_inst = (ecall_i) ? inst_i : 32'b0; // 传递 ecall 指令给 csr_regs 模块以保存 mepc
 endmodule

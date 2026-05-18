@@ -26,7 +26,7 @@ def bin_to_mem(infile, mem_type):
             datafile.write(chunk[::-1].hex() + '\n')
 
 
-def compile(prj_name, sim_type, enableTrace=False):
+def compile(prj_name, sim_type, enableTrace=True):
     '''编译 rtl 代码并输出到 obj_dir'''
     # 获取目标工程路径
     rtl_dir = AutoSim_dir.parent / prj_name
