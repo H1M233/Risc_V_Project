@@ -12,8 +12,8 @@
         "BPU ACCURACY": "0.916333"
       },
       "src0": {
-        "IPC": "0.791302",
-        "REAL TIME": "445.022",
+        "IPC": "0.791314",
+        "REAL TIME": "434.814",
         "ICACHE HIT": "0.988879",
         "DCACHE HIT": "0.872287",
         "RUN TIME": "8030",

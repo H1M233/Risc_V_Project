@@ -135,7 +135,6 @@ module id(
         inst_packaged_o[`OP_LOAD]   = is_load;
         inst_packaged_o[`OP_STORE]  = is_store;
         inst_packaged_o[`OP_ZICSR]  = is_zicsr;
-
         // IR-type
         inst_packaged_o[`INST_IR_ADD]  = (is_alu_r & f3_000 & f7_0000000) | (is_alu_i & f3_000);
         inst_packaged_o[`INST_R_SUB]   = is_alu_r & f3_000 & f7_0100000;
