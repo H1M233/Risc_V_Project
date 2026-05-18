@@ -1,0 +1,85 @@
+`timescale 1ns / 1ps
+
+module tb_verilator_software(
+    input clk_50MHz,
+    input clk_cpu,
+    input rst,
+
+    output [31:0] seg,
+    output [31:0] commit,
+    output pred_total, pred_miss, pred_total_b, pred_total_jr, pred_miss_b, pred_miss_jr,
+    output [31:0] pc,
+    output reg [31:0] func_block_addr,
+    output [31:0] LED
+);
+    `define VERILATOR_SOFTEWARE_TEST
+    top uut (
+        .w_clk_50Mhz    (clk_50MHz),
+        .cpu_clk        (clk_cpu),
+        .w_clk_rst      (rst),
+        .i_uart_rx      (1'b1),
+        .o_uart_tx      (),
+        .virtual_led    (LED),  
+        .virtual_seg    ()
+    );
+
+    `ifdef PROJECT_5_LEVEL_CPU_CACHE
+        initial begin
+            $readmemh("./mem_init/irom.txt", tb_verilator_software.uut.student_top_inst.Mem_IROM.rom_mem);
+            $readmemh("./mem_init/dram.txt", tb_verilator_software.uut.student_top_inst.bridge_inst.dram_driver_inst.Mem_DRAM.dram_inst.ram_mem);
+        end
+        assign seg = tb_verilator_software.uut.student_top_inst.bridge_inst.seg_driver.s;
+        wire hazard_en = tb_verilator_software.uut.student_top_inst.Core_cpu.hazard_hazard_en;
+        wire ex_valid = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.valid_i;
+        assign commit = ex_valid & tb_verilator_software.uut.student_top_inst.Core_cpu.EX.inst_packaged_i != 0;
+
+        assign pc = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.pc_addr_i;
+        wire ex_is_jal = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.is_jal;
+        wire ex_is_jalr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.is_jalr;
+        wire ex_is_branch = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.is_branch;
+        assign pred_miss = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.update_gshare_en_o | tb_verilator_software.uut.student_top_inst.Core_cpu.EX.update_btb_en_o;
+        assign pred_total = ex_is_jalr | ex_is_branch;
+        assign pred_total_b = ex_is_branch;
+        assign pred_total_jr = ex_is_jalr;
+        assign pred_miss_b = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.update_gshare_en_o;
+        assign pred_miss_jr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.update_btb_en_o;
+
+        always @(posedge clk_cpu) begin
+            if (ex_is_jal)
+                func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.add_res;
+            else if (ex_is_jalr)
+                func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.jalr_target;
+            else if (ex_is_branch & tb_verilator_software.uut.student_top_inst.Core_cpu.EX.branch_taken == 1'b1)
+                func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.branch_jump_addr;
+        end
+
+    `elsif PROJECT_5_LEVEL_CPU_IMPROVED
+        initial begin
+            $readmemh("./mem_init/irom.txt", tb_verilator_software.uut.student_top_inst.Mem_IROM.rom_mem);
+            $readmemh("./mem_init/dram.txt", tb_verilator_software.uut.student_top_inst.bridge_inst.dram_driver_inst.Mem_DRAM.dram_inst.ram_mem);
+        end
+        assign seg = tb_verilator_software.uut.student_top_inst.bridge_inst.seg_driver.s;
+        assign pc = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.pc_addr_i;
+
+        always @(posedge clk_cpu) begin
+            if (tb_verilator_software.uut.student_top_inst.Core_cpu.EX.jump_en)
+                func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.jump_addr_o;
+        end
+
+    `elsif PROJECT_5_LEVEL_CPU_OOO
+        initial begin
+            $readmemh("./mem_init/irom.txt", tb_verilator_software.uut.student_top_inst.Mem_IROM.rom_mem);
+            $readmemh("./mem_init/dram.txt", tb_verilator_software.uut.student_top_inst.bridge_inst.dram_driver_inst.Mem_DRAM.dram_inst.ram_mem);
+        end
+        assign seg = tb_verilator_software.uut.student_top_inst.bridge_inst.seg_driver.s;
+        assign pc = tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.ALU0.pc;
+
+        always @(posedge clk_cpu) begin
+            if (tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.ALU0.need_redirect)
+                func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.ALU0.redirect_pc;
+            else if (tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.ALU0.pred_taken)
+                func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.ALU0.actual_next_pc;
+        end
+
+    `endif
+endmodule

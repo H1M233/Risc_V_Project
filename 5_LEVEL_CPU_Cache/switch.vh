@@ -1,9 +1,12 @@
-// `define ENABLE_ICACHE
-// `define ENABLE_DCACHE
+`define ENABLE_DCACHE
 `define ALU_USE_FAST_COMPARATOR
-// `define USE_CASE
 
 
-`define DRAM_READ_DELAY 2
-`define DRAM_ADDR_START  32'h8010_0000
-`define DRAM_ADDR_END    32'h8013_FFFF
+`define DRAM_READ_DELAY  2
+`ifdef VERILATOR_INST_TEST
+    `define DRAM_ADDR_START  32'h0000_0000
+    `define DRAM_ADDR_END    32'hFFFF_FFFF
+`else
+    `define DRAM_ADDR_START  32'h8010_0000
+    `define DRAM_ADDR_END    32'h8013_FFFF
+`endif

@@ -38,7 +38,7 @@ module bpu_top #(
     input               actual_taken,       // ex阶段判断跳转为真
 
     (* max_fanout = 30 *)
-    input               pred_flush_r,
+    input               pred_flush,
     (* max_fanout = 20 *)
     input               pipe_hold
     
@@ -100,7 +100,7 @@ module bpu_top #(
         .actual_taken               (actual_taken),
 
         .pipe_hold                  (pipe_hold),
-        .pred_flush_en_r            (pred_flush_r),
+        .pred_flush                 (pred_flush),
 
         // Gshare - 查询
         .gshare_pht_index           (gshare_pht_index_i),

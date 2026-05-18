@@ -24,9 +24,9 @@ module ras #(
     reg [31:0] stack_mem [DEPTH - 1:0];
     reg [PTR_WIDTH:0] ptr;
 
-    assign isempty_o    = (ptr == 0);
-    assign isfull_o     = (ptr == DEPTH);
-    assign pop_addr_o   = (ptr != 0) ? stack_mem[ptr - 1] : 32'b0;      // 始终输出栈顶
+    assign isempty_o   = (ptr == 0);
+    assign isfull_o    = (ptr == DEPTH);
+    assign pop_addr_o  = (ptr != 0) ? stack_mem[ptr - 1] : 32'b0;      // 始终输出栈顶
 
     integer i;
     initial begin
@@ -44,15 +44,8 @@ module ras #(
             ptr <= 0;
         end
         else begin
-            // 压栈
-            if(push_en_i && ptr != DEPTH) begin
-                ptr <= ptr + 1'b1;
-            end
-
-            // 出栈
-            if(pop_en_i && ptr != 1'b0) begin
-                ptr <= ptr - 1'b1;
-            end
+            if (push_en_i && ptr != DEPTH) ptr <= ptr + 1'b1;    // 压栈
+            if (pop_en_i && ptr != 1'b0)   ptr <= ptr - 1'b1;    // 出栈
         end
     end
 endmodule

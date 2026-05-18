@@ -34,10 +34,10 @@ def compile(prj_name, sim_type, enableTrace=False):
     sim_cpp = AutoSim_dir / f'sim_{sim_type}.cpp'
     
     source_file = []
+    source_file.append(AutoSim_dir / f'tb_verilator_{sim_type}.v')
     source_file.extend(rtl_dir.glob('*.v'))
     source_file.extend(rtl_dir.glob('*.vh'))
     source_file.extend(new_dir.glob('*.sv'))
-    source_file.append(AutoSim_dir / 'tb_verilator.v')
 
     # Verilator 程序
     verilator_cmd = ['verilator',
@@ -50,7 +50,8 @@ def compile(prj_name, sim_type, enableTrace=False):
                     '-Wno-WIDTHTRUNC',       # 忽略位宽截断警告
                     '-Wno-WIDTHEXPAND',      # 忽略位宽扩展警告
                     '-Wno-CASEINCOMPLETE',   # 忽略case不完全警告
-                    '-Wno-UNOPTFLAT'         # 忽略组合逻辑环警告
+                    '-Wno-UNOPTFLAT',        # 忽略组合逻辑环警告
+                    '-Wno-UNSIGNED'          # 忽略判断逻辑永远为真警告
     ]
 
     if enableTrace:

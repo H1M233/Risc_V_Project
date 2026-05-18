@@ -4,6 +4,8 @@
 module mem(
     input               clk,
     input               rst,
+    input               dcache_ack,
+    input      [31:0]   dcache_rdata_mem,
 
     // from ex_mem
     input      [4:0]    rd_addr_i,
@@ -66,9 +68,9 @@ module mem(
 
     // mem2
     always@(*) begin
-        mem2_rd_addr_o       = mem2_rd_addr_i;
-        mem2_rd_data_o       = mem2_rd_data_i;
-        mem2_regs_wen_o      = mem2_regs_wen_i;
-        mem2_is_load_o       = mem2_req_load_i;
+        mem2_rd_addr_o   = mem2_rd_addr_i;
+        mem2_rd_data_o   = (mem2_req_load_i) ? dcache_rdata_mem : mem2_rd_data_i;
+        mem2_regs_wen_o  = (mem2_req_load_i) ? dcache_ack : mem2_regs_wen_i;
+        mem2_is_load_o   = mem2_req_load_i;
     end
 endmodule

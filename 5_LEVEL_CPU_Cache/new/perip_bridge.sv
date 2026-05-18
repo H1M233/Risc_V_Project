@@ -54,7 +54,7 @@ module perip_bridge(
     logic cnt_enable_cfg;
     
     // delay
-    localparam READ_DELAY = `DRAM_READ_DELAY;
+    localparam READ_DELAY = 2;
     logic [31:0] perip_addr_d [0: READ_DELAY - 1];
     logic        perip_wen_d  [0: READ_DELAY - 1];
 
@@ -150,11 +150,11 @@ module perip_bridge(
     
 
     // dram rw
-    logic [3:0] dram_we;
-    assign dram_we = (perip_addr >= DRAM_ADDR_START && perip_addr < DRAM_ADDR_END) ? perip_we : 32'b0;
+    logic [15:0] dram_addr;
+    assign dram_addr = perip_addr[17:2];
     dram_driver dram_driver_inst (
         .clk				(clk),
-        .perip_addr			(perip_addr[17:0]),
+        .dram_addr			(dram_addr),
         .perip_wdata		(perip_wdata),
         .perip_we 			(dram_we),
         .perip_rdata		(dram_rdata)

@@ -103,18 +103,14 @@ int main(int argc, char** argv) {
             totalCycle += 0.5;
 
             // 在上升沿统计
-            if (top->clk_cpu == 1) {
-                if (top->commit == 1) {
-                    commitCycle++;
-                }
-                if (top->pred_total == 1) {
-                    predTotal++;
-                    if (top->pred_miss == 1) predMiss++;
-                    if (top->pred_total_b) predTotalB++;
-                    if (top->pred_total_jr) predTotalJr++;
-                    if (top->pred_miss_b) predMissB++;
-                    if (top->pred_miss_jr) predMissJr++;
-                }
+            if (top->clk_cpu) {
+                if (top->commit) commitCycle++;
+                if (top->pred_total) predTotal++;
+                if (top->pred_miss) predMiss++;
+                if (top->pred_total_b) predTotalB++;
+                if (top->pred_total_jr) predTotalJr++;
+                if (top->pred_miss_b) predMissB++;
+                if (top->pred_miss_jr) predMissJr++;
             }
         }
         

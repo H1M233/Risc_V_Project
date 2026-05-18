@@ -91,8 +91,10 @@ module counter(
         end else begin
             cnt_gray_cpu_d1 <= cnt_ms_gray;
             cnt_gray_cpu_d2 <= cnt_gray_cpu_d1;
-            perip_rdata     <= gray_to_bin(cnt_gray_cpu_d2);
+            perip_rdata     <= gray_to_bin(cnt_gray_cpu_d2);    // *** unsure if it changes the result ***
         end
     end
+
+    // assign perip_rdata = gray_to_bin(cnt_gray_cpu_d2);
 
 endmodule

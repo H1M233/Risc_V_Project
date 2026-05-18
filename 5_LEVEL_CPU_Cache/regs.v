@@ -19,24 +19,27 @@ module regs(
     (* max_fanout = 30 *)
     output reg [31:0]   rs2_data_o
 );
-    reg [31:0] regs[31:0];              // 32个32位寄存器
+    // 32个32位寄存器
+    reg [31:0] regs_p1[31:0];
+    reg [31:0] regs_p2[31:0];
 
     // 读寄存器
     always@(*) begin
-        rs1_data_o  = regs[rs1_addr_i];
-        rs2_data_o  = regs[rs2_addr_i];
+        rs1_data_o  = regs_p1[rs1_addr_i];
+        rs2_data_o  = regs_p2[rs2_addr_i];
     end
 
     integer i;
-    // 写寄存器
     initial begin
         for (i = 0; i < 32; i = i + 1) begin
-            regs[i] = 32'b0;
+            regs_p1[i] = 32'b0;
+            regs_p2[i] = 32'b0;
         end
     end
     always @(posedge clk) begin
         if (rst && regs_wen)  begin
-            regs[rd_addr_i] <= rd_data_i;
+            regs_p1[rd_addr_i] <= rd_data_i;
+            regs_p2[rd_addr_i] <= rd_data_i;
         end
     end
 endmodule

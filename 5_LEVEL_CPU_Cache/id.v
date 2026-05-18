@@ -3,6 +3,7 @@
 
 module id(
     // from if_id
+    (* max_fanout = 30 *)
     input      [31:0]   inst_i,             // 从if_id模块传来的指令内容
     input      [31:0]   pc_addr_i,          // 从if_id模块传来的指令地址
 
@@ -24,26 +25,67 @@ module id(
     output reg [31:0]   value1_o,           // 传入寄存器1的数据
     output reg [31:0]   value2_o,           // 传入寄存器2的数据
     output reg          pred_taken_o,
-    output reg [31:0]   pred_pc_o,
     output reg [`OP_INST_NUM - 1:0] inst_packaged_o,
 
-    // to regs & hazard & forwarding
+    // to regs & hazard
     (* max_fanout = 30 *)
     output reg [4:0]    rs1_addr_o,
     (* max_fanout = 30 *)
     output reg [4:0]    rs2_addr_o,
-    output reg [31:0]   rs1_data_o,
-    output reg [31:0]   rs2_data_o
+
+    // from ex
+    input               ex_regs_wen_i,
+    input      [4:0]    ex_rd_addr_i,
+
+    // from mem1
+    input               mem1_regs_wen_i,
+    input      [4:0]    mem1_rd_addr_i,
+    input      [31:0]   mem1_rd_data_i,
+
+    // from mem2
+    input               mem2_regs_wen_i,
+    input      [4:0]    mem2_rd_addr_i,
+    input      [31:0]   mem2_rd_data_i,
+
+    // from wb
+    input               wb_regs_wen_i,
+    input      [4:0]    wb_rd_addr_i,
+    input      [31:0]   wb_rd_data_i,
+
+    // to id_ex
+    output reg [31:0]   fwd_rs1_data_o,
+    output reg [31:0]   fwd_rs2_data_o,
+    output reg          fwd_rs1_hit_ex_o,
+    output reg          fwd_rs2_hit_ex_o
 );  
+    
     // 提取指令
-    wire [31:0] data1       = rs1_data_i;
-    wire [31:0] data2       = rs2_data_i;
-    wire [6:0]  opcode      = inst_i[6:0];              // 传入指令opcode
-    wire [2:0]  funct3      = inst_i[14:12];
-    wire [6:0]  funct7      = inst_i[31:25];
-    wire [4:0]  rd_o        = inst_i[11:7];             // 传入指令rd地址
-    wire [4:0]  rs1_o       = inst_i[19:15];            // 传入指令rs1地址
-    wire [4:0]  rs2_o       = inst_i[24:20];            // 传入指令rs2地址
+    (* max_fanout = 30 *) wire [6:0]  opcode  = inst_i[6:0];              // 传入指令opcode
+    (* max_fanout = 30 *) wire [2:0]  funct3  = inst_i[14:12];
+    (* max_fanout = 30 *) wire [6:0]  funct7  = inst_i[31:25];
+    (* max_fanout = 30 *) wire [4:0]  rd_o    = inst_i[11:7];             // 传入指令rd地址
+    (* max_fanout = 30 *) wire [4:0]  rs1_o   = inst_i[19:15];            // 传入指令rs1地址
+    (* max_fanout = 30 *) wire [4:0]  rs2_o   = inst_i[24:20];            // 传入指令rs2地址
+
+    // 前推
+    wire forwarding_rs1_ex   = (rs1_o == ex_rd_addr_i) & ex_regs_wen_i;
+    wire forwarding_rs1_mem1 = (rs1_o == mem1_rd_addr_i) & mem1_regs_wen_i;
+    wire forwarding_rs1_mem2 = (rs1_o == mem2_rd_addr_i) & mem2_regs_wen_i;
+    wire forwarding_rs1_wb   = (rs1_o == wb_rd_addr_i) & wb_regs_wen_i;
+
+    wire forwarding_rs2_ex   = (rs2_o == ex_rd_addr_i) & ex_regs_wen_i & !is_alu_i;
+    wire forwarding_rs2_mem1 = (rs2_o == mem1_rd_addr_i) & mem1_regs_wen_i;
+    wire forwarding_rs2_mem2 = (rs2_o == mem2_rd_addr_i) & mem2_regs_wen_i;
+    wire forwarding_rs2_wb   = (rs2_o == wb_rd_addr_i) & wb_regs_wen_i;
+
+    wire [31:0] forwarding_rs1_data_hit =   (forwarding_rs1_mem1) ? mem1_rd_data_i :
+                                            (forwarding_rs1_mem2) ? mem2_rd_data_i :
+                                            (forwarding_rs1_wb)   ? wb_rd_data_i :
+                                            rs1_data_i;
+    wire [31:0] forwarding_rs2_data_hit =   (forwarding_rs2_mem1) ? mem1_rd_data_i :
+                                            (forwarding_rs2_mem2) ? mem2_rd_data_i :
+                                            (forwarding_rs2_wb)   ? wb_rd_data_i :
+                                            rs2_data_i;
 
     // opcode
     wire is_alu_i  = (opcode == `TYPE_I);
@@ -117,83 +159,121 @@ module id(
         inst_packaged_o[`REQUEST_VALUE_ONLY] = is_auipc | is_lui | is_jal | is_jalr;
     end
 
+    // ==========================================================
+    // reg_wen: 提前判断目标寄存器是否为 x0 寄存器，减少前推判断级数
+    // 
+    // value:   只用于传立即数，不传寄存器值!!!，允许在 id 内提前计算
+    //          默认认为 value1 放入写入 rd 的内容
+    // 
+    // jump:    只用于传入跳转地址，建议在 id 内提前计算
+    //          不够用可以借用
+    // ==========================================================
+    wire [31:0] pc_add_4 = pc_addr_i + 32'd4;
     always@(*) begin
-        pc_addr_o       = pc_addr_i;
-        inst_o          = inst_i;
-        rs1_data_o      = data1;
-        rs2_data_o      = data2;
-        pred_taken_o    = pred_taken_i;
-        pred_pc_o       = pred_pc_i;
+        pc_addr_o        = pc_addr_i;
+        inst_o           = inst_i;
+        pred_taken_o     = pred_taken_i;
+        fwd_rs1_data_o   = forwarding_rs1_data_hit;
+        fwd_rs2_data_o   = (is_alu_i) ? {{20{inst_i[31]}}, inst_i[31:20]} : forwarding_rs2_data_hit;
+        fwd_rs1_hit_ex_o = forwarding_rs1_ex;
+        fwd_rs2_hit_ex_o = forwarding_rs2_ex & !is_alu_i;
 
+        (* parallel_case *)
         case(1'b1)
             is_lui: begin
                 reg_wen     = (rd_o != 5'b0);
                 value1_o    = {inst_i[31:12], 12'b0};
+                value2_o    = 32'b0;
+                jump1_o     = 32'b0;
+                jump2_o     = 32'b0;
+                rs1_addr_o  = 5'b0;
+                rs2_addr_o  = 5'b0;
                 rd_addr_o   = rd_o;
             end
 
             is_auipc: begin
                 reg_wen     = (rd_o != 5'b0);
                 value1_o    = pc_addr_i + {inst_i[31:12], 12'b0};
+                value2_o    = 32'b0;
+                jump1_o     = 32'b0;
+                jump2_o     = 32'b0;
+                rs1_addr_o  = 5'b0;
+                rs2_addr_o  = 5'b0;
                 rd_addr_o   = rd_o;
             end
 
             is_jal: begin
                 reg_wen     = (rd_o != 5'b0);
-                value1_o    = pc_addr_i + 32'd4;                  
-                jump1_o     = pc_addr_i;
+                value1_o    = pc_add_4;
+                value2_o    = 32'b0;                  
+                jump1_o     = 32'b0;
                 jump2_o     = {{12{inst_i[31]}}, inst_i[19:12], inst_i[20], inst_i[30:21], 1'b0};
+                rs1_addr_o  = 5'b0;
+                rs2_addr_o  = 5'b0;
                 rd_addr_o   = rd_o;
             end
 
             is_jalr: begin
                 reg_wen     = (rd_o != 5'b0);
-                value1_o    = pc_addr_i + 32'd4;
-                jump1_o     = data1;
-                jump2_o     = {{20{inst_i[31]}}, inst_i[31:20]};
+                value1_o    = pc_add_4;
+                value2_o    = {{20{inst_i[31]}}, inst_i[31:20]};
+                jump1_o     = 32'b0;
+                jump2_o     = pred_pc_i - {{20{inst_i[31]}}, inst_i[31:20]};     // 提前计算 rs1 == pred_pc - imm
                 rs1_addr_o  = rs1_o;
+                rs2_addr_o  = 5'b0;
                 rd_addr_o   = rd_o;
             end
 
             is_branch: begin
                 reg_wen     = 1'b0;
-                value1_o    = data1;
-                value2_o    = data2;
+                value1_o    = 32'b0;
+                value2_o    = 32'b0;
                 jump1_o     = pc_addr_i + {{20{inst_i[31]}}, inst_i[7], inst_i[30:25], inst_i[11:8], 1'b0};
-                jump2_o     = pc_addr_i + 32'd4;
+                jump2_o     = pc_add_4;
                 rs1_addr_o  = rs1_o;
                 rs2_addr_o  = rs2_o;
+                rd_addr_o   = 5'b0;
             end
 
             is_load: begin
                 reg_wen     = (rd_o != 5'b0);
-                value1_o    = data1;
+                value1_o    = 32'b0;
                 value2_o    = {{20{inst_i[31]}}, inst_i[31:20]};
-                rs1_addr_o  = rs1_o; 
+                jump1_o     = 32'b0;
+                jump2_o     = 32'b0;
+                rs1_addr_o  = rs1_o;
+                rs2_addr_o  = 5'b0;
                 rd_addr_o   = rd_o;
             end
 
             is_store: begin
                 reg_wen     = 1'b0;
-                value1_o    = data1;
+                value1_o    = 32'b0;
                 value2_o    = {{20{inst_i[31]}}, inst_i[31:25], inst_i[11:7]};
-                rs1_addr_o  = rs1_o;            
-                rs2_addr_o  = rs2_o;  
+                jump1_o     = 32'b0;
+                jump2_o     = 32'b0;
+                rs1_addr_o  = rs1_o;
+                rs2_addr_o  = rs2_o;
                 rd_addr_o   = 5'b0;
             end
 
             is_alu_i: begin
                 reg_wen     = (rd_o != 5'b0);
-                value1_o    = data1;
-                value2_o    = {{20{inst_i[31]}}, inst_i[31:20]};
+                value1_o    = 32'b0;
+                value2_o    = 32'b0;
+                jump1_o     = 32'b0;
+                jump2_o     = 32'b0;
                 rs1_addr_o  = rs1_o;
+                rs2_addr_o  = 5'b0;
                 rd_addr_o   = rd_o;
             end
 
             is_alu_r: begin
                 reg_wen     = (rd_o != 5'b0);
-                value1_o    = data1;
-                value2_o    = data2;
+                value1_o    = 32'b0;
+                value2_o    = 32'b0;
+                jump1_o     = 32'b0;
+                jump2_o     = 32'b0;
                 rs1_addr_o  = rs1_o;
                 rs2_addr_o  = rs2_o;
                 rd_addr_o   = rd_o;
@@ -206,7 +286,7 @@ module id(
                 jump1_o     = 32'b0;
                 jump2_o     = 32'b0;
                 rs1_addr_o  = 5'b0;            
-                rs2_addr_o  = 5'b0;  
+                rs2_addr_o  = 5'b0;
                 rd_addr_o   = 5'b0;
             end
         endcase

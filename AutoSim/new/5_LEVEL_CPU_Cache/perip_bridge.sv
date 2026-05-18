@@ -54,7 +54,7 @@ module perip_bridge(
     logic cnt_enable_cfg;
     
     // delay
-    localparam READ_DELAY = `DRAM_READ_DELAY;
+    localparam READ_DELAY = 2;
     logic [31:0] perip_addr_d [0: READ_DELAY - 1];
     logic        perip_wen_d  [0: READ_DELAY - 1];
 
@@ -117,17 +117,17 @@ module perip_bridge(
     end
 
     // read process: in one cycle
-    always_comb begin
-        if (~perip_wen_delay) begin
-            case (perip_addr_delay)
-                SW0_ADDR:  mmio_rdata = virtual_sw_input[31:0];
-                SW1_ADDR:  mmio_rdata = virtual_sw_input[63:32];
-                KEY_ADDR:  mmio_rdata = {24'd0, virtual_key_input};
-                SEG_ADDR:  mmio_rdata = seg_wdata;
-                default:   mmio_rdata = 32'hDEAD_BEEF;
+    always_ff @(posedge clk) begin
+        if (~perip_wen_d[0]) begin
+            case (perip_addr_d[0])
+                SW0_ADDR:  mmio_rdata <= virtual_sw_input[31:0];
+                SW1_ADDR:  mmio_rdata <= virtual_sw_input[63:32];
+                KEY_ADDR:  mmio_rdata <= {24'd0, virtual_key_input};
+                SEG_ADDR:  mmio_rdata <= seg_wdata;
+                default:   mmio_rdata <= 32'hDEAD_BEEF;
             endcase
         end else begin
-            mmio_rdata = 32'h0;
+            mmio_rdata <= 32'h0;
         end
     end
 
@@ -150,11 +150,13 @@ module perip_bridge(
     
 
     // dram rw
+    logic [15:0] dram_addr;
+    assign dram_addr = perip_addr[17:2];
     logic [3:0] dram_we;
     assign dram_we = (perip_addr >= DRAM_ADDR_START && perip_addr < DRAM_ADDR_END) ? perip_we : 32'b0;
     dram_driver dram_driver_inst (
         .clk				(clk),
-        .perip_addr			(perip_addr[17:0]),
+        .dram_addr			(dram_addr),
         .perip_wdata		(perip_wdata),
         .perip_we 			(dram_we),
         .perip_rdata		(dram_rdata)
@@ -170,15 +172,14 @@ module perip_bridge(
     );
 
     always_comb begin
-        (* parallel_case, full_case *)
+        (* parallel_case *)
         case (1'b1)
             perip_hit_dram: perip_rdata = dram_rdata;
             perip_hit_mmio: perip_rdata = mmio_rdata;
             perip_hit_cnt:  perip_rdata = cnt_rdata;
             default:        perip_rdata = 32'b0;
         endcase
-    end
-    
+    end    
     assign virtual_led_output = LED;
     assign virtual_seg_output = seg_output;
 
