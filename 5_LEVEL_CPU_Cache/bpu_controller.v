@@ -33,7 +33,7 @@ module bpu_controller #(
     (* max_fanout = 30 *)
     output reg [31:0]               pred_pc,            // 向 if 输出预测的地址
     (* max_fanout = 30 *)
-    output reg                      pred_taken,         // 从 PHT 中读取的计数器高位值
+    output                          pred_taken,         // 从 PHT 中读取的计数器高位值
 
     // from ex
     input                           update_btb_en,      // ex 阶段返回的 BTB 更新使能
@@ -201,23 +201,25 @@ module bpu_controller #(
         endcase
     end
 
+    reg pred_taken_raw;
     always @(posedge clk) begin
         if (!rst) begin
-            pred_taken  <= 0;
-            pred_pc     <= 0;
+            pred_taken_raw  <= 0;
+            pred_pc         <= 0;
         end
         else if (pipe_hold) begin   // 当暂停时预测器的结果需要保存
             // ...
         end
         else if (inst_valid) begin
-            pred_taken  <= sel_pred_taken;
-            pred_pc     <= sel_pred_pc;
+            pred_taken_raw  <= sel_pred_taken;
+            pred_pc         <= sel_pred_pc;
         end
         else begin
-            pred_taken  <= 0;
-            pred_pc     <= 0;
+            pred_taken_raw  <= 0;
+            pred_pc         <= 0;
         end
     end
+    assign pred_taken = pred_taken_raw & !pred_flush;
 
     // 更新
     always @(*) begin

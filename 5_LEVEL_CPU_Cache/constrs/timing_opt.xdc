@@ -22,6 +22,6 @@ set_property KEEP_HIERARCHY SOFT [get_cells -hierarchical *Mem_DRAM*]
 # 限制扇出
 set_property MAX_FANOUT 30 [get_nets -hierarchical *pipe_hold*]
 set_property MAX_FANOUT 30 [get_nets -hierarchical *hazard_en*]
-set_property MAX_FANOUT 30 [get_nets -hierarchical *dcache_addr*/Q*]
+set_property MAX_FANOUT 30 [get_nets -hierarchical *dcache_addr*]
 set_property MAX_FANOUT 30 [get_nets -hierarchical *hit_tagv*]
 set_property MAX_FANOUT 30 [get_nets -hierarchical *hit_data_b*_w*]
