@@ -33,7 +33,7 @@ module bpu_controller #(
     (* max_fanout = 30 *)
     output reg [31:0]               pred_pc,            // 向 if 输出预测的地址
     (* max_fanout = 30 *)
-    output                          pred_taken,         // 从 PHT 中读取的计数器高位值
+    output reg                      pred_taken,         // 从 PHT 中读取的计数器高位值
 
     // from ex
     input                           update_btb_en,      // ex 阶段返回的 BTB 更新使能

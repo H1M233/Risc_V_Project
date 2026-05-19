@@ -3,22 +3,22 @@
     "37 INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.78527",
-        "REAL TIME": "14.8002",
+        "IPC": "0.782886",
+        "REAL TIME": "8.90005",
         "ICACHE HIT": "0.992835",
         "DCACHE HIT": "0.999915",
-        "RUN TIME": "166",
+        "RUN TIME": "167",
         "LED": "PASS √",
-        "BPU ACCURACY": "0.917923"
+        "BPU ACCURACY": "0.918042"
       },
       "src0": {
-        "IPC": "0.684962",
-        "REAL TIME": "478.017",
+        "IPC": "0.668091",
+        "REAL TIME": "585.613",
         "ICACHE HIT": "0.988879",
         "DCACHE HIT": "0.872287",
-        "RUN TIME": "8129",
+        "RUN TIME": "8337",
         "LED": "PASS √",
-        "BPU ACCURACY": "0.825977"
+        "BPU ACCURACY": "0.825457"
       },
       "src1": {
         "IPC": "0.604462",
@@ -37,6 +37,13 @@
         "RUN TIME": "10927",
         "LED": "PASS √",
         "BPU ACCURACY": "0.771183"
+      },
+      "womnew": {
+        "IPC": "0.707378",
+        "REAL TIME": "377.906",
+        "RUN TIME": "4389",
+        "BPU ACCURACY": "0.807299",
+        "LED": "FAIL x"
       }
     }
   },

@@ -173,10 +173,9 @@ int main(int argc, char** argv) {
     for (int row = 0; row < 4; ++row){
         uint8_t byte = (top->LED >> (24 - 8 * row)) & 0xFF;
         std::cout << std::endl;
-        std::cout << std::setw(10);
-
         for(int col = 0; col < 8; ++col){
             bool lit;
+            std::cout << std::setw(2);
             lit = (byte >> (7 - col)) & 1;
             if (lit){
                 std::cout << "\033[93m" << "██" << "\033[0m";
@@ -188,7 +187,7 @@ int main(int argc, char** argv) {
     }
 
     std::cout << std::setw(16) << (isTick ? "\033[92mPASS!!!" : "\033[91mFAIL!!!") 
-        << std::setw(12) << "Run time: " << std::hex << SEG_getTime << std::dec << " ms  " << "\033[0m\n\n";
+        << std::setw(12) << "Run time: " << std::hex << SEG_getTime << std::dec << " ms  LED: 0x" << std::hex << top->LED << std::dec <<"\033[0m\n\n";
 
     // 写回文件 传输给python
     std::ofstream f("software_results.txt");

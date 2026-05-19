@@ -1,4 +1,5 @@
 `define ALU_USE_FAST_COMPARATOR
+// `define USE_2WAY_DCACHE
 
 
 `define DRAM_READ_DELAY  2

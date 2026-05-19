@@ -59,7 +59,7 @@ module id_ex(
     output reg          mret_o
 );
     wire id_ex_hold_en  = dcache_stall;
-    wire id_ex_flush_en_n = ~(pred_flush | hazard_en | ecall_flush | mret_flush);
+    wire id_ex_flush_en_n = ~(pred_flush | hazard_en);
     always @(posedge clk) begin
         if(!rst) begin
             pc_addr_o           <= 32'b0;
@@ -97,7 +97,7 @@ module id_ex(
             rs1_addr_o          <= rs1_addr_i;
             rs2_addr_o          <= rs2_addr_i;
             pred_taken_o        <= pred_taken_i;
-            inst_packaged_o     <= inst_packaged_i;
+            inst_packaged_o     <= inst_packaged_i & {`OP_INST_NUM{id_ex_flush_en_n}};
             valid_o             <= id_ex_flush_en_n;
             fwd_rs1_data_o      <= fwd_rs1_data_i;
             fwd_rs2_data_o      <= fwd_rs2_data_i;
