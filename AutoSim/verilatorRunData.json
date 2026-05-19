@@ -3,8 +3,8 @@
     "37 INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.785331",
-        "REAL TIME": "10.3002",
+        "IPC": "0.785215",
+        "REAL TIME": "14.5003",
         "ICACHE HIT": "0.992835",
         "DCACHE HIT": "0.999915",
         "RUN TIME": "166",
@@ -30,13 +30,13 @@
         "BPU ACCURACY": "0.893429"
       },
       "src2": {
-        "IPC": "0.710882",
-        "REAL TIME": "651.019",
+        "IPC": "0.710695",
+        "REAL TIME": "653.112",
         "ICACHE HIT": "0.995896",
         "DCACHE HIT": "0.906889",
-        "RUN TIME": "10941",
+        "RUN TIME": "10927",
         "LED": "PASS √",
-        "BPU ACCURACY": "0.76366"
+        "BPU ACCURACY": "0.771183"
       }
     }
   },

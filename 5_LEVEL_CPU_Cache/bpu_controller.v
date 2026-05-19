@@ -46,6 +46,8 @@ module bpu_controller #(
     input                           pipe_hold,
     (* max_fanout = 30 *)
     input                           pred_flush,
+    input                           wb_ecall,
+    input                           wb_mret,
 
     // Gshare - 查询
     output     [BHR_WIDTH - 1:0]    gshare_pht_index,
@@ -85,7 +87,7 @@ module bpu_controller #(
     output reg [31:0]                           btb_update_target
 );
     // 指令是否可用
-    wire inst_valid = !pred_flush & !pred_taken;
+    wire inst_valid = ~(pred_flush | pred_taken | wb_ecall | wb_mret);
 
     // 取出 rd 和 rs1 的地址
     wire    [4:0]   rd_addr     = pc_inst[11:7];
@@ -201,25 +203,23 @@ module bpu_controller #(
         endcase
     end
 
-    reg pred_taken_raw;
     always @(posedge clk) begin
         if (!rst) begin
-            pred_taken_raw  <= 0;
-            pred_pc         <= 0;
+            pred_taken  <= 0;
+            pred_pc     <= 0;
         end
         else if (pipe_hold) begin   // 当暂停时预测器的结果需要保存
             // ...
         end
         else if (inst_valid) begin
-            pred_taken_raw  <= sel_pred_taken;
-            pred_pc         <= sel_pred_pc;
+            pred_taken  <= sel_pred_taken;
+            pred_pc     <= sel_pred_pc;
         end
         else begin
-            pred_taken_raw  <= 0;
-            pred_pc         <= 0;
+            pred_taken  <= 0;
+            pred_pc     <= 0;
         end
     end
-    assign pred_taken = pred_taken_raw & !pred_flush;
 
     // 更新
     always @(*) begin

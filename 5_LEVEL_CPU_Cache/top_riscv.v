@@ -768,7 +768,9 @@ module top_riscv(
         .actual_taken       (ex_actual_taken),
 
         .pipe_hold          (pipe_hold_bpu),
-        .pred_flush         (ex_pred_flush_en_o)
+        .pred_flush         (ex_pred_flush_en_o),
+        .wb_ecall           (wb_ecall_o),
+        .wb_mret            (wb_mret_o)
     );
 
 endmodule

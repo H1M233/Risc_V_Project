@@ -41,7 +41,9 @@ module bpu_top #(
     (* max_fanout = 30 *)
     input               pred_flush,
     (* max_fanout = 20 *)
-    input               pipe_hold
+    input               pipe_hold,
+    input               wb_ecall,
+    input               wb_mret
     
 );
     // connect gshare with bpu_controller
@@ -103,6 +105,8 @@ module bpu_top #(
 
         .pipe_hold                  (pipe_hold),
         .pred_flush                 (pred_flush),
+        .wb_ecall                   (wb_ecall),
+        .wb_mret                    (wb_mret),
 
         // Gshare - 查询
         .gshare_pht_index           (gshare_pht_index_i),
