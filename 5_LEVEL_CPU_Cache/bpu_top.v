@@ -38,13 +38,9 @@ module bpu_top #(
     input      [31:0]   update_target,      // ex阶段返回的实际跳转地址
     input               actual_taken,       // ex阶段判断跳转为真
 
-    (* max_fanout = 30 *)
-    input               pred_flush,
     (* max_fanout = 20 *)
     input               pipe_hold,
-    input               wb_ecall,
-    input               wb_mret
-    
+    input               pipe_flush
 );
     // connect gshare with bpu_controller
     wire [BHR_WIDTH - 1:0]  gshare_pht_index_i;
@@ -104,9 +100,7 @@ module bpu_top #(
         .actual_taken               (actual_taken),
 
         .pipe_hold                  (pipe_hold),
-        .pred_flush                 (pred_flush),
-        .wb_ecall                   (wb_ecall),
-        .wb_mret                    (wb_mret),
+        .pipe_flush                 (pipe_flush),
 
         // Gshare - 查询
         .gshare_pht_index           (gshare_pht_index_i),

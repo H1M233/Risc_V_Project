@@ -76,7 +76,10 @@ module ex(
     output reg          csr_wen_o,
     //output reg [31:0]   csr_addr_o,
     output reg [31:0]   csr_wdata_o,
-    output     [31:0]   ecall_inst
+    output     [31:0]   ecall_inst,
+
+    input               ecall_flush,
+    input               mret_flush
 );
     // 主操作码独热
     wire is_alu_i  = inst_packaged_i[`OP_I];
@@ -84,10 +87,10 @@ module ex(
     wire is_auipc  = inst_packaged_i[`OP_AUIPC];
     wire is_lui    = inst_packaged_i[`OP_LUI];
     wire is_jal    = inst_packaged_i[`OP_JAL];
-    wire is_jalr   = inst_packaged_i[`OP_JALR] & ~pred_flush_en & valid_i;
-    wire is_branch = inst_packaged_i[`OP_BRANCH] & ~pred_flush_en & valid_i;
-    wire is_load   = inst_packaged_i[`OP_LOAD] & ~pred_flush_en & valid_i;
-    wire is_store  = inst_packaged_i[`OP_STORE] & ~pred_flush_en & valid_i;
+    wire is_jalr   = inst_packaged_i[`OP_JALR] & ~pred_flush_en & & valid_i & !ecall_flush & !mret_flush;
+    wire is_branch = inst_packaged_i[`OP_BRANCH] & ~pred_flush_en & & valid_i & !ecall_flush & !mret_flush;
+    wire is_load   = inst_packaged_i[`OP_LOAD] & ~pred_flush_en & & valid_i & !ecall_flush & !mret_flush;
+    wire is_store  = inst_packaged_i[`OP_STORE] & ~pred_flush_en & & valid_i & !ecall_flush & !mret_flush;
     wire is_zicsr  = inst_packaged_i[`OP_ZICSR];
 
     // IR-type
@@ -240,7 +243,7 @@ module ex(
     wire perip_write_dram = (mem_addr_calc >= `DRAM_ADDR_START && mem_addr_calc < `DRAM_ADDR_END);
     always @(posedge clk) begin: EX_DCACHE   
         // 转发 D-cache
-        dcache_req_load   <= is_load & regs_wen_i;   // dcache 读使能
+        dcache_req_load   <= is_load & regs_wen_i & !ecall_flush & !mret_flush;   // dcache 读使能
         dcache_req_store  <= is_store;               // dcache 写使能
         dcache_addr       <= mem_addr_calc;
         dcache_write_dram <= perip_write_dram;
@@ -301,10 +304,10 @@ module ex(
     // 读写
     always @(*) begin: ALU_WB
         // 寄存器写入
-        regs_wen_o          = !pred_flush_en & regs_wen_i; // regs 写使能
+        regs_wen_o          = !pred_flush_en & regs_wen_i & !ecall_flush & !mret_flush; // regs 写使能
         rd_addr_o           = rd_addr_i;
         rd_data_o           = alu_result;
-        mem_req_load_o      = is_load & regs_wen_i; // 判断 x0 寄存器提前到 id 阶段，是 x0 直接不用 Load 请求
+        mem_req_load_o      = is_load & regs_wen_i & !ecall_flush & !mret_flush; // 判断 x0 寄存器提前到 id 阶段，是 x0 直接不用 Load 请求
         mem_load_is_signed  = (sel_lb | sel_lh | sel_lw);
         mem_load_addr_low   = mem_addr_calc_low;
         
@@ -344,7 +347,6 @@ module ex(
                       (sel_csrrsi) ? rs_res :
                       (sel_csrrci) ? rc_res :
                                       32'b0;               // CSR 写数据
-        // csr_addr_o = value2_i;   // CSR 地址来自立即数
     end 
     
     assign ecall_o = ecall_i;

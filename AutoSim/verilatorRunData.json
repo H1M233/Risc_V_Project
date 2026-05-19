@@ -3,8 +3,8 @@
     "37 INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.785215",
-        "REAL TIME": "14.5003",
+        "IPC": "0.78527",
+        "REAL TIME": "14.8002",
         "ICACHE HIT": "0.992835",
         "DCACHE HIT": "0.999915",
         "RUN TIME": "166",

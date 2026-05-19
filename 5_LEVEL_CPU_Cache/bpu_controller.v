@@ -45,9 +45,7 @@ module bpu_controller #(
     (* max_fanout = 20 *)
     input                           pipe_hold,
     (* max_fanout = 30 *)
-    input                           pred_flush,
-    input                           wb_ecall,
-    input                           wb_mret,
+    input                           pipe_flush,
 
     // Gshare - 查询
     output     [BHR_WIDTH - 1:0]    gshare_pht_index,
@@ -87,7 +85,7 @@ module bpu_controller #(
     output reg [31:0]                           btb_update_target
 );
     // 指令是否可用
-    wire inst_valid = ~(pred_flush | pred_taken | wb_ecall | wb_mret);
+    wire inst_valid = ~pipe_flush;
 
     // 取出 rd 和 rs1 的地址
     wire    [4:0]   rd_addr     = pc_inst[11:7];

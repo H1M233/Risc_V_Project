@@ -3,10 +3,10 @@
 module if2_id(
     input               clk,
     input               rst,
-    input               pred_taken,
-    input               pred_flush,
+    
     (* max_fanout = 30 *)
     input               pipe_hold,
+    input               pipe_flush,
 
     // from if
     input      [31:0]   inst_i,
@@ -17,10 +17,6 @@ module if2_id(
     input      [4:0]    rd_i,
     input      [4:0]    rs1_i,
     input      [4:0]    rs2_i,
-
-    // from wb
-    input               ecall_flush,
-    input               mret_flush,
 
     // to id
     (* max_fanout = 30 *) output reg [31:0]   inst_o,
@@ -33,8 +29,6 @@ module if2_id(
     (* max_fanout = 30 *) output reg [4:0]    rs2_o
 
 );
-    wire if2_id_hold_en = pipe_hold;
-    wire if2_id_flush_en = (ecall_flush | mret_flush | pred_taken | pred_flush);
     always @(posedge clk) begin
         if (!rst) begin
             pc_o        <= 32'b0;
@@ -46,10 +40,10 @@ module if2_id(
             rs1_o       <= 5'b0;
             rs2_o       <= 5'b0;
         end
-        else if (if2_id_hold_en) begin
+        else if (pipe_hold) begin
             // ...
         end
-        else if (if2_id_flush_en) begin
+        else if (pipe_flush) begin
             pc_o        <= 32'b0;
             inst_o      <= `NOP;
             opcode_o    <= 7'b0;

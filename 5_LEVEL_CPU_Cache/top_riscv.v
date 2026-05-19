@@ -242,6 +242,10 @@ module top_riscv(
     (* max_fanout = 30 *)
     wire pipe_hold_bpu = dcache_stall | hazard_hazard_en;
 
+    wire pipe_flush_if1_if2 = bpu_pred_taken | ex_pred_flush_en_o | wb_ecall_flush | wb_mret_flush;
+    wire pipe_flush_if2_id = bpu_pred_taken | ex_pred_flush_en_o | wb_ecall_flush | wb_mret_flush;
+    wire pipe_flush_bpu = bpu_pred_taken | ex_pred_flush_en_o | wb_ecall_flush | wb_mret_flush;
+
     // ============================================================
     // ex to bpu
     // ============================================================
@@ -371,15 +375,10 @@ module top_riscv(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
 
-        .pred_taken         (bpu_pred_taken),
-        .pred_flush         (ex_pred_flush_en_o),
         .pipe_hold          (pipe_hold_if1_if2),
+        .pipe_flush         (pipe_flush_if1_if2),
 
         .pc_i               (if1_pc_o),
-
-        .ecall_flush        (wb_ecall_flush),
-        .mret_flush         (wb_mret_flush),
-
         .if2_valid_o        (if2_valid_i),
         .pc_o               (if2_pc_i)
     );
@@ -408,6 +407,7 @@ module top_riscv(
         .rst                (cpu_rst),
 
         .pipe_hold          (pipe_hold_if2_id),
+        .pipe_flush         (pipe_flush_if2_id),
 
         .inst_i             (if2_inst_o),
         .pc_i               (if2_pc_o),
@@ -417,12 +417,6 @@ module top_riscv(
         .rd_i               (if2_rd_o),
         .rs1_i              (if2_rs1_o),
         .rs2_i              (if2_rs2_o),
-
-        .pred_taken         (bpu_pred_taken),
-        .pred_flush         (ex_pred_flush_en_o),
-
-        .ecall_flush        (wb_ecall_flush),
-        .mret_flush         (wb_mret_flush),
 
         .inst_o             (id_inst_i),
         .pc_o               (id_pc_i),
@@ -604,7 +598,10 @@ module top_riscv(
         .mret_o             (ex_mret_o),
         .csr_wen_o          (ex_csr_wen_o),
         .csr_wdata_o        (ex_csr_wdata_o),
-        .ecall_inst         (ex_ecall_inst)    
+        .ecall_inst         (ex_ecall_inst),
+        
+        .ecall_flush        (wb_ecall_flush),
+        .mret_flush         (wb_mret_flush)
     );
 
     // ============================================================
@@ -768,9 +765,7 @@ module top_riscv(
         .actual_taken       (ex_actual_taken),
 
         .pipe_hold          (pipe_hold_bpu),
-        .pred_flush         (ex_pred_flush_en_o),
-        .wb_ecall           (wb_ecall_o),
-        .wb_mret            (wb_mret_o)
+        .pipe_flush         (pipe_flush_bpu)
     );
 
 endmodule

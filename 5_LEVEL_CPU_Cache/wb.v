@@ -29,6 +29,6 @@ module wb(
         ecall_o     = ecall_i;
         ecall_flush = ecall_i;  
         mret_o      = mret_i;
-        mret_flush  = mret_i;  
+        mret_flush  = mret_i;
     end
 endmodule
