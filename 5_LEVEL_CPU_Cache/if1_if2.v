@@ -19,21 +19,22 @@ module if1_if2(
     output reg          if2_valid_o,
     output reg [31:0]   pc_o
 );
+    wire if1_if2_hold_en = pipe_hold;
+    wire if1_if2_flush_en = (pred_taken | pred_flush | ecall_flush | mret_flush);
 
     always @(posedge clk) begin
         if (!rst) begin
             if2_valid_o <= 1'b0;
             pc_o        <= 32'h0;
         end
-        else if(ecall_flush | mret_flush) begin
-            if2_valid_o <= 1'b0;
-            pc_o        <= 32'h0;
+        else if (if1_if2_hold_en) begin
+            // ...
         end
-        else if (pred_taken | pred_flush) begin
+        else if (if1_if2_flush_en) begin
             if2_valid_o <= 1'b0;
-            pc_o        <= 32'h0;
+            pc_o        <= 32'b0;
         end
-        else if (!pipe_hold) begin
+        else begin
             if2_valid_o <= 1'b1;
             pc_o        <= pc_i;
         end

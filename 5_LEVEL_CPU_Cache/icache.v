@@ -10,13 +10,17 @@ module icache #(
     input               rst,
 
     // CPU / IF side
+    (* max_fanout = 30 *)
     input      [31:0]   cpu_pc,
     (* max_fanout = 30 *)
     output reg [31:0]   cpu_inst,
+    (* max_fanout = 30 *)
     input               pipe_hold,
 
     // IROM side
+    (* max_fanout = 30 *)
     output     [31:0]   mem_addr,
+    (* max_fanout = 30 *)
     input      [31:0]   mem_inst
 );
     assign mem_addr = cpu_pc;
@@ -25,7 +29,10 @@ module icache #(
         if (!rst) begin
             cpu_inst <= `NOP;
         end
-        else if (!pipe_hold) begin
+        else if (pipe_hold) begin
+            // ...
+        end
+        else begin
             cpu_inst <= mem_inst;
         end
     end

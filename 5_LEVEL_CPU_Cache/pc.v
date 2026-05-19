@@ -27,27 +27,21 @@ module pc(
     input      [31:0]   pred_pc,
     input               pred_taken
 );
+    wire pc_hold_en       = (hazard_en | dcache_stall);
+    wire flush_or_trap_en = (wb_ecall | wb_mret | pred_flush); // ecall 处理，跳转到 ecall 处理函数 / mret 处理，跳转到 mret 处理函数
+    wire [31:0] flush_or_trap_pc = (wb_ecall | wb_mret) ? ecall_mret_addr : pred_flush_pc;
     always @(posedge clk) begin
         if(!rst) begin
             pc_addr_o <= 32'h8000_0000;
         end
-        else if(wb_ecall) begin
-            pc_addr_o <= ecall_mret_addr;   // ecall 处理，跳转到 ecall 处理函数
-        end
-        else if(wb_mret) begin
-            pc_addr_o <= ecall_mret_addr;   // mret 处理，跳转到 mret 处理函数
-        end
-        else if(pred_flush) begin
-            pc_addr_o <= pred_flush_pc;
-        end
-        else if(hazard_en) begin
-            pc_addr_o <= pc_addr_o;
-        end
+        else if(flush_or_trap_en) begin        // ecall 处理，跳转到 ecall 处理函数 / mret 处理，跳转到 mret 处理函数
+            pc_addr_o <= flush_or_trap_pc;
+        end 
         else if(pred_taken) begin
             pc_addr_o <= pred_pc;
         end
-        else if (dcache_stall) begin
-            pc_addr_o <= pc_addr_o;
+        else if(pc_hold_en) begin
+            // ...
         end
         else begin
             pc_addr_o <= pc_addr_o + 4;

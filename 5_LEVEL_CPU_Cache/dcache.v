@@ -2,7 +2,7 @@
 `include "switch.vh"
 
 module dcache#(
-    parameter INDEX_WIDTH   = 4,
+    parameter INDEX_WIDTH   = 6,    // INDEX_WIDTH 需 < 6
     parameter TAG_WIDTH     = (30 - INDEX_WIDTH)
 )(
     input               clk,
@@ -27,118 +27,176 @@ module dcache#(
     output     [31:0]   mem_wdata,
     input      [31:0]   mem_rdata,
 
-    output reg          mem_ack
+    output              mem_ack
 );
     localparam LINE_NUM = 2 ** INDEX_WIDTH;
 
     // 两路 FIFO
-    (* ram_style = "block" *) reg [7:0] data_b0 [0:LINE_NUM * 2 - 1];
-    (* ram_style = "block" *) reg [7:0] data_b1 [0:LINE_NUM * 2 - 1];
-    (* ram_style = "block" *) reg [7:0] data_b2 [0:LINE_NUM * 2 - 1];
-    (* ram_style = "block" *) reg [7:0] data_b3 [0:LINE_NUM * 2 - 1];
-    reg [TAG_WIDTH:0] tagv [0:LINE_NUM * 2 - 1];   // [TAG_WIDTH]:Valid, [TAG_WIDTH-1:0]:Tag
+    (* ram_style = "block" *) reg [7:0] data_b0_w0 [0:LINE_NUM - 1];
+    (* ram_style = "block" *) reg [7:0] data_b1_w0 [0:LINE_NUM - 1];
+    (* ram_style = "block" *) reg [7:0] data_b2_w0 [0:LINE_NUM - 1];
+    (* ram_style = "block" *) reg [7:0] data_b3_w0 [0:LINE_NUM - 1];
+    (* ram_style = "block" *) reg [7:0] data_b0_w1 [0:LINE_NUM - 1];
+    (* ram_style = "block" *) reg [7:0] data_b1_w1 [0:LINE_NUM - 1];
+    (* ram_style = "block" *) reg [7:0] data_b2_w1 [0:LINE_NUM - 1];
+    (* ram_style = "block" *) reg [7:0] data_b3_w1 [0:LINE_NUM - 1];
+
+    // [TAG_WIDTH]:Valid, [TAG_WIDTH-1:0]:Tag
+    (* ram_style = "distributed" *) reg [TAG_WIDTH:0] tagv_w0 [0:LINE_NUM - 1];
+    (* ram_style = "distributed" *) reg [TAG_WIDTH:0] tagv_w1 [0:LINE_NUM - 1];
     reg replace_way [0:LINE_NUM - 1];
 
+    // 状态寄存
+    reg hit_r, miss_r;
+    reg hit_way_r;
+    reg miss_wait;
+    reg [INDEX_WIDTH-1:0] miss_index;
+    reg [TAG_WIDTH - 1:0] miss_tag;
+    reg miss_way;
+
+    // 初始化
     integer i;
     initial begin
-        for (i = 0; i < LINE_NUM * 2; i = i + 1) tagv[i] = 0;
+        for (i = 0; i < LINE_NUM; i = i + 1) tagv_w0[i] = 0;
+        for (i = 0; i < LINE_NUM; i = i + 1) tagv_w1[i] = 0;
         for (i = 0; i < LINE_NUM; i = i + 1) replace_way[i] = 0;
     end
+
+    // 地址解码
     wire [INDEX_WIDTH - 1:0] dcache_index = cpu_addr[INDEX_WIDTH + 1:2];
     wire [TAG_WIDTH - 1:0]   dcache_tag   = cpu_addr[31:INDEX_WIDTH + 2];
 
-    wire [TAG_WIDTH:0] hit_tagv_way0 = tagv[{dcache_index, 1'b0}];
-    wire [TAG_WIDTH:0] hit_tagv_way1 = tagv[{dcache_index, 1'b1}];
-    wire [TAG_WIDTH - 1:0] hit_tag_way0 = hit_tagv_way0[TAG_WIDTH - 1:0];
-    wire [TAG_WIDTH - 1:0] hit_tag_way1 = hit_tagv_way1[TAG_WIDTH - 1:0];
-    wire hit_valid_way0 = hit_tagv_way0[TAG_WIDTH];
-    wire hit_valid_way1 = hit_tagv_way1[TAG_WIDTH];
-
-    wire hit_way0 = (hit_tag_way0 == dcache_tag && hit_valid_way0);
-    wire hit_way1 = (hit_tag_way1 == dcache_tag && hit_valid_way1);
+    // 判断命中
+    wire [TAG_WIDTH:0] hit_tagv_w0 = tagv_w0[dcache_index];
+    wire [TAG_WIDTH:0] hit_tagv_w1 = tagv_w1[dcache_index];
+    wire [TAG_WIDTH - 1:0] hit_tag_w0 = hit_tagv_w0[TAG_WIDTH - 1:0];
+    wire [TAG_WIDTH - 1:0] hit_tag_w1 = hit_tagv_w1[TAG_WIDTH - 1:0];
+    wire hit_valid_w0 = hit_tagv_w0[TAG_WIDTH];
+    wire hit_valid_w1 = hit_tagv_w1[TAG_WIDTH];
+    wire hit_way0 = (hit_tag_w0 == dcache_tag && hit_valid_w0);
+    wire hit_way1 = (hit_tag_w1 == dcache_tag && hit_valid_w1);
     wire dcache_hit = hit_way0 | hit_way1;
     wire hit_way = ~hit_way0;
     wire miss_replace_way = replace_way[dcache_index];
-    reg [7:0] hit_data_b3, hit_data_b2, hit_data_b1, hit_data_b0;
 
     // 读
+    reg [7:0] hit_data_b3_w0;
+    reg [7:0] hit_data_b2_w0;
+    reg [7:0] hit_data_b1_w0;
+    reg [7:0] hit_data_b0_w0;
+    reg [7:0] hit_data_b3_w1;
+    reg [7:0] hit_data_b2_w1;
+    reg [7:0] hit_data_b1_w1;
+    reg [7:0] hit_data_b0_w1;
     always @(posedge clk) begin
-        hit_data_b3 <= data_b3[{dcache_index, hit_way}];
-        hit_data_b2 <= data_b2[{dcache_index, hit_way}];
-        hit_data_b1 <= data_b1[{dcache_index, hit_way}];
-        hit_data_b0 <= data_b0[{dcache_index, hit_way}];
-        mem_ack <= dcache_hit | miss_wait;
+        hit_data_b3_w0 <= data_b3_w0[dcache_index];
+        hit_data_b2_w0 <= data_b2_w0[dcache_index];
+        hit_data_b1_w0 <= data_b1_w0[dcache_index];
+        hit_data_b0_w0 <= data_b0_w0[dcache_index];
+        hit_data_b3_w1 <= data_b3_w1[dcache_index];
+        hit_data_b2_w1 <= data_b2_w1[dcache_index];
+        hit_data_b1_w1 <= data_b1_w1[dcache_index];
+        hit_data_b0_w1 <= data_b0_w1[dcache_index];
     end
     
-    wire [31:0] hit_data = {hit_data_b3, hit_data_b2, hit_data_b1, hit_data_b0};
+    // 命中数据
+    reg [31:0] hit_data;
+    always @(*) begin
+        hit_data =  hit_way_r ?
+                    {hit_data_b3_w1, hit_data_b2_w1, hit_data_b1_w1, hit_data_b0_w1} :
+                    {hit_data_b3_w0, hit_data_b2_w0, hit_data_b1_w0, hit_data_b0_w0};
+    end
 
-    // 写 data
+    // Store 写 data
     always @(posedge clk) begin
         if (dcache_hit & cpu_req_store) begin
-            if (cpu_we[3]) data_b3[{dcache_index, hit_way}] <= cpu_wdata[31:24];
-            if (cpu_we[2]) data_b2[{dcache_index, hit_way}] <= cpu_wdata[23:16];
-            if (cpu_we[1]) data_b1[{dcache_index, hit_way}] <= cpu_wdata[15:8];
-            if (cpu_we[0]) data_b0[{dcache_index, hit_way}] <= cpu_wdata[7:0];
+            if (hit_way0) begin
+                if (cpu_we[3]) data_b3_w0[dcache_index] <= cpu_wdata[31:24];
+                if (cpu_we[2]) data_b2_w0[dcache_index] <= cpu_wdata[23:16];
+                if (cpu_we[1]) data_b1_w0[dcache_index] <= cpu_wdata[15:8];
+                if (cpu_we[0]) data_b0_w0[dcache_index] <= cpu_wdata[7:0];
+            end
+            else begin
+                if (cpu_we[3]) data_b3_w1[dcache_index] <= cpu_wdata[31:24];
+                if (cpu_we[2]) data_b2_w1[dcache_index] <= cpu_wdata[23:16];
+                if (cpu_we[1]) data_b1_w1[dcache_index] <= cpu_wdata[15:8];
+                if (cpu_we[0]) data_b0_w1[dcache_index] <= cpu_wdata[7:0];
+            end
         end
-        if (miss_r) begin
-            data_b3[{miss_index, miss_way}] <= mem_rdata[31:24];
-            data_b2[{miss_index, miss_way}] <= mem_rdata[23:16];
-            data_b1[{miss_index, miss_way}] <= mem_rdata[15:8];
-            data_b0[{miss_index, miss_way}] <= mem_rdata[7:0];
+        else if (miss_r) begin
+            if (miss_way == 0) begin
+                data_b3_w0[miss_index] <= mem_rdata[31:24];
+                data_b2_w0[miss_index] <= mem_rdata[23:16];
+                data_b1_w0[miss_index] <= mem_rdata[15:8];
+                data_b0_w0[miss_index] <= mem_rdata[7:0];
+            end 
+            else begin
+                data_b3_w1[miss_index] <= mem_rdata[31:24];
+                data_b2_w1[miss_index] <= mem_rdata[23:16];
+                data_b1_w1[miss_index] <= mem_rdata[15:8];
+                data_b0_w1[miss_index] <= mem_rdata[7:0];
+            end
         end
     end
 
     // 写 tagv
     always @(posedge clk) begin
         if (miss_r) begin
-            tagv[{miss_index, miss_way}] <= {1'b1, miss_tag};
+            if (miss_way == 0)
+                tagv_w0[miss_index] <= {1'b1, miss_tag};
+            else
+                tagv_w1[miss_index] <= {1'b1, miss_tag};
             replace_way[miss_index] <= ~replace_way[miss_index];    // FIFO 替换指针更新
         end
     end
 
-    // 未命中时状态寄存
-    reg miss_wait;
-    reg [INDEX_WIDTH-1:0] miss_index;
-    reg [TAG_WIDTH - 1:0] miss_tag;
-    reg miss_way;
+    // 未命中状态转换
     always @(posedge clk) begin
         if (!rst) begin
-            miss_wait    <= 0;
+            miss_wait   <= 0;
             miss_index  <= 0;
             miss_tag    <= 0;
             miss_way    <= 0;
         end
-        else if (!dcache_hit && cpu_req_load && !miss_wait) begin
-            miss_wait   <= 1'b1;
-            miss_index  <= dcache_index;
-            miss_tag    <= dcache_tag;
-            miss_way    <= miss_replace_way;
-        end
-        else if (miss_wait) begin
-            miss_wait    <= 1'b0;
+        else begin
+            if (!dcache_hit && cpu_req_load && !miss_wait) begin
+                miss_wait   <= 1'b1;
+                miss_index  <= dcache_index;
+                miss_tag    <= dcache_tag;
+                miss_way    <= miss_replace_way;
+            end
+            else if (miss_wait) begin
+                miss_wait   <= 1'b0;
+            end
         end
     end
 
-    reg miss_r;
-    reg req_load_r, req_load_r2;
+    // 输出状态寄存
     always @(posedge clk) begin
         if (!rst) begin
-            miss_r          <= 1'b0;
-            req_load_r      <= 1'b0;
-            req_load_r2     <= 1'b0;
+            hit_r       <= 1'b0;
+            miss_r      <= 1'b0;
+            hit_way_r   <= 1'b0;
         end
         else begin
-            miss_r          <= miss_wait;
-            req_load_r      <= cpu_req_load;
-            req_load_r2     <= req_load_r;
+            hit_r       <= dcache_hit;
+            miss_r      <= miss_wait;
+            hit_way_r   <= hit_way;
         end
     end
 
-    assign mem_addr    = cpu_addr;
-    assign mem_we      = (cpu_write_dram) ? cpu_we : 4'b0;
-    assign mem_wen     = cpu_req_store;
-    assign mem_wdata   = cpu_wdata;
+    // 传输至 DRAM
+    assign mem_addr     = cpu_addr;
+    assign mem_we       = (cpu_write_dram) ? cpu_we : 4'b0;
+    assign mem_wen      = cpu_req_store;
+    assign mem_wdata    = cpu_wdata;
 
-    assign stall = !dcache_hit && cpu_req_load && !miss_wait;
-    assign cpu_rdata = (miss_r) ? mem_rdata : hit_data;
+    // 如果两个 way 都无效，可以直接 stall，无需等待 tag 比较 - 让信号能够提前到达并稳定
+    wire both_invalid   = !hit_valid_w0 && !hit_valid_w1;
+    wire fast_miss      = both_invalid && cpu_req_load && !miss_wait;
+    assign stall        = fast_miss || (!dcache_hit && cpu_req_load && !miss_wait);
+
+    // 读数据
+    assign cpu_rdata    = (miss_r) ? mem_rdata : hit_data;
+    assign mem_ack      = hit_r | miss_r;
 endmodule

@@ -6,6 +6,12 @@ module id(
     (* max_fanout = 30 *)
     input      [31:0]   inst_i,             // 从if_id模块传来的指令内容
     input      [31:0]   pc_addr_i,          // 从if_id模块传来的指令地址
+    input      [6:0]    opcode_i,
+    input      [2:0]    funct3_i,
+    input      [6:0]    funct7_i,
+    input      [4:0]    rd_i,
+    input      [4:0]    rs1_i,
+    input      [4:0]    rs2_i,
 
     // from bpu
     input               pred_taken_i,
@@ -59,29 +65,20 @@ module id(
     output reg          fwd_rs2_hit_ex_o,
 
     //ecall, mret
+    output reg [31:0]   csr_addr_o,
     output reg          ecall,
     output reg          mret
-
 );  
-    
-    // 提取指令
-    (* max_fanout = 30 *) wire [6:0]  opcode  = inst_i[6:0];              // 传入指令opcode
-    (* max_fanout = 30 *) wire [2:0]  funct3  = inst_i[14:12];
-    (* max_fanout = 30 *) wire [6:0]  funct7  = inst_i[31:25];
-    (* max_fanout = 30 *) wire [4:0]  rd_o    = inst_i[11:7];             // 传入指令rd地址
-    (* max_fanout = 30 *) wire [4:0]  rs1_o   = inst_i[19:15];            // 传入指令rs1地址
-    (* max_fanout = 30 *) wire [4:0]  rs2_o   = inst_i[24:20];            // 传入指令rs2地址
-
     // 前推
-    wire forwarding_rs1_ex   = (rs1_o == ex_rd_addr_i) & ex_regs_wen_i;
-    wire forwarding_rs1_mem1 = (rs1_o == mem1_rd_addr_i) & mem1_regs_wen_i;
-    wire forwarding_rs1_mem2 = (rs1_o == mem2_rd_addr_i) & mem2_regs_wen_i;
-    wire forwarding_rs1_wb   = (rs1_o == wb_rd_addr_i) & wb_regs_wen_i;
+    wire forwarding_rs1_ex   = (rs1_i == ex_rd_addr_i) & ex_regs_wen_i;
+    wire forwarding_rs1_mem1 = (rs1_i == mem1_rd_addr_i) & mem1_regs_wen_i;
+    wire forwarding_rs1_mem2 = (rs1_i == mem2_rd_addr_i) & mem2_regs_wen_i;
+    wire forwarding_rs1_wb   = (rs1_i == wb_rd_addr_i) & wb_regs_wen_i;
 
-    wire forwarding_rs2_ex   = (rs2_o == ex_rd_addr_i) & ex_regs_wen_i & !is_alu_i;
-    wire forwarding_rs2_mem1 = (rs2_o == mem1_rd_addr_i) & mem1_regs_wen_i;
-    wire forwarding_rs2_mem2 = (rs2_o == mem2_rd_addr_i) & mem2_regs_wen_i;
-    wire forwarding_rs2_wb   = (rs2_o == wb_rd_addr_i) & wb_regs_wen_i;
+    wire forwarding_rs2_ex   = (rs2_i == ex_rd_addr_i) & ex_regs_wen_i & !is_alu_i;
+    wire forwarding_rs2_mem1 = (rs2_i == mem1_rd_addr_i) & mem1_regs_wen_i;
+    wire forwarding_rs2_mem2 = (rs2_i == mem2_rd_addr_i) & mem2_regs_wen_i;
+    wire forwarding_rs2_wb   = (rs2_i == wb_rd_addr_i) & wb_regs_wen_i;
 
     wire [31:0] forwarding_rs1_data_hit =   (forwarding_rs1_mem1) ? mem1_rd_data_i :
                                             (forwarding_rs1_mem2) ? mem2_rd_data_i :
@@ -93,30 +90,30 @@ module id(
                                             rs2_data_i;
 
     // opcode
-    (* max_fanout = 30 *) wire is_alu_i  = (opcode == `TYPE_I);
-    (* max_fanout = 30 *) wire is_alu_r  = (opcode == `TYPE_R);
-    (* max_fanout = 30 *) wire is_auipc  = (opcode == `AUIPC);
-    (* max_fanout = 30 *) wire is_lui    = (opcode == `LUI);
-    (* max_fanout = 30 *) wire is_jal    = (opcode == `JAL);
-    (* max_fanout = 30 *) wire is_jalr   = (opcode == `JALR);
-    (* max_fanout = 30 *) wire is_branch = (opcode == `TYPE_B);
-    (* max_fanout = 30 *) wire is_load   = (opcode == `TYPE_L);
-    (* max_fanout = 30 *) wire is_store  = (opcode == `TYPE_S);
-    (* max_fanout = 30 *) wire is_zicsr  = (opcode == `TYPE_Zicsr);
+    (* max_fanout = 30 *) wire is_alu_i  = (opcode_i == `TYPE_I);
+    (* max_fanout = 30 *) wire is_alu_r  = (opcode_i == `TYPE_R);
+    (* max_fanout = 30 *) wire is_auipc  = (opcode_i == `AUIPC);
+    (* max_fanout = 30 *) wire is_lui    = (opcode_i == `LUI);
+    (* max_fanout = 30 *) wire is_jal    = (opcode_i == `JAL);
+    (* max_fanout = 30 *) wire is_jalr   = (opcode_i == `JALR);
+    (* max_fanout = 30 *) wire is_branch = (opcode_i == `TYPE_B);
+    (* max_fanout = 30 *) wire is_load   = (opcode_i == `TYPE_L);
+    (* max_fanout = 30 *) wire is_store  = (opcode_i == `TYPE_S);
+    (* max_fanout = 30 *) wire is_zicsr  = (opcode_i == `TYPE_Zicsr);
 
     // f3
-    (* max_fanout = 30 *) wire f3_000 = (funct3 == 3'b000);
-    (* max_fanout = 30 *) wire f3_001 = (funct3 == 3'b001);
-    (* max_fanout = 30 *) wire f3_010 = (funct3 == 3'b010);
-    (* max_fanout = 30 *) wire f3_011 = (funct3 == 3'b011);
-    (* max_fanout = 30 *) wire f3_100 = (funct3 == 3'b100);
-    (* max_fanout = 30 *) wire f3_101 = (funct3 == 3'b101);
-    (* max_fanout = 30 *) wire f3_110 = (funct3 == 3'b110);
-    (* max_fanout = 30 *) wire f3_111 = (funct3 == 3'b111);
+    (* max_fanout = 30 *) wire f3_000 = (funct3_i == 3'b000);
+    (* max_fanout = 30 *) wire f3_001 = (funct3_i == 3'b001);
+    (* max_fanout = 30 *) wire f3_010 = (funct3_i == 3'b010);
+    (* max_fanout = 30 *) wire f3_011 = (funct3_i == 3'b011);
+    (* max_fanout = 30 *) wire f3_100 = (funct3_i == 3'b100);
+    (* max_fanout = 30 *) wire f3_101 = (funct3_i == 3'b101);
+    (* max_fanout = 30 *) wire f3_110 = (funct3_i == 3'b110);
+    (* max_fanout = 30 *) wire f3_111 = (funct3_i == 3'b111);
 
     // f7
-    (* max_fanout = 30 *) wire f7_0000000 = (funct7 == 7'b0000000);
-    (* max_fanout = 30 *) wire f7_0100000 = (funct7 == 7'b0100000);
+    (* max_fanout = 30 *) wire f7_0000000 = (funct7_i == 7'b0000000);
+    (* max_fanout = 30 *) wire f7_0100000 = (funct7_i == 7'b0100000);
 
     //区分ecall和mret
     (* max_fanout = 30 *) wire is_ecall = (inst_i[31:20] == 12'b000000000000);
@@ -197,53 +194,56 @@ module id(
         fwd_rs2_data_o   = (is_alu_i) ? {{20{inst_i[31]}}, inst_i[31:20]} : forwarding_rs2_data_hit;
         fwd_rs1_hit_ex_o = forwarding_rs1_ex;
         fwd_rs2_hit_ex_o = forwarding_rs2_ex & !is_alu_i;
-        ecall            = 1'b0;
-        mret             = 1'b0;
+
+        // CSR
+        csr_addr_o       = {{20{inst_i[31]}}, inst_i[31:20]};
+        ecall            = is_zicsr & (funct3_i == `INST_ECALL | funct3_i == `INST_MRET) & is_ecall;
+        mret             = is_zicsr & (funct3_i == `INST_ECALL | funct3_i == `INST_MRET) & is_mret;
 
         (* parallel_case *)
         case(1'b1)
             is_lui: begin
-                reg_wen     = (rd_o != 5'b0);
+                reg_wen     = (rd_i != 5'b0);
                 value1_o    = {inst_i[31:12], 12'b0};
                 value2_o    = 32'b0;
                 jump1_o     = 32'b0;
                 jump2_o     = 32'b0;
                 rs1_addr_o  = 5'b0;
                 rs2_addr_o  = 5'b0;
-                rd_addr_o   = rd_o;
+                rd_addr_o   = rd_i;
             end
 
             is_auipc: begin
-                reg_wen     = (rd_o != 5'b0);
+                reg_wen     = (rd_i != 5'b0);
                 value1_o    = pc_addr_i + {inst_i[31:12], 12'b0};
                 value2_o    = 32'b0;
                 jump1_o     = 32'b0;
                 jump2_o     = 32'b0;
                 rs1_addr_o  = 5'b0;
                 rs2_addr_o  = 5'b0;
-                rd_addr_o   = rd_o;
+                rd_addr_o   = rd_i;
             end
 
             is_jal: begin
-                reg_wen     = (rd_o != 5'b0);
+                reg_wen     = (rd_i != 5'b0);
                 value1_o    = pc_add_4;
                 value2_o    = 32'b0;                  
                 jump1_o     = 32'b0;
                 jump2_o     = {{12{inst_i[31]}}, inst_i[19:12], inst_i[20], inst_i[30:21], 1'b0};
                 rs1_addr_o  = 5'b0;
                 rs2_addr_o  = 5'b0;
-                rd_addr_o   = rd_o;
+                rd_addr_o   = rd_i;
             end
 
             is_jalr: begin
-                reg_wen     = (rd_o != 5'b0);
+                reg_wen     = (rd_i != 5'b0);
                 value1_o    = pc_add_4;
                 value2_o    = {{20{inst_i[31]}}, inst_i[31:20]};
                 jump1_o     = 32'b0;
                 jump2_o     = pred_pc_i - {{20{inst_i[31]}}, inst_i[31:20]};     // 提前计算 rs1 == pred_pc - imm
-                rs1_addr_o  = rs1_o;
+                rs1_addr_o  = rs1_i;
                 rs2_addr_o  = 5'b0;
-                rd_addr_o   = rd_o;
+                rd_addr_o   = rd_i;
             end
 
             is_branch: begin
@@ -252,20 +252,20 @@ module id(
                 value2_o    = 32'b0;
                 jump1_o     = pc_addr_i + {{20{inst_i[31]}}, inst_i[7], inst_i[30:25], inst_i[11:8], 1'b0};
                 jump2_o     = pc_add_4;
-                rs1_addr_o  = rs1_o;
-                rs2_addr_o  = rs2_o;
+                rs1_addr_o  = rs1_i;
+                rs2_addr_o  = rs2_i;
                 rd_addr_o   = 5'b0;
             end
 
             is_load: begin
-                reg_wen     = (rd_o != 5'b0);
+                reg_wen     = (rd_i != 5'b0);
                 value1_o    = 32'b0;
                 value2_o    = {{20{inst_i[31]}}, inst_i[31:20]};
                 jump1_o     = 32'b0;
                 jump2_o     = 32'b0;
-                rs1_addr_o  = rs1_o;
+                rs1_addr_o  = rs1_i;
                 rs2_addr_o  = 5'b0;
-                rd_addr_o   = rd_o;
+                rd_addr_o   = rd_i;
             end
 
             is_store: begin
@@ -274,60 +274,74 @@ module id(
                 value2_o    = {{20{inst_i[31]}}, inst_i[31:25], inst_i[11:7]};
                 jump1_o     = 32'b0;
                 jump2_o     = 32'b0;
-                rs1_addr_o  = rs1_o;
-                rs2_addr_o  = rs2_o;
+                rs1_addr_o  = rs1_i;
+                rs2_addr_o  = rs2_i;
                 rd_addr_o   = 5'b0;
             end
 
             is_alu_i: begin
-                reg_wen     = (rd_o != 5'b0);
+                reg_wen     = (rd_i != 5'b0);
                 value1_o    = 32'b0;
                 value2_o    = 32'b0;
                 jump1_o     = 32'b0;
                 jump2_o     = 32'b0;
-                rs1_addr_o  = rs1_o;
+                rs1_addr_o  = rs1_i;
                 rs2_addr_o  = 5'b0;
-                rd_addr_o   = rd_o;
+                rd_addr_o   = rd_i;
             end
 
             is_alu_r: begin
-                reg_wen     = (rd_o != 5'b0);
+                reg_wen     = (rd_i != 5'b0);
                 value1_o    = 32'b0;
                 value2_o    = 32'b0;
                 jump1_o     = 32'b0;
                 jump2_o     = 32'b0;
-                rs1_addr_o  = rs1_o;
-                rs2_addr_o  = rs2_o;
-                rd_addr_o   = rd_o;
+                rs1_addr_o  = rs1_i;
+                rs2_addr_o  = rs2_i;
+                rd_addr_o   = rd_i;
             end
 
             is_zicsr: begin
-                case(funct3)
+                case(funct3_i)
                     `CSRRW,`CSRRS,`CSRRC: begin
-                        reg_wen     = 1'b1;
+                        reg_wen     = (rd_i != 5'b0);
                         value1_o    = 32'b0;
-                        value2_o    = {{20{inst_i[31]}}, inst_i[31:20]};
-                        rs1_addr_o  = rs1_o;
+                        value2_o    = 32'b0;
+                        jump1_o     = 32'b0;
+                        jump2_o     = 32'b0;
+                        rs1_addr_o  = rs1_i;
                         rs2_addr_o  = 5'b0;
-                        rd_addr_o   = rd_o;
+                        rd_addr_o   = rd_i;
                     end
                     `CSRRWI,`CSRRSI,`CSRRCI: begin
-                        reg_wen     = 1'b1;
+                        reg_wen     = (rd_i != 5'b0);
                         value1_o    = inst_i[19:15]; // zicsr立即数在rs1地址位
-                        value2_o    = {{20{inst_i[31]}}, inst_i[31:20]};
-                        rs1_addr_o  = rs1_o;
+                        value2_o    = 32'b0;
+                        jump1_o     = 32'b0;
+                        jump2_o     = 32'b0;
+                        rs1_addr_o  = rs1_i;
                         rs2_addr_o  = 5'b0;
-                        rd_addr_o   = rd_o;
+                        rd_addr_o   = rd_i;
                     end
-                    `INST_ECALL, `INST_MRET: begin
+                    `ECALL_MRET: begin
                         reg_wen     = 1'b0; // ecall和mret不写寄存器
                         value1_o    = 32'b0;
                         value2_o    = 32'b0;
+                        jump1_o     = 32'b0;
+                        jump2_o     = 32'b0;
                         rs1_addr_o  = 5'b0;
                         rs2_addr_o  = 5'b0;
                         rd_addr_o   = 5'b0;
-                        ecall       = (is_ecall) ? 1'b1 : 1'b0; // ecall信号
-                        mret        = (is_mret)  ? 1'b1 : 1'b0; // mret信号
+                    end
+                    default: begin
+                        reg_wen     = 1'b0;
+                        value1_o    = 32'b0;
+                        value2_o    = 32'b0;
+                        jump1_o     = 32'b0;
+                        jump2_o     = 32'b0;
+                        rs1_addr_o  = 5'b0;
+                        rs2_addr_o  = 5'b0;
+                        rd_addr_o   = 5'b0;
                     end
                 endcase
             end
@@ -338,7 +352,7 @@ module id(
                 value2_o    = 32'b0;
                 jump1_o     = 32'b0;
                 jump2_o     = 32'b0;
-                rs1_addr_o  = 5'b0;            
+                rs1_addr_o  = 5'b0;
                 rs2_addr_o  = 5'b0;
                 rd_addr_o   = 5'b0;
             end

@@ -97,7 +97,7 @@ def sim(sim_type, stdout=True, env=os.environ.copy()):
 
 def prj_ch(ch=[]):
     while not ch:
-        print("\r[1] 5_LEVEL_CPU_Cache  [2] 5_LEVEL_CPU_improved:  [3] 5_LEVEL_CPU_ooo ", end='', flush=True)
+        print("\r[1] 5_LEVEL_CPU_Cache  [2] 5_LEVEL_CPU_improved  [3] 5_LEVEL_CPU_ooo: ", end='', flush=True)
         prj_name_ask = getch()
         if prj_name_ask == '1':
             ch = '5_LEVEL_CPU_Cache'
@@ -108,7 +108,7 @@ def prj_ch(ch=[]):
         elif prj_name_ask == 'ESC':
             print("\033[96mESC\033[0m\r")
             sys.exit()
-    print(f"\033[96m{ch}\033[0m")
+    print(f"\033[96m{ch} @{clkFreqList[ch]} MHz\033[0m")
     return ch
 
 
@@ -117,7 +117,7 @@ def mem_ch(ch=[]):
     isInst = False
     ret = False
     while not ch and not isAll and not isInst and not ret:
-        print("\r[i] 37 inst  [1] init  [2] src0  [3] src1  [4] src2  [a] ALL: ", end='', flush=True)
+        print("\r[i] 37 inst  [1] init  [2] src0  [3] src1  [4] src2  [a] ALL  [m] 分赛: ", end='', flush=True)
         mem_name_ask = getch()
         if mem_name_ask.lower() == 'i':
             isInst = True
@@ -132,6 +132,29 @@ def mem_ch(ch=[]):
         elif mem_name_ask.lower() == 'a':
             ch = ['init', 'src0', 'src1', 'src2']
             isAll = True
+        elif mem_name_ask.lower() == 'm':
+            print("\n", end='')
+            fenSai_ch = []
+            fenSai_ret = False
+            while not fenSai_ch and not fenSai_ret:
+                print("\r[1] withMext  [2] witMext_new  [3] withoutMext  [4] withoutMext_new: ", end='', flush=True)
+                fenSai_name_ask = getch()
+                if fenSai_name_ask == '1':
+                    fenSai_ch = ['wm']
+                elif fenSai_name_ask == '2':
+                    fenSai_ch = ['wmnew']
+                elif fenSai_name_ask == '3':
+                    fenSai_ch = ['wom']
+                elif fenSai_name_ask == '4':
+                    fenSai_ch = ['womnew']
+                elif mem_name_ask == 'ESC':
+                    fenSai_ret = True
+                print('\033[96m', end='')
+            if fenSai_ret:
+                print('ESC', end='')
+            else:
+                ch.extend(fenSai_ch)
+
         elif mem_name_ask == 'ESC':
             ret = True
     print('\033[96m', end='')
@@ -305,8 +328,6 @@ if __name__ == '__main__':
 
     while True:
         prj_name = prj_ch()
-        print(f"当前时钟频率: {clkFreqList[prj_name]} MHz")
-
         while True:
             mem_list, isAll, isInst, ret = mem_ch()
 

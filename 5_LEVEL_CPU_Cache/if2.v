@@ -4,8 +4,6 @@ module if2(
     // from if1_if2
     input               if2_valid_i,
     input      [31:0]   pc_i,
-    input               pred_flush,
-    input               pred_taken,
 
     // from icache
     input      [31:0]   inst_i,
@@ -14,10 +12,24 @@ module if2(
     (* max_fanout = 30 *)
     output reg [31:0]   pc_o,
     (* max_fanout = 30 *)
-    output reg [31:0]   inst_o
+    output reg [31:0]   inst_o,
+    output reg [6:0]    opcode_o,
+    output reg [2:0]    funct3_o,
+    output reg [6:0]    funct7_o,
+    output reg [4:0]    rd_o,
+    output reg [4:0]    rs1_o,
+    output reg [4:0]    rs2_o
 );
     always @(*) begin
-        pc_o    = (pred_flush) ? 32'b0 : pc_i;
-        inst_o  = (if2_valid_i & !pred_flush & !pred_taken) ? inst_i : `NOP;
+        pc_o    = pc_i;
+        inst_o  = (if2_valid_i) ? inst_i : `NOP;
+
+        // 预译码
+        opcode_o  = inst_o[6:0];
+        funct3_o  = inst_o[14:12];
+        funct7_o  = inst_o[31:25];
+        rd_o      = inst_o[11:7];
+        rs1_o     = inst_o[19:15];
+        rs2_o     = inst_o[24:20];
     end
 endmodule

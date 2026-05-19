@@ -26,6 +26,7 @@ module bpu_controller #(
     input      [31:0]               pc_addr,            // if1 阶段指令地址
 
     // from if2
+    input      [31:0]               pc_addr_if2,
     input      [31:0]               pc_inst,            // if2 取得的指令
 
     // to pc & id
@@ -83,6 +84,9 @@ module bpu_controller #(
     output reg [31 - BTB_INDEX_WIDTH - 2:0]     btb_update_tag,
     output reg [31:0]                           btb_update_target
 );
+    // 指令是否可用
+    wire inst_valid = !pred_flush & !pred_taken;
+
     // 取出 rd 和 rs1 的地址
     wire    [4:0]   rd_addr     = pc_inst[11:7];
     wire    [4:0]   rs1_addr    = pc_inst[19:15];
@@ -106,10 +110,9 @@ module bpu_controller #(
     wire            is_ras_push = (is_ret_JAL && !ras_isfull);
 
     (* max_fanout = 20 *)
-    reg     [31:0]  pc_reg;
-    wire    [31:0]  pc_add_4    = pc_reg + 32'h4;
-    wire    [31:0]  pc_add_JAL  = pc_reg + JAL_imm;
-    wire    [31:0]  pc_add_B    = pc_reg + B_imm;
+    wire    [31:0]  pc_add_4    = pc_addr_if2 + 32'h4;
+    wire    [31:0]  pc_add_JAL  = pc_addr_if2 + JAL_imm;
+    wire    [31:0]  pc_add_B    = pc_addr_if2 + B_imm;
 
     // Gshare索引：取PC中间位与BHR异或
     wire [BHR_WIDTH - 1:0]  pht_index           = pc_addr[BHR_WIDTH + 1:2] ^ gshare_ghr;
@@ -123,12 +126,9 @@ module bpu_controller #(
 
     // 查询
     (* max_fanout = 30 *)
-    assign gshare_pht_index = (pred_taken) ? 0 : pht_index;     // 预测跳转后屏蔽查询入口
+    assign gshare_pht_index = (inst_valid) ? pht_index : 0;     // 预测跳转后屏蔽查询入口
     always@(posedge clk) begin
         if (!rst) begin
-            // PC
-            pc_reg          <= 0;
-
             // RAS
             ras_pop_en      <= 0;
             ras_push_en     <= 0;
@@ -137,69 +137,85 @@ module bpu_controller #(
             // BTB
             btb_query_index <= 0;
             btb_query_tag   <= 0;
-        end
-        else if (!pipe_hold) begin
-            // PC
-            pc_reg          <= pc_addr;
 
+            // GSHARE
+            gshare_prev_b   <= 0;
+        end
+        else if (pipe_hold) begin
+            // ..
+        end
+        else if (inst_valid) begin
             // RAS
-            ras_pop_en      <= is_ras_pop & !pred_taken;
-            ras_push_en     <= is_ras_push & !pred_taken;
+            ras_pop_en      <= is_ras_pop;
+            ras_push_en     <= is_ras_push;
             ras_push_addr   <= pc_add_4;
 
             // BTB
             btb_query_index <= btb_query_index_w;
             btb_query_tag   <= btb_query_tag_w;
-        end
-    end
 
-    // Gshare
-    always @(posedge clk) begin
-        if (!rst) begin
-            gshare_prev_b   <= 0;
+            // GSHARE
+            gshare_prev_b   <= is_B_type & inst_valid;
         end
         else begin
-            gshare_prev_b   <= is_B_type & !pred_flush;
+            // RAS
+            ras_pop_en      <= 1'b0;
+            ras_push_en     <= 1'b0;
+            ras_push_addr   <= 32'b0;
+
+            // BTB
+            btb_query_index <= btb_query_index_w;
+            btb_query_tag   <= btb_query_tag_w;
+
+            // GSHARE
+            gshare_prev_b   <= 1'b0;
         end
     end
     
     // 预测结果
     reg sel_pred_taken;
-        reg [31:0] sel_pred_pc;
-        always @(*) begin
-            (* parallel_case *)
-            case (1'b1)
-                is_ras_pop: begin
-                    sel_pred_taken  = 1'b1;
-                    sel_pred_pc     = ras_pop_addr;
-                end
-                is_B_type: begin
-                    sel_pred_taken  = gshare_pred_taken;
-                    sel_pred_pc     = pc_add_B;
-                end
-                is_JALR: begin
-                    sel_pred_taken  = btb_hit;
-                    sel_pred_pc     = btb_target_pc;
-                end
-                is_JAL: begin
-                    sel_pred_taken  = 1'b1;
-                    sel_pred_pc     = pc_add_JAL;
-                end
-                default: begin
-                    sel_pred_taken  = 1'b0;
-                    sel_pred_pc     = pc_add_4;
-                end
-            endcase
-        end
+    reg [31:0] sel_pred_pc;
+    always @(*) begin
+        (* parallel_case *)
+        case (1'b1)
+            is_ras_pop: begin
+                sel_pred_taken  = 1'b1;
+                sel_pred_pc     = ras_pop_addr;
+            end
+            is_B_type: begin
+                sel_pred_taken  = gshare_pred_taken;
+                sel_pred_pc     = pc_add_B;
+            end
+            is_JALR: begin
+                sel_pred_taken  = btb_hit;
+                sel_pred_pc     = btb_target_pc;
+            end
+            is_JAL: begin
+                sel_pred_taken  = 1'b1;
+                sel_pred_pc     = pc_add_JAL;
+            end
+            default: begin
+                sel_pred_taken  = 1'b0;
+                sel_pred_pc     = 32'b0;
+            end
+        endcase
+    end
 
     always @(posedge clk) begin
         if (!rst) begin
             pred_taken  <= 0;
             pred_pc     <= 0;
         end
-        else if (!pipe_hold) begin  // 当暂停时预测器的结果需要保存
-            pred_taken  <= sel_pred_taken & !pred_taken & !pred_flush; // 避免重复预测 (!pred_flush_r)
+        else if (pipe_hold) begin   // 当暂停时预测器的结果需要保存
+            // ...
+        end
+        else if (inst_valid) begin
+            pred_taken  <= sel_pred_taken;
             pred_pc     <= sel_pred_pc;
+        end
+        else begin
+            pred_taken  <= 0;
+            pred_pc     <= 0;
         end
     end
 

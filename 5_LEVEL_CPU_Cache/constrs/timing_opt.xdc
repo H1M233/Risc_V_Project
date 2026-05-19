@@ -1,17 +1,27 @@
 # 设置 EX 的 pblock
-delete_pblocks [get_pblocks pblock_EX_stage]
 # create_pblock pblock_EX_stage
-    
-# add_cells_to_pblock [get_pblocks pblock_EX_stage] \
-#     [get_cells -hier -filter {NAME =~ "*EX*" || NAME =~ "*FWD*" || NAME =~ "*ID_EX*" || NAME =~ "*BPU*" || NAME =~ "*PC*"}]
-    
-# resize_pblock [get_pblocks pblock_EX_stage] \
-#     -add {SLICE_X70Y180:SLICE_X117Y229}
 
-# ## 关键设置：此区域允许其他无关逻辑混入，但会尽量引导布线器就近布线
+# add_cells_to_pblock [get_pblocks pblock_EX_stage] \
+#     [get_cells -hier -filter {NAME =~ "*EX*" || NAME =~ "*IF2_ID*" || NAME =~ "*ID_EX*" || NAME =~ "*EX_MEM*" || NAME =~ "*PC*" || NAME =~ "*EX_MEM*" || NAME =~ "*DCACHE*"}]
+
+# resize_pblock [get_pblocks pblock_EX_stage] \
+#     -add {SLICE_X2Y150:SLICE_X79Y199}
+
+# ### 关键设置：此区域允许其他无关逻辑混入，但会尽量引导布线器就近布线
 # set_property CONTAIN_ROUTING true       [get_pblocks pblock_EX_stage]
 # set_property EXCLUDE_PLACEMENT false    [get_pblocks pblock_EX_stage]
 # set_property SNAPPING_MODE ON           [get_pblocks pblock_EX_stage]
 
+set_false_path -from [get_clocks -filter {NAME =~ "*clk_out2_pll*"}] -to [get_clocks -filter {NAME =~ "*clk_out1_pll*"}]
+set_false_path -from [get_clocks -filter {NAME =~ "*clk_out1_pll*"}] -to [get_clocks -filter {NAME =~ "*clk_out2_pll*"}]
 
-# set_max_delay 3.33 -from [get_pins -hier -filter {NAME =~ "*forwarding_rs1_data_o*/Q" || NAME =~ "*forwarding_rs2_data_o*/Q"}] -to [get_pins -hier -filter {NAME =~ "*pred_flush*/D" || NAME =~ "*rd_data_o*/D"}]
+set_property KEEP_HIERARCHY SOFT [get_cells -hierarchical *pll_inst*]
+set_property KEEP_HIERARCHY SOFT [get_cells -hierarchical *Mem_IROM*]
+set_property KEEP_HIERARCHY SOFT [get_cells -hierarchical *Mem_DRAM*]
+
+# 限制扇出
+set_property MAX_FANOUT 30 [get_nets -hierarchical *pipe_hold*]
+set_property MAX_FANOUT 30 [get_nets -hierarchical *hazard_en*]
+set_property MAX_FANOUT 30 [get_nets -hierarchical *dcache_addr*/Q*]
+set_property MAX_FANOUT 30 [get_nets -hierarchical *hit_tagv*]
+set_property MAX_FANOUT 30 [get_nets -hierarchical *hit_data_b*_w*]

@@ -33,8 +33,10 @@ module ex_mem(
     output reg [1:0]    load_addr_low_o,
     output reg          load_is_signed_o
 );
+    wire ex_mem_hold_en = dcache_stall;
+    wire ex_mem_flush_en = (ecall_flush | mret_flush);
     always@(posedge clk) begin
-        if(!rst) begin
+        if (!rst) begin
             rd_addr_o           <= 5'b0;
             rd_data_o           <= 32'b0;
             regs_wen_o          <= 1'b0;
@@ -45,7 +47,10 @@ module ex_mem(
             load_addr_low_o     <= 2'b0;
             load_is_signed_o    <= 1'b0;
         end
-        else if(ecall_flush | mret_flush) begin
+        else if (ex_mem_hold_en) begin
+            // ...
+        end
+        else if (ex_mem_flush_en) begin
             rd_addr_o           <= 5'b0;
             rd_data_o           <= 32'b0;
             regs_wen_o          <= 1'b0;
@@ -56,7 +61,7 @@ module ex_mem(
             load_addr_low_o     <= 2'b0;
             load_is_signed_o    <= 1'b0;
         end
-        else if (!dcache_stall) begin
+        else begin
             rd_addr_o           <= rd_addr_i;
             rd_data_o           <= rd_data_i;
             regs_wen_o          <= regs_wen_i;

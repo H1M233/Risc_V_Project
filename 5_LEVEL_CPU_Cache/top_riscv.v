@@ -52,6 +52,12 @@ module top_riscv(
     (* max_fanout = 30 *)
     wire [31:0]     if2_inst_o;
     wire [31:0]     if2_pc_o;
+    wire [6:0]      if2_opcode_o;
+    wire [2:0]      if2_funct3_o;
+    wire [6:0]      if2_funct7_o;
+    wire [4:0]      if2_rd_o;
+    wire [4:0]      if2_rs1_o;
+    wire [4:0]      if2_rs2_o;
 
     // ============================================================
     // if_id to id
@@ -59,6 +65,12 @@ module top_riscv(
     (* max_fanout = 30 *)
     wire [31:0]     id_inst_i;
     wire [31:0]     id_pc_i;
+    wire [6:0]      id_opcode_i;
+    wire [2:0]      id_funct3_i;
+    wire [6:0]      id_funct7_i;
+    wire [4:0]      id_rd_i;
+    wire [4:0]      id_rs1_i;
+    wire [4:0]      id_rs2_i;
 
     // ============================================================
     // id to id_ex
@@ -81,6 +93,7 @@ module top_riscv(
     wire            id_fwd_rs2_hit_ex_o;
     wire [31:0]     id_fwd_rs1_data_o;
     wire [31:0]     id_fwd_rs2_data_o;
+    wire [31:0]     id_csr_addr_o;
     wire            id_ecall_o;
     wire            id_mret_o;
 
@@ -221,7 +234,13 @@ module top_riscv(
 
     // ��ˮ����ͣ����
     (* max_fanout = 30 *)
-    wire pipe_hold = dcache_stall | hazard_hazard_en;
+    wire pipe_hold_icache = dcache_stall | hazard_hazard_en;
+    (* max_fanout = 30 *)
+    wire pipe_hold_if1_if2 = dcache_stall | hazard_hazard_en;
+    (* max_fanout = 30 *)
+    wire pipe_hold_if2_id = dcache_stall | hazard_hazard_en;
+    (* max_fanout = 30 *)
+    wire pipe_hold_bpu = dcache_stall | hazard_hazard_en;
 
     // ============================================================
     // ex to bpu
@@ -266,7 +285,7 @@ module top_riscv(
 
         .cpu_pc             (if1_pc_o),
         .cpu_inst           (icache_inst),
-        .pipe_hold          (pipe_hold),
+        .pipe_hold          (pipe_hold_icache),
 
         .mem_addr           (irom_addr),
         .mem_inst           (irom_data)
@@ -295,8 +314,8 @@ module top_riscv(
         .dcache_ack_mem     (dcache_ack_mem),
 
         // from id
-        .id_rs1_raddr_i     (id_rs1_addr_o),
-        .id_rs2_raddr_i     (id_rs2_addr_o),
+        .id_rs1_raddr_i     (id_rs1_i),
+        .id_rs2_raddr_i     (id_rs2_i),
 
         // to if_id, id_ex, pc
         .hazard_en          (hazard_hazard_en)
@@ -327,7 +346,7 @@ module top_riscv(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
 
-        .csr_addr           (id_value2_o),        
+        .csr_addr           (id_csr_addr_o),        
         .csr_wdata          (ex_csr_wdata_o),     
         .csr_wen            (ex_csr_wen_o),
 
@@ -354,12 +373,12 @@ module top_riscv(
 
         .pred_taken         (bpu_pred_taken),
         .pred_flush         (ex_pred_flush_en_o),
-        .pipe_hold          (pipe_hold),
+        .pipe_hold          (pipe_hold_if1_if2),
 
         .pc_i               (if1_pc_o),
 
-        .ecall_flush         (wb_ecall_flush),
-        .mret_flush          (wb_mret_flush),
+        .ecall_flush        (wb_ecall_flush),
+        .mret_flush         (wb_mret_flush),
 
         .if2_valid_o        (if2_valid_i),
         .pc_o               (if2_pc_i)
@@ -367,14 +386,18 @@ module top_riscv(
 
     if2 IF2(
         .inst_i             (icache_inst),
-        .pred_flush         (ex_pred_flush_en_o),
-        .pred_taken         (bpu_pred_taken),
 
         .if2_valid_i        (if2_valid_i),
         .pc_i               (if2_pc_i),
 
         .inst_o             (if2_inst_o),
-        .pc_o               (if2_pc_o)
+        .pc_o               (if2_pc_o),
+        .opcode_o           (if2_opcode_o),
+        .funct3_o           (if2_funct3_o),
+        .funct7_o           (if2_funct7_o),
+        .rd_o               (if2_rd_o),
+        .rs1_o              (if2_rs1_o),
+        .rs2_o              (if2_rs2_o)
     );
 
     // ============================================================
@@ -384,18 +407,31 @@ module top_riscv(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
 
-        .pipe_hold          (pipe_hold),
+        .pipe_hold          (pipe_hold_if2_id),
 
         .inst_i             (if2_inst_o),
         .pc_i               (if2_pc_o),
+        .opcode_i           (if2_opcode_o),
+        .funct3_i           (if2_funct3_o),
+        .funct7_i           (if2_funct7_o),
+        .rd_i               (if2_rd_o),
+        .rs1_i              (if2_rs1_o),
+        .rs2_i              (if2_rs2_o),
 
         .pred_taken         (bpu_pred_taken),
+        .pred_flush         (ex_pred_flush_en_o),
 
-        .ecall_flush         (wb_ecall_flush),
-        .mret_flush          (wb_mret_flush),
+        .ecall_flush        (wb_ecall_flush),
+        .mret_flush         (wb_mret_flush),
 
         .inst_o             (id_inst_i),
-        .pc_o               (id_pc_i)
+        .pc_o               (id_pc_i),
+        .opcode_o           (id_opcode_i),
+        .funct3_o           (id_funct3_i),
+        .funct7_o           (id_funct7_i),
+        .rd_o               (id_rd_i),
+        .rs1_o              (id_rs1_i),
+        .rs2_o              (id_rs2_i)
     );
 
     // ============================================================
@@ -404,6 +440,12 @@ module top_riscv(
     id ID(
         .inst_i             (id_inst_i),
         .pc_addr_i          (id_pc_i),
+        .opcode_i           (id_opcode_i),
+        .funct3_i           (id_funct3_i),
+        .funct7_i           (id_funct7_i),
+        .rd_i               (id_rd_i),
+        .rs1_i              (id_rs1_i),
+        .rs2_i              (id_rs2_i),
 
         .pred_taken_i       (bpu_pred_taken),
         .pred_pc_i          (bpu_pred_pc),
@@ -444,6 +486,8 @@ module top_riscv(
         .fwd_rs2_data_o     (id_fwd_rs2_data_o),               
         .fwd_rs1_hit_ex_o   (id_fwd_rs1_hit_ex_o),
         .fwd_rs2_hit_ex_o   (id_fwd_rs2_hit_ex_o),
+
+        .csr_addr_o         (id_csr_addr_o),
         .ecall              (id_ecall_o),
         .mret               (id_mret_o)
     );
@@ -711,6 +755,7 @@ module top_riscv(
         .rst                (cpu_rst),
 
         .pc_addr            (if1_pc_o),
+        .pc_addr_if2        (if2_pc_o),
         .pc_inst            (if2_inst_o),
 
         .pred_pc            (bpu_pred_pc),
@@ -722,7 +767,7 @@ module top_riscv(
         .update_target      (ex_pred_update_target),
         .actual_taken       (ex_actual_taken),
 
-        .pipe_hold          (pipe_hold),
+        .pipe_hold          (pipe_hold_bpu),
         .pred_flush         (ex_pred_flush_en_o)
     );
 

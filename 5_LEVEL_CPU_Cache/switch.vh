@@ -1,4 +1,3 @@
-`define ENABLE_DCACHE
 `define ALU_USE_FAST_COMPARATOR
 
 

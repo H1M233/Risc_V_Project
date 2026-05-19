@@ -5,6 +5,7 @@ module if1(
     input      [31:0]   pc_i,           // 从 pc 接受的指令地址
 
     // to if1_if2 & bpu & icache
+    (* max_fanout = 30 *)
     output reg [31:0]   pc_o           // 传递指令地址
 );
     always @(*) begin

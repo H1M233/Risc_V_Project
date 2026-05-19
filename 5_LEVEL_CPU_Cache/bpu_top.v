@@ -24,6 +24,7 @@ module bpu_top #(
     input      [31:0]   pc_addr,            // if1 阶段指令地址
 
     // from if2
+    input      [31:0]   pc_addr_if2,
     input      [31:0]   pc_inst,            // if2 取得的指令
 
     // to pc & id
@@ -86,6 +87,7 @@ module bpu_top #(
 
         // from  if
         .pc_addr                    (pc_addr),
+        .pc_addr_if2                (pc_addr_if2),
         .pc_inst                    (pc_inst),
         
         // to pc & id

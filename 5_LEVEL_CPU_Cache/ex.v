@@ -42,7 +42,6 @@ module ex(
     output reg          regs_wen_o,
     output              ecall_o,
     output              mret_o,
-    // output reg [4:0]    load_packaged_o,
 
     // to ex_mem & hazard   
     output reg [4:0]    rd_addr_o,
@@ -229,7 +228,10 @@ module ex(
             sel_sra  : alu_result = sra_res;
             sel_or   : alu_result = or_res;
             sel_and  : alu_result = and_res;
+
             request_value_only: alu_result = value1_i;
+
+            is_zicsr : alu_result = csr_rdata;
             default  : alu_result = 32'b0;
         endcase
     end
@@ -299,7 +301,7 @@ module ex(
     // 读写
     always @(*) begin: ALU_WB
         // 寄存器写入
-        regs_wen_o          = valid_i & !pred_flush_en & regs_wen_i; // regs 写使能
+        regs_wen_o          = !pred_flush_en & regs_wen_i; // regs 写使能
         rd_addr_o           = rd_addr_i;
         rd_data_o           = alu_result;
         mem_req_load_o      = is_load & regs_wen_i; // 判断 x0 寄存器提前到 id 阶段，是 x0 直接不用 Load 请求
@@ -343,9 +345,6 @@ module ex(
                       (sel_csrrci) ? rc_res :
                                       32'b0;               // CSR 写数据
         // csr_addr_o = value2_i;   // CSR 地址来自立即数
-        // regs_wen_o = valid_i & ~pred_flush_en & is_zicsr & regs_wen_i; // regs 写使能，CSR 指令需要写回寄存器
-        // rd_addr_o  = rd_addr_i;   // rd 地址来自指令
-        // rd_data_o  = csr_rdata;   // rd 数据来自 CSR
     end 
     
     assign ecall_o = ecall_i;

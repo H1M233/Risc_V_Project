@@ -24,8 +24,9 @@ module mem_wb(
     output reg          ecall_o,
     output reg          mret_o
 );
+    wire mem_wb_flush_en = (ecall_flush | mret_flush);
     always@(posedge clk) begin
-        if(!rst) begin
+        if (!rst) begin
             rd_data_o       <= 32'b0;
             rd_addr_o       <= 5'b0;
             regs_wen_o      <= 1'b0;
@@ -33,7 +34,7 @@ module mem_wb(
             ecall_o         <= 1'b0;
             mret_o          <= 1'b0;
         end
-        else if(ecall_flush | mret_flush) begin
+        else if (mem_wb_flush_en) begin
             rd_data_o       <= 32'b0;
             rd_addr_o       <= 5'b0;
             regs_wen_o      <= 1'b0;
