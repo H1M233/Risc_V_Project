@@ -23,8 +23,6 @@ module top_riscv(
     // ============================================================
     wire [31:0]     pc_pc_addr_o;
     wire [31:0]     icache_inst;
-    wire            pc_ecall;
-    wire            pc_mret;
 
     // ============================================================
     // hazard / stall
@@ -259,19 +257,6 @@ module top_riscv(
     (* max_fanout = 30 *)
     wire            ex_actual_taken;
 
-    // ============================================================
-    // wb to pc
-    // ============================================================
-    wb_pc WB_PC(
-        .clk            (cpu_clk),
-        .rst            (cpu_rst),
-
-        .wb_ecall       (wb_ecall_o),
-        .wb_mret        (wb_mret_o),
-
-        .pc_ecall       (pc_ecall),
-        .pc_mret        (pc_mret)
-    );
 
     // ============================================================
     // PC
@@ -286,8 +271,8 @@ module top_riscv(
         .pred_flush         (ex_pred_flush_en_o),
         .pred_flush_pc      (ex_pred_flush_pc_o),
 
-        .wb_ecall           (pc_ecall),
-        .wb_mret            (pc_mret),
+        .wb_ecall           (wb_ecall_o),
+        .wb_mret            (wb_mret_o),
 
         .ecall_mret_addr    (csr_regs_ecall_mret_addr),
 
@@ -373,8 +358,8 @@ module top_riscv(
 
         .csr_rdata          (csr_regs_csr_rdata),
 
-        .ecall              (wb_ecall_o),      
-        .mret               (wb_mret_o),       
+        .ecall              (mem_ecall_o),      
+        .mret               (mem_mret_o),       
         .ecall_inst         (ex_ecall_inst),     
         .ecall_mret_addr    (csr_regs_ecall_mret_addr)
     );

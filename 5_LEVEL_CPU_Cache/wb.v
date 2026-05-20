@@ -26,9 +26,9 @@ module wb(
         rd_addr_o   = rd_addr_i;
         regs_wen_o  = regs_wen_i;
         rd_data_o   = rd_data_i;
-        ecall_o     = 0;
-        ecall_flush = ecall_i;  
-        mret_o      = 0;
+        ecall_o     = ecall_i;
+        ecall_flush = ecall_i;
+        mret_o      = mret_i;
         mret_flush  = mret_i;
     end
 endmodule
