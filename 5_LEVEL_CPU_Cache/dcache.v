@@ -1,10 +1,7 @@
 `include "rv32I.vh"
 `include "switch.vh"
 
-module dcache#(
-    parameter INDEX_WIDTH   = 2,    // INDEX_WIDTH 需 < 6
-    parameter TAG_WIDTH     = (30 - INDEX_WIDTH)
-)(
+module dcache(
     input               clk,
     input               rst,
 
@@ -18,6 +15,7 @@ module dcache#(
     output     [31:0]   cpu_rdata,
     input               cpu_write_dram,
 
+    (* max_fanout = 30 *)
     output              stall,
 
     // external DROM side
@@ -29,6 +27,8 @@ module dcache#(
 
     output              mem_ack
 );
+    localparam INDEX_WIDTH = `DCACHE_INDEX_WIDTH;
+    localparam TAG_WIDTH = 30 - INDEX_WIDTH;
     localparam LINE_NUM = 2 ** INDEX_WIDTH;
 
     // 两路 FIFO
@@ -36,19 +36,19 @@ module dcache#(
     (* ram_style = "distributed" *) reg [7:0] data_b1_w0 [0:LINE_NUM - 1];
     (* ram_style = "distributed" *) reg [7:0] data_b2_w0 [0:LINE_NUM - 1];
     (* ram_style = "distributed" *) reg [7:0] data_b3_w0 [0:LINE_NUM - 1];
-    `ifdef USE_2WAY_DCACHE
+`ifdef USE_2WAY_DCACHE
     (* ram_style = "distributed" *) reg [7:0] data_b0_w1 [0:LINE_NUM - 1];
     (* ram_style = "distributed" *) reg [7:0] data_b1_w1 [0:LINE_NUM - 1];
     (* ram_style = "distributed" *) reg [7:0] data_b2_w1 [0:LINE_NUM - 1];
     (* ram_style = "distributed" *) reg [7:0] data_b3_w1 [0:LINE_NUM - 1];
-    `endif
+`endif
 
     // [TAG_WIDTH]:Valid, [TAG_WIDTH-1:0]:Tag
     (* ram_style = "distributed" *) reg [TAG_WIDTH:0] tagv_w0 [0:LINE_NUM - 1];
-    `ifdef USE_2WAY_DCACHE
+`ifdef USE_2WAY_DCACHE
     (* ram_style = "distributed" *) reg [TAG_WIDTH:0] tagv_w1 [0:LINE_NUM - 1];
     reg replace_way [0:LINE_NUM - 1];
-    `endif
+`endif
 
     // 状态寄存
     reg hit_r, miss_r;
@@ -61,51 +61,51 @@ module dcache#(
     integer i;
     initial begin
         for (i = 0; i < LINE_NUM; i = i + 1) tagv_w0[i] = 0;
-        `ifdef USE_2WAY_DCACHE
+    `ifdef USE_2WAY_DCACHE
         for (i = 0; i < LINE_NUM; i = i + 1) tagv_w1[i] = 0;
         for (i = 0; i < LINE_NUM; i = i + 1) replace_way[i] = 0;
-        `endif
+    `endif
     end
 
     // 地址解码
-    wire [INDEX_WIDTH - 1:0] query_index = cpu_addr[INDEX_WIDTH + 1:2];
-    wire [TAG_WIDTH - 1:0]   query_tag   = cpu_addr[31:INDEX_WIDTH + 2];
+    (* max_fanout = 30 *) wire [INDEX_WIDTH - 1:0] query_index = cpu_addr[INDEX_WIDTH + 1:2];
+    (* max_fanout = 30 *) wire [TAG_WIDTH - 1:0]   query_tag   = cpu_addr[31:INDEX_WIDTH + 2];
 
     // 判断命中
     wire [TAG_WIDTH:0] hit_tagv_w0 = tagv_w0[query_index];
     wire hit_way0 = (hit_tagv_w0 == {1'b1, query_tag});
-    `ifdef USE_2WAY_DCACHE
+`ifdef USE_2WAY_DCACHE
     wire [TAG_WIDTH:0] hit_tagv_w1 = tagv_w1[query_index];
     wire hit_way1 = (hit_tagv_w1 == {1'b1, query_tag});
     wire dcache_hit = hit_way0 | hit_way1;
     wire miss_replace_way = replace_way[query_index];
-    `else
+`else
     wire hit_way1 = 1'b0;
     wire dcache_hit = hit_way0;
     wire miss_replace_way = 1'b0;
-    `endif
+`endif
 
     // 读
     wire [7:0] hit_data_b3_w0 = data_b3_w0[query_index];
     wire [7:0] hit_data_b2_w0 = data_b2_w0[query_index];
     wire [7:0] hit_data_b1_w0 = data_b1_w0[query_index];
     wire [7:0] hit_data_b0_w0 = data_b0_w0[query_index];
-    `ifdef USE_2WAY_DCACHE
+`ifdef USE_2WAY_DCACHE
     wire [7:0] hit_data_b3_w1 = data_b3_w1[query_index];
     wire [7:0] hit_data_b2_w1 = data_b2_w1[query_index];
     wire [7:0] hit_data_b1_w1 = data_b1_w1[query_index];
     wire [7:0] hit_data_b0_w1 = data_b0_w1[query_index];
-    `endif
+`endif
 
     // 命中数据
     reg [31:0] hit_data;
     always @(posedge clk) begin
         `ifdef USE_2WAY_DCACHE
-        hit_data <= hit_way1 ?
-                    {hit_data_b3_w1, hit_data_b2_w1, hit_data_b1_w1, hit_data_b0_w1} :
-                    {hit_data_b3_w0, hit_data_b2_w0, hit_data_b1_w0, hit_data_b0_w0};
+            hit_data <= hit_way1 ?
+                        {hit_data_b3_w1, hit_data_b2_w1, hit_data_b1_w1, hit_data_b0_w1} :
+                        {hit_data_b3_w0, hit_data_b2_w0, hit_data_b1_w0, hit_data_b0_w0};
         `else
-        hit_data <= {hit_data_b3_w0, hit_data_b2_w0, hit_data_b1_w0, hit_data_b0_w0};
+            hit_data <= {hit_data_b3_w0, hit_data_b2_w0, hit_data_b1_w0, hit_data_b0_w0};
         `endif
     end
 
@@ -118,14 +118,14 @@ module dcache#(
                 if (cpu_we[1]) data_b1_w0[query_index] <= cpu_wdata[15:8];
                 if (cpu_we[0]) data_b0_w0[query_index] <= cpu_wdata[7:0];
             end
-            `ifdef USE_2WAY_DCACHE
+        `ifdef USE_2WAY_DCACHE
             else begin
                 if (cpu_we[3]) data_b3_w1[query_index] <= cpu_wdata[31:24];
                 if (cpu_we[2]) data_b2_w1[query_index] <= cpu_wdata[23:16];
                 if (cpu_we[1]) data_b1_w1[query_index] <= cpu_wdata[15:8];
                 if (cpu_we[0]) data_b0_w1[query_index] <= cpu_wdata[7:0];
             end
-            `endif
+        `endif
         end
         else if (miss_r) begin
             if (miss_way == 0) begin
@@ -134,14 +134,14 @@ module dcache#(
                 data_b1_w0[miss_index] <= mem_rdata[15:8];
                 data_b0_w0[miss_index] <= mem_rdata[7:0];
             end 
-            `ifdef USE_2WAY_DCACHE
+        `ifdef USE_2WAY_DCACHE
             else begin
                 data_b3_w1[miss_index] <= mem_rdata[31:24];
                 data_b2_w1[miss_index] <= mem_rdata[23:16];
                 data_b1_w1[miss_index] <= mem_rdata[15:8];
                 data_b0_w1[miss_index] <= mem_rdata[7:0];
             end
-            `endif
+        `endif
         end
     end
 
@@ -150,11 +150,11 @@ module dcache#(
         if (miss_r) begin
             if (miss_way == 0)
                 tagv_w0[miss_index] <= {1'b1, miss_tag};
-            `ifdef USE_2WAY_DCACHE
+        `ifdef USE_2WAY_DCACHE
             else
                 tagv_w1[miss_index] <= {1'b1, miss_tag};
-            replace_way[miss_index] <= ~replace_way[miss_index];    // FIFO 替换指针更新
-            `endif
+            replace_way[miss_index] <= ~miss_way;    // FIFO 替换指针更新
+        `endif
         end
     end
 

@@ -16,6 +16,7 @@ module icache #(
     output reg [31:0]   cpu_inst,
     (* max_fanout = 30 *)
     input               pipe_hold,
+    input               pipe_flush,
 
     // IROM side
     (* max_fanout = 30 *)
@@ -31,6 +32,9 @@ module icache #(
         end
         else if (pipe_hold) begin
             // ...
+        end
+        else if (pipe_flush) begin
+            cpu_inst <= `NOP;
         end
         else begin
             cpu_inst <= mem_inst;

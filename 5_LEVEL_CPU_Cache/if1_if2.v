@@ -12,24 +12,20 @@ module if1_if2(
     input      [31:0]   pc_i,
 
     // to if2
-    output reg          if2_valid_o,
     output reg [31:0]   pc_o
 );
     always @(posedge clk) begin
         if (!rst) begin
-            if2_valid_o <= 1'b0;
-            pc_o        <= 32'h0;
+            pc_o <= 32'h0;
         end
         else if (pipe_hold) begin
             // ...
         end
         else if (pipe_flush) begin
-            if2_valid_o <= 1'b0;
-            pc_o        <= 32'b0;
+            pc_o <= 32'b0;
         end
         else begin
-            if2_valid_o <= 1'b1;
-            pc_o        <= pc_i;
+            pc_o <= pc_i;
         end
     end
 endmodule

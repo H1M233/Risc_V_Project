@@ -30,7 +30,9 @@ module ex(
     // from fowarding - fanout set
     input      [31:0]   fwd_rs1_data_i,
     input      [31:0]   fwd_rs2_data_i,
+    (* max_fanout = 20 *)
     input               fwd_rs1_hit_ex_i,
+    (* max_fanout = 20 *)
     input               fwd_rs2_hit_ex_i,
     input      [31:0]   fwd_ex_rd_data_i,
 
@@ -137,10 +139,10 @@ module ex(
     wire request_value_only = inst_packaged_i[`REQUEST_VALUE_ONLY];
 
     // 前推选择
-    (* max_fanout = 30 *) wire [31:0] rs1_data_fwd = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
-    (* max_fanout = 30 *) wire [31:0] rs2_data_fwd = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
-    (* max_fanout = 30 *) wire [31:0] value1_eff = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
-    (* max_fanout = 30 *) wire [31:0] value2_eff = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
+    (* max_fanout = 20 *) wire [31:0] rs1_data_fwd = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
+    (* max_fanout = 20 *) wire [31:0] rs2_data_fwd = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
+    (* max_fanout = 20 *) wire [31:0] value1_eff = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
+    (* max_fanout = 20 *) wire [31:0] value2_eff = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
 
     // 计算
     wire [4:0]  shamt    = value2_eff[4:0];
@@ -188,23 +190,23 @@ module ex(
         assign {branch_carry, branch_sub_result} = {1'b0, branch_rs1_data} - {1'b0, branch_rs2_data};   // 等同于例化减法器
         wire branch_sign_diff = (branch_rs1_data[31] ^ branch_rs2_data[31]);
 
-        wire branch_eq_res  = (branch_rs1_data == branch_rs2_data);
-        wire branch_ltu_res   = branch_carry;
-        wire branch_lts_res   = (branch_sign_diff) ? branch_rs1_data[31] : branch_carry;
+        (* max_fanout = 20 *) wire branch_eq_res    = (branch_rs1_data == branch_rs2_data);
+        (* max_fanout = 20 *) wire branch_ltu_res   = branch_carry;
+        (* max_fanout = 20 *) wire branch_lts_res   = (branch_sign_diff) ? branch_rs1_data[31] : branch_carry;
     `endif
 
     // Branch 计算
-    wire branch_taken = (sel_beq  & branch_eq_res  ) |
-                        (sel_bne  & ~branch_eq_res ) |
-                        (sel_blt  & branch_lts_res ) |
-                        (sel_bge  & ~branch_lts_res) |
-                        (sel_bltu & branch_ltu_res ) |
-                        (sel_bgeu & ~branch_ltu_res);
+    (* max_fanout = 20 *) wire branch_taken =   (sel_beq  & branch_eq_res  ) |
+                                                (sel_bne  & ~branch_eq_res ) |
+                                                (sel_blt  & branch_lts_res ) |
+                                                (sel_bge  & ~branch_lts_res) |
+                                                (sel_bltu & branch_ltu_res ) |
+                                                (sel_bgeu & ~branch_ltu_res);
 
     // 预测错误判断
     wire jalr_pred_mispredict    = (rs1_data_fwd != jump2_i);           // without is_jalr, rs1 == pred_pc - imm
     wire branch_pred_mispredict  = (pred_taken_i != branch_taken);      // without is_branch
-    wire [31:0] branch_jump_addr = (branch_taken) ? jump1_i : jump2_i;  // 提前到 id 计算
+    wire [31:0] branch_jump_addr = (~pred_taken_i) ? jump1_i : jump2_i; // 提前到 id 计算
 
     // 地址计算
     wire [31:0] jalr_target       = rs1_data_fwd + value2_i;
@@ -301,7 +303,7 @@ module ex(
         endcase
     end
 
-    // 读写
+    // rd & dram 读写
     always @(*) begin: ALU_WB
         // 寄存器写入
         regs_wen_o          = !pred_flush_en & regs_wen_i & !ecall_flush & !mret_flush; // regs 写使能
@@ -331,10 +333,9 @@ module ex(
         actual_taken_o      <= branch_taken;
 
         // 分支控制
-        pred_flush_en       <=  (is_branch & branch_pred_mispredict) |
-                                (is_jalr   & jalr_pred_mispredict);
-        pred_flush_pc       <=  ({32{is_branch}} & branch_jump_addr) |
-                                ({32{is_jalr}}   & jalr_target);
+        pred_flush_en       <=  (is_branch & branch_pred_mispredict) | (is_jalr & jalr_pred_mispredict);
+        pred_flush_pc       <=  (is_branch) ? branch_jump_addr :
+                                (is_jalr)   ? jalr_target : 32'b0;
     end
 
     // CSR 控制

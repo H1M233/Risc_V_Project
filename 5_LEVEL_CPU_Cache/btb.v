@@ -30,11 +30,9 @@ module btb #(
     
     // 查询
     wire [TAG_WIDTH:0]     tagv_query  = tagv[query_index_i];
-    wire [TAG_WIDTH - 1:0] tag_query   = tagv_query[TAG_WIDTH - 1:0];
-    wire                   valid_query = tagv_query[TAG_WIDTH];
     
     // 输出命中结果和目标地址
-    assign hit_o       = (valid_query && tag_query == query_tag_i);
+    assign hit_o       = (tagv_query == {1'b1, query_tag_i});
     assign target_pc_o = (hit_o) ? target[query_index_i] : 32'b0;
     
     integer i;

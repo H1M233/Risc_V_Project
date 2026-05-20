@@ -127,16 +127,34 @@ module bpu_controller #(
     // 查询
     (* max_fanout = 30 *)
     assign gshare_pht_index = (inst_valid) ? pht_index : 0;     // 预测跳转后屏蔽查询入口
-    always@(posedge clk) begin
+    always @(posedge clk) begin
         if (!rst) begin
             // RAS
-            ras_pop_en      <= 0;
-            ras_push_en     <= 0;
             ras_push_addr   <= 0;
 
             // BTB
             btb_query_index <= 0;
             btb_query_tag   <= 0;
+        end
+        else if (pipe_hold) begin
+            // ...
+        end
+        else begin
+            // RAS
+            ras_push_addr   <= pc_add_4;
+
+            // BTB
+            btb_query_index <= btb_query_index_w;
+            btb_query_tag   <= btb_query_tag_w;
+        end
+    end
+
+    // 查询更新使能 - 受冲刷影响
+    always @(posedge clk) begin
+        if (!rst) begin
+            // RAS
+            ras_pop_en      <= 0;
+            ras_push_en     <= 0;
 
             // GSHARE
             gshare_prev_b   <= 0;
@@ -148,27 +166,17 @@ module bpu_controller #(
             // RAS
             ras_pop_en      <= is_ras_pop;
             ras_push_en     <= is_ras_push;
-            ras_push_addr   <= pc_add_4;
-
-            // BTB
-            btb_query_index <= btb_query_index_w;
-            btb_query_tag   <= btb_query_tag_w;
 
             // GSHARE
-            gshare_prev_b   <= is_B_type & inst_valid;
+            gshare_prev_b   <= is_B_type;
         end
         else begin
             // RAS
-            ras_pop_en      <= 1'b0;
-            ras_push_en     <= 1'b0;
-            ras_push_addr   <= 32'b0;
-
-            // BTB
-            btb_query_index <= btb_query_index_w;
-            btb_query_tag   <= btb_query_tag_w;
+            ras_pop_en      <= 0;
+            ras_push_en     <= 0;
 
             // GSHARE
-            gshare_prev_b   <= 1'b0;
+            gshare_prev_b   <= 0;
         end
     end
     

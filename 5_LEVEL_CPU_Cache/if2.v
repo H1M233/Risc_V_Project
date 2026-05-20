@@ -2,7 +2,6 @@
 
 module if2(
     // from if1_if2
-    input               if2_valid_i,
     input      [31:0]   pc_i,
 
     // from icache
@@ -22,7 +21,7 @@ module if2(
 );
     always @(*) begin
         pc_o    = pc_i;
-        inst_o  = (if2_valid_i) ? inst_i : `NOP;
+        inst_o  = inst_i;
 
         // 预译码
         opcode_o  = inst_o[6:0];

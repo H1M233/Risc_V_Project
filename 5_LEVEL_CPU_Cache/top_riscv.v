@@ -21,6 +21,7 @@ module top_riscv(
     // ============================================================
     // PC / I-cache
     // ============================================================
+    (* max_fanout = 30 *)
     wire [31:0]     pc_pc_addr_o;
     wire [31:0]     icache_inst;
 
@@ -48,7 +49,6 @@ module top_riscv(
     // ============================================================
     wire [31:0]     if1_pc_o;
     wire [31:0]     if2_pc_i;
-    wire            if2_valid_i;
     (* max_fanout = 30 *)
     wire [31:0]     if2_inst_o;
     wire [31:0]     if2_pc_o;
@@ -193,6 +193,7 @@ module top_riscv(
     // ============================================================
     wire [31:0]     dcache_rdata;
     wire            dcache_ack_mem;
+    (* max_fanout = 30 *)
     wire            dcache_stall;
 
     // ============================================================
@@ -233,18 +234,15 @@ module top_riscv(
     wire            bpu_pred_taken;
 
     // ��ˮ����ͣ����
-    (* max_fanout = 30 *)
-    wire pipe_hold_icache = dcache_stall | hazard_hazard_en;
-    (* max_fanout = 30 *)
-    wire pipe_hold_if1_if2 = dcache_stall | hazard_hazard_en;
-    (* max_fanout = 30 *)
-    wire pipe_hold_if2_id = dcache_stall | hazard_hazard_en;
-    (* max_fanout = 30 *)
-    wire pipe_hold_bpu = dcache_stall | hazard_hazard_en;
+    (* max_fanout = 30 *) wire pipe_hold_icache = dcache_stall | hazard_hazard_en;
+    (* max_fanout = 30 *) wire pipe_hold_if1_if2 = dcache_stall | hazard_hazard_en;
+    (* max_fanout = 30 *) wire pipe_hold_if2_id = dcache_stall | hazard_hazard_en;
+    (* max_fanout = 30 *) wire pipe_hold_bpu = dcache_stall | hazard_hazard_en;
 
-    wire pipe_flush_if1_if2 = bpu_pred_taken | ex_pred_flush_en_o | wb_ecall_flush | wb_mret_flush;
-    wire pipe_flush_if2_id = bpu_pred_taken | ex_pred_flush_en_o | wb_ecall_flush | wb_mret_flush;
-    wire pipe_flush_bpu = bpu_pred_taken | ex_pred_flush_en_o | wb_ecall_flush | wb_mret_flush;
+    (* max_fanout = 30 *) wire pipe_flush_icache = bpu_pred_taken | ex_pred_flush_en_o | wb_ecall_flush | wb_mret_flush;
+    (* max_fanout = 30 *) wire pipe_flush_if1_if2 = bpu_pred_taken | ex_pred_flush_en_o | wb_ecall_flush | wb_mret_flush;
+    (* max_fanout = 30 *) wire pipe_flush_if2_id = bpu_pred_taken | ex_pred_flush_en_o | wb_ecall_flush | wb_mret_flush;
+    (* max_fanout = 30 *) wire pipe_flush_bpu = bpu_pred_taken | ex_pred_flush_en_o | wb_ecall_flush | wb_mret_flush;
 
     // ============================================================
     // ex to bpu
@@ -290,6 +288,7 @@ module top_riscv(
         .cpu_pc             (if1_pc_o),
         .cpu_inst           (icache_inst),
         .pipe_hold          (pipe_hold_icache),
+        .pipe_flush         (pipe_flush_icache),
 
         .mem_addr           (irom_addr),
         .mem_inst           (irom_data)
@@ -312,10 +311,6 @@ module top_riscv(
 
         .mem1_rd_addr_i     (mem1_rd_addr_o),
         .mem1_is_load_i     (mem1_is_load_o),
-
-        .mem2_rd_addr_i     (mem2_rd_addr_o),
-        .mem2_is_load_i     (mem2_is_load_o),
-        .dcache_ack_mem     (dcache_ack_mem),
 
         // from id
         .id_rs1_raddr_i     (id_rs1_i),
@@ -379,14 +374,12 @@ module top_riscv(
         .pipe_flush         (pipe_flush_if1_if2),
 
         .pc_i               (if1_pc_o),
-        .if2_valid_o        (if2_valid_i),
         .pc_o               (if2_pc_i)
     );
 
     if2 IF2(
         .inst_i             (icache_inst),
 
-        .if2_valid_i        (if2_valid_i),
         .pc_i               (if2_pc_i),
 
         .inst_o             (if2_inst_o),
