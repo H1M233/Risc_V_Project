@@ -24,7 +24,6 @@ module if1_if2(
             pc_o <= 32'h0;
         end
         else if(if1_if2_flush_en) begin
-            if2_valid_o <= 1'b0;
             pc_o        <= 32'h0;
         end
         else if (pipe_hold) begin

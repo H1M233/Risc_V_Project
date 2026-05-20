@@ -375,6 +375,9 @@ module top_riscv(
         .pipe_hold          (pipe_hold_if1_if2),
         .pipe_flush         (pipe_flush_if1_if2),
 
+        .ecall_flush        (wb_ecall_flush),
+        .mret_flush         (wb_mret_flush),
+
         .pc_i               (if1_pc_o),
         .pc_o               (if2_pc_i)
     );
