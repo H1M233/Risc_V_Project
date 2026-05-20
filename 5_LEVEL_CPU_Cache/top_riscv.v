@@ -148,11 +148,11 @@ module top_riscv(
     wire            ex_regs_wen_o;
     wire            ex_ecall_o;
     wire            ex_mret_o;
+    wire [31:0]     ex_ecall_inst;
 
     // ex to csr_regs
     wire            ex_csr_wen_o;
     wire [31:0]     ex_csr_wdata_o;
-    wire [31:0]     ex_ecall_inst;
     wire [11:0]     ex_csr_addr_o;
 
     // ex to ex_mem & hazard
@@ -172,6 +172,7 @@ module top_riscv(
     wire            mem_req_load_i;
     wire            mem_ecall_i;
     wire            mem_mret_i;
+    wire [31:0]     mem_ecall_inst_i;
 
     // ============================================================
     // mem to mem_wb
@@ -188,6 +189,7 @@ module top_riscv(
 
     wire            mem_ecall_o;
     wire            mem_mret_o;
+    wire [31:0]     mem_ecall_inst_o;
 
     // ============================================================
     // mem to D-cache
@@ -207,6 +209,7 @@ module top_riscv(
     wire            wb_is_load_i;
     wire            wb_ecall_i;
     wire            wb_mret_i;
+    wire [31:0]     wb_ecall_inst_i;
 
     // ============================================================
     // wb to regs
@@ -216,10 +219,11 @@ module top_riscv(
     wire            wb_regs_wen_o;
 
     // ============================================================
-    // wb to pc
+    // wb to pc & csg_regs
     // ============================================================
     wire            wb_ecall_o;
     wire            wb_mret_o;
+    wire [31:0]     wb_ecall_inst_o;
 
     // ============================================================
     // wb to flush 
@@ -355,7 +359,7 @@ module top_riscv(
 
         .ecall              (mem_ecall_o),      
         .mret               (mem_mret_o),       
-        .ecall_inst         (ex_ecall_inst),     
+        .ecall_inst         (mem_ecall_inst_o),     
         .ecall_mret_addr    (csr_regs_ecall_mret_addr)
     );
 
@@ -627,6 +631,7 @@ module top_riscv(
         .load_mask_i        (ex_load_mask_o),
         .load_addr_low_i    (ex_load_addr_low_o),
         .load_is_signed_i   (ex_load_is_signed_o),
+        .ecall_inst_i       (ex_ecall_inst),
 
         .ecall_flush        (wb_ecall_flush),
         .mret_flush         (wb_mret_flush),
@@ -639,7 +644,8 @@ module top_riscv(
         .mret_o             (mem_mret_i),
         .load_mask_o        (mem_load_mask_i),
         .load_addr_low_o    (mem_load_addr_low_i),
-        .load_is_signed_o   (mem_load_is_signed_i)
+        .load_is_signed_o   (mem_load_is_signed_i),
+        .ecall_inst_o       (mem_ecall_inst_i)
     );
 
     // ============================================================
@@ -660,6 +666,7 @@ module top_riscv(
         .load_mask_i        (mem_load_mask_i),
         .load_addr_low_i    (mem_load_addr_low_i),
         .load_is_signed_i   (mem_load_is_signed_i),
+        .ecall_inst_i       (mem_ecall_inst_i),
 
         .mem1_is_load_o     (mem1_is_load_o),
         .mem2_is_load_o     (mem2_is_load_o),
@@ -672,7 +679,8 @@ module top_riscv(
         .mem2_rd_data_o     (mem2_rd_data_o),
         .mem2_regs_wen_o    (mem2_regs_wen_o),
         .ecall_o            (mem_ecall_o),
-        .mret_o             (mem_mret_o)
+        .mret_o             (mem_mret_o),
+        .ecall_inst_o       (mem_ecall_inst_o)
     );
 
     // ============================================================
@@ -714,6 +722,7 @@ module top_riscv(
         .is_load_i          (mem2_is_load_o),
         .ecall_i            (mem_ecall_o),
         .mret_i             (mem_mret_o),
+        .ecall_inst_i       (mem_ecall_inst_o),
 
         .ecall_flush        (wb_ecall_flush),
         .mret_flush         (wb_mret_flush),
@@ -723,7 +732,8 @@ module top_riscv(
         .regs_wen_o         (wb_regs_wen_i),
         .is_load_o          (wb_is_load_i),
         .ecall_o            (wb_ecall_i),
-        .mret_o             (wb_mret_i)
+        .mret_o             (wb_mret_i),
+        .ecall_inst_o       (wb_ecall_inst_i)
     );
 
     // ============================================================
@@ -735,7 +745,7 @@ module top_riscv(
         .regs_wen_i         (wb_regs_wen_i),
         .ecall_i            (wb_ecall_i),
         .mret_i             (wb_mret_i),
-
+        .ecall_inst_i       (wb_ecall_inst_i),
         .rd_addr_o          (wb_rd_addr_o),
         .rd_data_o          (wb_rd_data_o),
         .regs_wen_o         (wb_regs_wen_o),
@@ -743,7 +753,8 @@ module top_riscv(
         .ecall_o            (wb_ecall_o),
         .mret_o             (wb_mret_o),
         .ecall_flush        (wb_ecall_flush),
-        .mret_flush         (wb_mret_flush)
+        .mret_flush         (wb_mret_flush),
+        .ecall_inst_o       (wb_ecall_inst_o)
     );
 
     // ============================================================

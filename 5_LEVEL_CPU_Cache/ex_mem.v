@@ -15,6 +15,7 @@ module ex_mem(
     input      [1:0]    load_mask_i,
     input      [1:0]    load_addr_low_i,
     input               load_is_signed_i,
+    input      [31:0]   ecall_inst_i,
     
     // from wb
     input               ecall_flush,
@@ -31,7 +32,8 @@ module ex_mem(
     output reg          mret_o,
     output reg [1:0]    load_mask_o,
     output reg [1:0]    load_addr_low_o,
-    output reg          load_is_signed_o
+    output reg          load_is_signed_o,
+    output reg [31:0]   ecall_inst_o
 );
     wire ex_mem_hold_en = dcache_stall;
     wire ex_mem_flush_en = (ecall_flush | mret_flush);
@@ -46,6 +48,7 @@ module ex_mem(
             load_mask_o         <= 2'b0;
             load_addr_low_o     <= 2'b0;
             load_is_signed_o    <= 1'b0;
+            ecall_inst_o        <= 32'b0;
         end
         else if (ex_mem_hold_en) begin
             // ...
@@ -60,6 +63,7 @@ module ex_mem(
             load_mask_o         <= 2'b0;
             load_addr_low_o     <= 2'b0;
             load_is_signed_o    <= 1'b0;
+            ecall_inst_o        <= 32'b0;
         end
         else begin
             rd_addr_o           <= rd_addr_i;
@@ -71,6 +75,7 @@ module ex_mem(
             load_mask_o         <= load_mask_i;
             load_addr_low_o     <= load_addr_low_i;
             load_is_signed_o    <= load_is_signed_i;
+            ecall_inst_o        <= ecall_inst_i;
         end
     end
 endmodule

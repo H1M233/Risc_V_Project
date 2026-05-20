@@ -17,6 +17,7 @@ module mem(
     input      [1:0]    load_mask_i,
     input      [1:0]    load_addr_low_i,
     input               load_is_signed_i,
+    input      [31:0]   ecall_inst_i,
     
     // to hazard & wb
     output              mem1_is_load_o,
@@ -32,7 +33,8 @@ module mem(
     output reg [31:0]   mem2_rd_data_o,
     output reg          mem2_regs_wen_o,
     output reg          ecall_o,
-    output reg          mret_o
+    output reg          mret_o,
+    output reg [31:0]   ecall_inst_o
 );  
     reg        mem1_req_load_o;
     reg [4:0]  mem1_rd_addr_oo;
@@ -72,6 +74,7 @@ module mem(
             mem2_load_is_signed_i   <= 0;
             ecall_o                 <= 0;
             mret_o                  <= 0;
+            ecall_inst_o            <= 0;
         end
         else begin
             mem2_req_load_i         <= mem1_req_load_o;
@@ -83,6 +86,7 @@ module mem(
             mem2_load_is_signed_i   <= load_is_signed_i;
             ecall_o                 <= ecall_i;
             mret_o                  <= mret_i;
+            ecall_inst_o            <= ecall_inst_i;
         end
     end
 

@@ -12,7 +12,7 @@ module csr_regs(
     //ecall
     input ecall,                    //from wb
     input mret,                     //from wb
-    input [31:0] ecall_inst,
+    input [31:0] ecall_inst,        //from wb
     output reg [31:0] ecall_mret_addr
 );
     // 定义CSR寄存器

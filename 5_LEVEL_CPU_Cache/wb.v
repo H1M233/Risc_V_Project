@@ -8,6 +8,7 @@ module wb(
     input               regs_wen_i,
     input               ecall_i,
     input               mret_i,
+    input      [31:0]   ecall_inst_i,
 
     // to regs
     output reg [4:0]    rd_addr_o,
@@ -19,7 +20,8 @@ module wb(
     output reg          mret_o,
 
     output reg          ecall_flush,
-    output reg          mret_flush
+    output reg          mret_flush,
+    output reg [31:0]   ecall_inst_o
 );
 
     always@(*) begin
@@ -30,5 +32,6 @@ module wb(
         ecall_flush = ecall_i;
         mret_o      = mret_i;
         mret_flush  = mret_i;
+        ecall_inst_o = ecall_inst_i;
     end
 endmodule

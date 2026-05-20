@@ -353,6 +353,6 @@ module ex(
     
     assign ecall_o = ecall_i;
     assign mret_o  = mret_i;
-    assign ecall_inst = (ecall_i) ? inst_i : 32'b0; // 传递 ecall 指令给 csr_regs 模块以保存 mepc
+    assign ecall_inst = (ecall_i) ? pc_addr_i : 32'b0; // 传递 ecall 指令给 csr_regs 模块以保存 mepc
     assign csr_addr_o = csr_addr_i; //打拍
 endmodule
