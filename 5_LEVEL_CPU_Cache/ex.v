@@ -22,6 +22,7 @@ module ex(
     input                       valid_i,
     input                       ecall_i,
     input                       mret_i,
+    input      [11:0]           csr_addr_i,
     
     output reg [1:0]            mem_load_addr_low,
     output reg [1:0]            mem_load_mask,
@@ -74,7 +75,7 @@ module ex(
 
     //to csr_regs
     output reg          csr_wen_o,
-    //output reg [31:0]   csr_addr_o,
+    output     [11:0]   csr_addr_o,
     output reg [31:0]   csr_wdata_o,
     output     [31:0]   ecall_inst,
 
@@ -352,4 +353,5 @@ module ex(
     assign ecall_o = ecall_i;
     assign mret_o  = mret_i;
     assign ecall_inst = (ecall_i) ? inst_i : 32'b0; // 传递 ecall 指令给 csr_regs 模块以保存 mepc
+    assign csr_addr_o = csr_addr_i; //打拍
 endmodule

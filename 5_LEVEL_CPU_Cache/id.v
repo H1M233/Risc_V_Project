@@ -65,7 +65,7 @@ module id(
     output reg          fwd_rs2_hit_ex_o,
 
     //ecall, mret
-    output reg [31:0]   csr_addr_o,
+    output reg [11:0]   csr_addr_o,
     output reg          ecall,
     output reg          mret
 );  
@@ -196,9 +196,9 @@ module id(
         fwd_rs2_hit_ex_o = forwarding_rs2_ex & !is_alu_i;
 
         // CSR
-        csr_addr_o       = {{20{inst_i[31]}}, inst_i[31:20]};
-        ecall            = is_zicsr & (funct3_i == `INST_ECALL | funct3_i == `INST_MRET) & is_ecall;
-        mret             = is_zicsr & (funct3_i == `INST_ECALL | funct3_i == `INST_MRET) & is_mret;
+        csr_addr_o       = is_zicsr ? inst_i[31:20] : 12'h520;
+        ecall            = is_zicsr & is_ecall;
+        mret             = is_zicsr & is_mret;
 
         (* parallel_case *)
         case(1'b1)

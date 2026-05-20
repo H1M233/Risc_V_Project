@@ -31,8 +31,8 @@ module mem(
     output reg [4:0]    mem2_rd_addr_o,
     output reg [31:0]   mem2_rd_data_o,
     output reg          mem2_regs_wen_o,
-    output              ecall_o,
-    output              mret_o
+    output reg          ecall_o,
+    output reg          mret_o
 );  
     reg        mem1_req_load_o;
     reg [4:0]  mem1_rd_addr_oo;
@@ -70,6 +70,8 @@ module mem(
             mem2_load_mask_i        <= 0;
             mem2_load_addr_low_i    <= 0;
             mem2_load_is_signed_i   <= 0;
+            ecall_o                 <= 0;
+            mret_o                  <= 0;
         end
         else begin
             mem2_req_load_i         <= mem1_req_load_o;
@@ -79,6 +81,8 @@ module mem(
             mem2_load_mask_i        <= load_mask_i;
             mem2_load_addr_low_i    <= load_addr_low_i;
             mem2_load_is_signed_i   <= load_is_signed_i;
+            ecall_o                 <= ecall_i;
+            mret_o                  <= mret_i;
         end
     end
 
@@ -90,8 +94,7 @@ module mem(
         mem2_regs_wen_o  = dcache_ack | mem2_regs_wen_i;
         mem2_is_load_o   = mem2_req_load_i;
     end
-    assign ecall_o = ecall_i;
-    assign mret_o  = mret_i;
+
 
 
     // 函数：

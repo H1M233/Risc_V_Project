@@ -23,6 +23,8 @@ module top_riscv(
     // ============================================================
     wire [31:0]     pc_pc_addr_o;
     wire [31:0]     icache_inst;
+    wire            pc_ecall;
+    wire            pc_mret;
 
     // ============================================================
     // hazard / stall
@@ -93,7 +95,7 @@ module top_riscv(
     wire            id_fwd_rs2_hit_ex_o;
     wire [31:0]     id_fwd_rs1_data_o;
     wire [31:0]     id_fwd_rs2_data_o;
-    wire [31:0]     id_csr_addr_o;
+    wire [11:0]     id_csr_addr_o;
     wire            id_ecall_o;
     wire            id_mret_o;
 
@@ -128,7 +130,7 @@ module top_riscv(
     wire            ex_fwd_rs2_hit_ex_i;
     wire [31:0]     ex_fwd_rs1_data_i;
     wire [31:0]     ex_fwd_rs2_data_i;
-    
+    wire [11:0]     ex_csr_addr_i;
     wire            ex_ecall_i;
     wire            ex_mret_i;
 
@@ -153,6 +155,7 @@ module top_riscv(
     wire            ex_csr_wen_o;
     wire [31:0]     ex_csr_wdata_o;
     wire [31:0]     ex_ecall_inst;
+    wire [11:0]     ex_csr_addr_o;
 
     // ex to ex_mem & hazard
     wire [31:0]     ex_rd_data_o;
@@ -257,6 +260,20 @@ module top_riscv(
     wire            ex_actual_taken;
 
     // ============================================================
+    // wb to pc
+    // ============================================================
+    wb_pc WB_PC(
+        .clk            (cpu_clk),
+        .rst            (cpu_rst),
+
+        .wb_ecall       (wb_ecall_o),
+        .wb_mret        (wb_mret_o),
+
+        .pc_ecall       (pc_ecall),
+        .pc_mret        (pc_mret)
+    );
+
+    // ============================================================
     // PC
     // ============================================================
     pc PC(
@@ -269,8 +286,8 @@ module top_riscv(
         .pred_flush         (ex_pred_flush_en_o),
         .pred_flush_pc      (ex_pred_flush_pc_o),
 
-        .wb_ecall           (wb_ecall_o),
-        .wb_mret            (wb_mret_o),
+        .wb_ecall           (pc_ecall),
+        .wb_mret            (pc_mret),
 
         .ecall_mret_addr    (csr_regs_ecall_mret_addr),
 
@@ -350,7 +367,7 @@ module top_riscv(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
 
-        .csr_addr           (id_csr_addr_o),        
+        .csr_addr           (ex_csr_addr_o),        
         .csr_wdata          (ex_csr_wdata_o),     
         .csr_wen            (ex_csr_wen_o),
 
@@ -380,7 +397,10 @@ module top_riscv(
 
         .pc_i               (if1_pc_o),
         .if2_valid_o        (if2_valid_i),
-        .pc_o               (if2_pc_i)
+        .pc_o               (if2_pc_i),
+
+        .ecall_flush        (wb_ecall_flush),
+        .mret_flush         (wb_mret_flush)
     );
 
     if2 IF2(
@@ -417,6 +437,9 @@ module top_riscv(
         .rd_i               (if2_rd_o),
         .rs1_i              (if2_rs1_o),
         .rs2_i              (if2_rs2_o),
+
+        .ecall_flush        (wb_ecall_flush),
+        .mret_flush         (wb_mret_flush),
 
         .inst_o             (id_inst_i),
         .pc_o               (id_pc_i),
@@ -517,6 +540,8 @@ module top_riscv(
         .ecall_i            (id_ecall_o),
         .mret_i             (id_mret_o),
 
+        .csr_addr_i         (id_csr_addr_o),
+
         .ecall_flush        (wb_ecall_flush),
         .mret_flush         (wb_mret_flush),
 
@@ -539,7 +564,8 @@ module top_riscv(
         .fwd_rs2_hit_ex_o   (ex_fwd_rs2_hit_ex_i),
 
         .ecall_o            (ex_ecall_i),
-        .mret_o             (ex_mret_i)
+        .mret_o             (ex_mret_i),
+        .csr_addr_o         (ex_csr_addr_i)
     );
 
     // ============================================================
@@ -593,9 +619,11 @@ module top_riscv(
 
         .ecall_i            (ex_ecall_i),
         .mret_i             (ex_mret_i),
+        .csr_addr_i         (ex_csr_addr_i),
         .csr_rdata          (csr_regs_csr_rdata),
         .ecall_o            (ex_ecall_o),
         .mret_o             (ex_mret_o),
+        .csr_addr_o         (ex_csr_addr_o),
         .csr_wen_o          (ex_csr_wen_o),
         .csr_wdata_o        (ex_csr_wdata_o),
         .ecall_inst         (ex_ecall_inst),

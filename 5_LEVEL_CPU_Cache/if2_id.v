@@ -18,6 +18,10 @@ module if2_id(
     input      [4:0]    rs1_i,
     input      [4:0]    rs2_i,
 
+    // from wb
+    input               ecall_flush,
+    input               mret_flush,
+
     // to id
     (* max_fanout = 30 *) output reg [31:0]   inst_o,
     (* max_fanout = 30 *) output reg [31:0]   pc_o,
@@ -29,8 +33,20 @@ module if2_id(
     (* max_fanout = 30 *) output reg [4:0]    rs2_o
 
 );
+    wire if2_id_flush_en = (ecall_flush | mret_flush);
+
     always @(posedge clk) begin
         if (!rst) begin
+            pc_o        <= 32'b0;
+            inst_o      <= `NOP;
+            opcode_o    <= 7'b0;
+            funct3_o    <= 3'b0;
+            funct7_o    <= 7'b0;
+            rd_o        <= 5'b0;
+            rs1_o       <= 5'b0;
+            rs2_o       <= 5'b0;
+        end
+        else if(if2_id_flush_en) begin
             pc_o        <= 32'b0;
             inst_o      <= `NOP;
             opcode_o    <= 7'b0;
