@@ -26,3 +26,7 @@ twin/
 .library_mapping.xml
 .project
 AutoSim/riscv-tests/
+
+5_LEVEL_CPU_Cache/div.v
+5_LEVEL_CPU_Cache/divider.v
+

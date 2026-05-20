@@ -31,6 +31,8 @@ module id_ex(
     //ecall
     input               ecall_i,
     input               mret_i,
+    //打拍给csr
+    input      [11:0]   csr_addr_i,
     //form wb
     input               ecall_flush,
     input               mret_flush,
@@ -56,8 +58,11 @@ module id_ex(
     output reg          fwd_rs2_hit_ex_o,
 
     output reg          ecall_o,
-    output reg          mret_o
+    output reg          mret_o,
+
+    output reg [11:0]   csr_addr_o
 );
+    wire id_ex_ecall_mret_flush = (ecall_flush | mret_flush);
     wire id_ex_hold_en  = dcache_stall;
     wire id_ex_flush_en_n = ~(pred_flush | hazard_en);
     always @(posedge clk) begin
@@ -81,6 +86,29 @@ module id_ex(
             fwd_rs2_hit_ex_o    <= 1'b0;
             ecall_o             <= 1'b0;
             mret_o              <= 1'b0;
+            csr_addr_o          <= 12'b0;
+        end
+        else if(id_ex_ecall_mret_flush) begin
+            pc_addr_o           <= 32'b0;
+            regs_wen_o          <= 1'b0;
+            inst_o              <= `NOP;
+            value1_o            <= 32'b0;
+            value2_o            <= 32'b0;
+            jump1_o             <= 32'b0;
+            jump2_o             <= 32'b0;
+            rd_addr_o           <= 5'b0;
+            rs1_addr_o          <= 5'b0;
+            rs2_addr_o          <= 5'b0;
+            pred_taken_o        <= 1'b0;
+            inst_packaged_o     <= {`OP_INST_NUM{1'b0}};
+            valid_o             <= 1'b0;
+            fwd_rs1_data_o      <= 32'b0;
+            fwd_rs2_data_o      <= 32'b0;
+            fwd_rs1_hit_ex_o    <= 1'b0;
+            fwd_rs2_hit_ex_o    <= 1'b0;
+            ecall_o             <= 1'b0;    // ecall_flush 信号来自 wb，当发生 ecall 时，清空 id_ex 寄存器，防止错误执行
+            mret_o              <= 1'b0;    // mret_flush 信号来自 wb，当发生 mret 时，清空 id_ex 寄存器，防止错误执行
+            csr_addr_o          <= 12'b0;
         end
         else if (id_ex_hold_en) begin
             // ..
@@ -105,6 +133,7 @@ module id_ex(
             fwd_rs2_hit_ex_o    <= fwd_rs2_hit_ex_i;
             ecall_o             <= ecall_i;
             mret_o              <= mret_i;
+            csr_addr_o          <= csr_addr_i;
         end
     end
 endmodule

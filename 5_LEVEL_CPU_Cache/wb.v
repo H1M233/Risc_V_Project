@@ -27,7 +27,7 @@ module wb(
         regs_wen_o  = regs_wen_i;
         rd_data_o   = rd_data_i;
         ecall_o     = ecall_i;
-        ecall_flush = ecall_i;  
+        ecall_flush = ecall_i;
         mret_o      = mret_i;
         mret_flush  = mret_i;
     end

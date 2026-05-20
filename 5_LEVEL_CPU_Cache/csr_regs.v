@@ -4,7 +4,7 @@
 module csr_regs(
     input clk,
     input rst,
-    input [31:0] csr_addr,         //from id value2
+    input [11:0] csr_addr,        
     input [31:0] csr_wdata,        //from ex
     input csr_wen,
 
@@ -20,13 +20,14 @@ module csr_regs(
     reg [31:0] mepc;      // 机器异常程序计数器
     reg [31:0] mcause;    // 机器异常原因寄存器
     reg [31:0] mtvec;     // 机器异常向量基地址寄存器
+    reg [31:0] mscratch;   // 机器临时寄存器
 
     // CSR地址映射
     localparam MSTATUS_ADDR = 12'h300;
     localparam MEPC_ADDR    = 12'h341;
     localparam MCAUSE_ADDR  = 12'h342;
     localparam MTVEC_ADDR   = 12'h305;
-
+    localparam MSCATCH_ADDR = 12'h340;
     // CSR写入逻辑
     always @(posedge clk) begin
         if (!rst) begin
@@ -34,6 +35,7 @@ module csr_regs(
             mepc <= 32'b0;
             mcause <= 32'b0;
             mtvec <= 32'b0;
+            mscratch <= 32'b0;
             ecall_mret_addr <= 32'b0;
         end
         else if (ecall) begin
@@ -52,6 +54,7 @@ module csr_regs(
                 MEPC_ADDR: mepc <= csr_wdata;
                 MCAUSE_ADDR: mcause <= csr_wdata;
                 MTVEC_ADDR: mtvec <= csr_wdata;
+                MSCATCH_ADDR: mscratch <= csr_wdata;
                 default: ; // 无效地址，保持不变
             endcase
         end 
@@ -63,6 +66,7 @@ module csr_regs(
             MEPC_ADDR: csr_rdata = mepc;
             MCAUSE_ADDR: csr_rdata = mcause;
             MTVEC_ADDR: csr_rdata = mtvec;
+            MSCATCH_ADDR: csr_rdata = mscratch;
             default: csr_rdata = 32'b0; // 无效地址，返回0
         endcase
     end
