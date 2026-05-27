@@ -1,90 +1,12 @@
 {
   "5_LEVEL_CPU_Cache": {
-    "37 INST TEST": "PASS √",
+    "INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.786",
-        "REAL TIME": "9.20015",
+        "IPC": "0.785624",
+        "REAL TIME": "9.20019",
         "RUN TIME": "142",
-        "LED": "PASS √",
-        "BPU ACCURACY": "0.915205"
-      },
-      "src0": {
-        "IPC": "0.678832",
-        "REAL TIME": "462.006",
-        "RUN TIME": "6968",
-        "LED": "PASS √",
-        "BPU ACCURACY": "0.828588"
-      },
-      "src1": {
-        "IPC": "0.584908",
-        "REAL TIME": "472.406",
-        "RUN TIME": "7414",
-        "LED": "PASS √",
-        "BPU ACCURACY": "0.889703"
-      },
-      "src2": {
-        "IPC": "0.708546",
-        "REAL TIME": "604.007",
-        "RUN TIME": "9366",
-        "LED": "PASS √",
-        "BPU ACCURACY": "0.771976"
-      },
-      "womnew": {
-        "IPC": "0.703362",
-        "REAL TIME": "259.801",
-        "RUN TIME": "3762",
-        "BPU ACCURACY": "0.810712",
-        "LED": "FAIL x"
-      }
-    }
-  },
-  "5_LEVEL_CPU_improved": {
-    "37 INST TEST": "PASS √",
-    "SOFTWARE TEST": {
-      "init": {
-        "IPC": "0.755332",
-        "REAL TIME": "7.3",
-        "RUN TIME": "270",
-        "LED": "PASS √"
-      },
-      "src0": {
-        "IPC": "0.742455",
-        "REAL TIME": "314.805",
-        "RUN TIME": "12727",
-        "LED": "PASS √"
-      },
-      "src1": {
-        "IPC": "0.662658",
-        "REAL TIME": "547.613",
-        "RUN TIME": "13118",
-        "LED": "PASS √"
-      },
-      "src2": {
-        "IPC": "0.739524",
-        "REAL TIME": "415.703",
-        "RUN TIME": "16668",
-        "LED": "PASS √"
-      }
-    }
-  },
-  "5_LEVEL_CPU_ooo": {
-    "37 INST TEST": "FAIL x",
-    "SOFTWARE TEST": {
-      "init": {
-        "IPC": "1.4915e-08",
-        "REAL TIME": "24.1",
-        "ICACHE HIT": "0.985397",
-        "DCACHE HIT": "0",
-        "RUN TIME": "267",
-        "LED": "PASS √"
-      },
-      "src0": {
-        "IPC": "2.53145e-10",
-        "REAL TIME": "1527.61",
-        "ICACHE HIT": "0.961626",
-        "DCACHE HIT": "0",
-        "RUN TIME": "15800",
+        "BPU ACCURACY": "0.915205",
         "LED": "PASS √"
       }
     }

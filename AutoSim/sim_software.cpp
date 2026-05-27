@@ -189,7 +189,7 @@ int main(int argc, char** argv) {
     }
     std::cout << "\n\n=================================== Simulation Finished ===================================\033[0m\n";
     // 输出 LED 内容
-    bool isTick = (top->LED == 0x0122'1c08);
+    bool isTick = (top->LED == 0x0122'1c08 | top->LED == 0x078b'7323);
     for (int row = 0; row < 4; ++row){
         uint8_t byte = (top->LED >> (24 - 8 * row)) & 0xFF;
         std::cout << std::endl;

@@ -23,49 +23,52 @@ module ex(
     input      [11:0]           csr_addr_i,
 
     // from fowarding - fanout set
+    (* max_fanout = 20 *)
     input      [31:0]   fwd_rs1_data_i,
+    (* max_fanout = 20 *)
     input      [31:0]   fwd_rs2_data_i,
     (* max_fanout = 20 *)
     input               fwd_rs1_hit_ex_i,
     (* max_fanout = 20 *)
     input               fwd_rs2_hit_ex_i,
+    (* max_fanout = 20 *)
     input      [31:0]   fwd_ex_rd_data_i,
 
     // from csr_regs
     input      [31:0]   csr_rdata,
 
     // to ex_mem & hazard
-    output reg          regs_wen_o,
+    output              regs_wen_o,
     output              ecall_o,
     output              mret_o,
-    output reg          mem_req_load,
-    output reg [1:0]    mem_load_addr_low,
+    output              mem_req_load,
+    output     [1:0]    mem_load_addr_low,
     output reg [1:0]    mem_load_mask,
-    output reg          mem_load_is_signed,
-    output reg          valid_o,
-    output reg [4:0]    rd_addr_o,
+    output              mem_load_is_signed,
+    output              valid_o,
+    output     [4:0]    rd_addr_o,
     (* max_fanout = 30 *)
-    output reg [31:0]   rd_data_o,
+    output     [31:0]   rd_data_o,
 
     // to ex_dcache & hazard
-    output reg          dcache_req_load,
-    output reg          dcache_req_store,
-    output reg [31:0]   dcache_addr,
+    output              dcache_req_load,
+    output              dcache_req_store,
+    output     [31:0]   dcache_addr,
     output reg [31:0]   dcache_wdata,
     output reg [3:0]    dcache_we,
-    output reg          dcache_write_dram,
+    output              dcache_write_dram,
 
     // to ex_bpu
-    output reg          update_btb_en_o,
-    output reg          update_gshare_en_o,
-    output reg [31:0]   update_pc_o,
-    output reg [31:0]   update_target_o,
-    output reg          actual_taken_o,
-    output reg          pred_flush_en,
-    output reg [31:0]   pred_flush_pc,
+    output              update_btb_en_o,
+    output              update_gshare_en_o,
+    output     [31:0]   update_pc_o,
+    output     [31:0]   update_target_o,
+    output              actual_taken_o,
+    output              pred_flush_en,
+    output     [31:0]   pred_flush_pc,
 
     // to csr_regs
-    output reg          csr_wen_o,
+    output              csr_wen_o,
     output     [11:0]   csr_addr_o,
     output reg [31:0]   csr_wdata_o,
     output     [31:0]   ecall_inst
@@ -129,8 +132,8 @@ module ex(
     // 前推选择
     (* max_fanout = 20 *) wire [31:0] rs1_data_fwd = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
     (* max_fanout = 20 *) wire [31:0] rs2_data_fwd = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
-    (* max_fanout = 20 *) wire [31:0] value1_eff = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
-    (* max_fanout = 20 *) wire [31:0] value2_eff = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
+    (* max_fanout = 20 *) wire [31:0] value1_eff = rs1_data_fwd;
+    (* max_fanout = 20 *) wire [31:0] value2_eff = rs2_data_fwd;
 
     // 计算
     wire [4:0]  shamt    = value2_eff[4:0];
@@ -218,18 +221,28 @@ module ex(
         endcase
     end
 
+    // 跳转
+    assign update_btb_en_o     = jalr_pred_mispredict;        // btb 更新使能
+    assign update_gshare_en_o  = branch_pred_mispredict;      // gshare 更新使能
+    assign update_pc_o         = pc_addr_i;
+    assign update_target_o     = jalr_target;
+    assign actual_taken_o      = branch_taken;
+
+    // 冲刷控制
+    assign pred_flush_en  = (branch_pred_mispredict | jalr_pred_mispredict);
+    assign pred_flush_pc  = (is_branch) ? branch_jump_addr :
+                            (is_jalr)   ? jalr_target : 32'b0;
+    
     // Dcache 控制
-    wire perip_write_dram = (mem_addr_calc >= `DRAM_ADDR_START && mem_addr_calc < `DRAM_ADDR_END);
-    always @(*) begin
-        // 转发 D-cache
-        dcache_req_load     = is_load & regs_wen_i;   // dcache 读使能
-        dcache_req_store    = is_store;               // dcache 写使能
-        dcache_addr         = mem_addr_calc;
-        dcache_write_dram   = perip_write_dram;
-        mem_req_load        = is_load & regs_wen_i;
-        mem_load_is_signed  = (sel_lb | sel_lh | sel_lw);
-        mem_load_addr_low   = mem_addr_calc_low;
-        
+    assign dcache_req_load     = is_load & regs_wen_i;   // dcache 读使能
+    assign dcache_req_store    = is_store;               // dcache 写使能
+    assign dcache_addr         = mem_addr_calc;
+    assign dcache_write_dram   = (mem_addr_calc >= `DRAM_ADDR_START && mem_addr_calc < `DRAM_ADDR_END);
+    assign mem_req_load        = is_load & regs_wen_i;
+    assign mem_load_is_signed  = (sel_lb | sel_lh | sel_lw);
+    assign mem_load_addr_low   = mem_addr_calc_low;
+
+    always @(*) begin        
         (* parallel_case *)
         case (1'b1)
             sel_lb:  mem_load_mask = 2'b01;
@@ -294,42 +307,28 @@ module ex(
     end
 
     // rd & dram 读写
-    always @(*) begin: ALU_WB
-        // 寄存器写入
-        regs_wen_o  = regs_wen_i; // regs 写使能
-        rd_addr_o   = rd_addr_i;
-        rd_data_o   = alu_result;
-        valid_o     = valid_i;
-    end
-
-    // 跳转
-    always @(*) begin
-        update_btb_en_o     = jalr_pred_mispredict;        // btb 更新使能
-        update_gshare_en_o  = branch_pred_mispredict;      // gshare 更新使能
-        update_pc_o         = pc_addr_i;
-        update_target_o     = jalr_target;
-        actual_taken_o      = branch_taken;
-
-        // 分支控制
-        pred_flush_en       =  (branch_pred_mispredict | jalr_pred_mispredict);
-        pred_flush_pc       =   (is_branch) ? branch_jump_addr :
-                                (is_jalr)   ? jalr_target : 32'b0;
-    end
+    assign regs_wen_o  = regs_wen_i; // regs 写使能
+    assign rd_addr_o   = rd_addr_i;
+    assign rd_data_o   = alu_result;
+    assign valid_o     = valid_i;
 
     // CSR 控制
     always @(*) begin: ALU_CSR_CTRL
-        csr_wen_o = is_zicsr; // CSR 写使能
-        csr_wdata_o = (sel_csrrw)  ? rw_res :
-                      (sel_csrrs)  ? rs_res :
-                      (sel_csrrc)  ? rc_res :
-                      (sel_csrrwi) ? rw_res :
-                      (sel_csrrsi) ? rs_res :
-                      (sel_csrrci) ? rc_res :
-                                      32'b0;               // CSR 写数据
+        (* parallel_case *)
+        case (1'b1)
+            sel_csrrw:  csr_wdata_o = rw_res;
+            sel_csrrs:  csr_wdata_o = rs_res;
+            sel_csrrc:  csr_wdata_o = rc_res;
+            sel_csrrwi: csr_wdata_o = rw_res;
+            sel_csrrsi: csr_wdata_o = rs_res;
+            sel_csrrci: csr_wdata_o = rc_res;
+            default:    csr_wdata_o = 32'b0;
+        endcase
     end 
     
-    assign ecall_o = ecall_i;
-    assign mret_o  = mret_i;
-    assign ecall_inst = (ecall_i) ? pc_addr_i : 32'b0; // 传递 ecall 指令给 csr_regs 模块以保存 mepc
-    assign csr_addr_o = csr_addr_i; //打拍
+    assign csr_wen_o    = is_zicsr;     // CSR 写使能
+    assign ecall_o      = ecall_i;
+    assign mret_o       = mret_i;
+    assign ecall_inst   = (ecall_i) ? pc_addr_i : 32'b0; // 传递 ecall 指令给 csr_regs 模块以保存 mepc
+    assign csr_addr_o   = csr_addr_i;   //打拍
 endmodule

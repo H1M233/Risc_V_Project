@@ -1,0 +1,34 @@
+{
+  "Project": {
+    "5_LEVEL_CPU_Cache": {
+      "folder": "5_LEVEL_CPU_Cache",
+      "clockFreq": "350"
+    }
+  },
+  "mem_init": {
+    "init": {
+      "irom": "irom_init.bin",
+      "dram": "dram_init.bin"
+    },
+    "src0": {
+      "irom": "irom_src0.bin",
+      "dram": "dram_init.bin"
+    },
+    "src1": {
+      "irom": "irom_src1.bin",
+      "dram": "dram_init.bin"
+    },
+    "src2": {
+      "irom": "irom_src2.bin",
+      "dram": "dram_init.bin"
+    },
+    "withMext": {
+      "irom": "irom_wm_v2.bin",
+      "dram": "dram_init.bin"
+    },
+    "withoutMext": {
+      "irom": "irom_wom_v2.bin",
+      "dram": "dram_init.bin"
+    }
+  }
+}
