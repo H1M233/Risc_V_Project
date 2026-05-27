@@ -51,6 +51,14 @@ int main(int argc, char** argv) {
     double predTotalB = 0.0;
     double predTotalJr = 0.0;
 
+    // 剩余时间计算
+    double lastSimTime = 0.0;
+    double speed_ns = 0.0;
+    int speedRef = 10;
+
+    // 进度条设置
+    const double barWidth = 70.0;
+
     // 记录函数
     auto step_and_advance = [&](double delta_time_ns) {
         contextp->time(sim_time_ns * 1000);
@@ -121,7 +129,7 @@ int main(int argc, char** argv) {
         // 执行到下一个事件
         step_and_advance(next_event_time - sim_time_ns);
         
-        // 每 1s 打印一次
+        // 每 0.1s 打印一次
         static double last_print_time = 0.0;
         current_time = get_elapsed_ms();
         if (current_time - last_print_time >= 100) {
@@ -130,9 +138,15 @@ int main(int argc, char** argv) {
                 SEG_getTime = top->seg & 0x000F'FFFF;
             }
             
+            // 计算剩余时间
+            if (lastSimTime != 0.0) {
+                speed_ns = (speed_ns * (speedRef - 1) + sim_time_ns - lastSimTime) / speedRef;
+            }
+            lastSimTime = sim_time_ns;
+            long long int ETATime_ms = (PREV_TIME * NS2MS - sim_time_ns) / speed_ns / 10;
+
             // 打印进度条
             std::cout << "\r" << "\033[6A" << "\033[2K" << "\033[96m";
-            double barWidth = 70.0;
             double percentage = (PREV_TIME) ? sim_time_ns / NS2MS / PREV_TIME : 0.0;
             for (double cnt = 0.0; cnt <= barWidth; ++cnt){
                 if (cnt / barWidth > percentage && !SEG_getTime) std::cout << "\033[0m=";
@@ -162,7 +176,13 @@ int main(int argc, char** argv) {
                       << std::endl << std::endl << "\033[2K"
                       << "PC:" 
                       << std::right << std::setw(10) << std::hex << top->func_block_addr << " -> " 
-                      << std::right << std::setw(8) << top->pc << std::dec 
+                      << std::right << std::setw(8) << top->pc << std::dec
+                      << std::left << std::setw(3) << " "
+                      << "ETA: "
+                      << std::right << std::setw(13) << ETATime_ms / 60
+                      << std::left << std::setw(3) << " m"
+                      << std::right << std::setw(2) << ETATime_ms % 60
+                      << std::left << std::setw(3) << " s"
 
                       << std::flush;
         }

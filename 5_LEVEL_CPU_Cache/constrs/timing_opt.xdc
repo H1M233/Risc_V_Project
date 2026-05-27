@@ -20,7 +20,6 @@ set_property KEEP_HIERARCHY SOFT [get_cells -hierarchical *Mem_DRAM*]
 set_property MAX_FANOUT 30 [get_nets -hierarchical *pipe_hold*]
 set_property MAX_FANOUT 30 [get_nets -hierarchical *pred_flush*]
 set_property MAX_FANOUT 30 [get_nets -hierarchical *hazard_en*]
-set_property MAX_FANOUT 30 [get_nets -hierarchical *dcache_addr*]
 set_property MAX_FANOUT 30 [get_nets -hierarchical *hit_tagv*]
 
 # 用 320MHz 去约束 clk2_constrs_320MHz

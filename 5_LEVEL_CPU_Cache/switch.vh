@@ -1,5 +1,3 @@
-`define ALU_USE_FAST_COMPARATOR
-`define USE_2WAY_DCACHE
 `define DCACHE_INDEX_WIDTH 2
 
 

@@ -3,46 +3,38 @@
     "37 INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.785986",
-        "REAL TIME": "14.2001",
-        "ICACHE HIT": "0.992835",
-        "DCACHE HIT": "0.999915",
-        "RUN TIME": "166",
+        "IPC": "0.786",
+        "REAL TIME": "9.20015",
+        "RUN TIME": "142",
         "LED": "PASS √",
-        "BPU ACCURACY": "0.917923"
+        "BPU ACCURACY": "0.915205"
       },
       "src0": {
-        "IPC": "0.684973",
-        "REAL TIME": "742.908",
-        "ICACHE HIT": "0.988879",
-        "DCACHE HIT": "0.872287",
-        "RUN TIME": "8129",
+        "IPC": "0.678832",
+        "REAL TIME": "462.006",
+        "RUN TIME": "6968",
         "LED": "PASS √",
-        "BPU ACCURACY": "0.826"
+        "BPU ACCURACY": "0.828588"
       },
       "src1": {
-        "IPC": "0.604468",
-        "REAL TIME": "804.517",
-        "ICACHE HIT": "0.953877",
-        "DCACHE HIT": "0.903863",
-        "RUN TIME": "8654",
+        "IPC": "0.584908",
+        "REAL TIME": "472.406",
+        "RUN TIME": "7414",
         "LED": "PASS √",
-        "BPU ACCURACY": "0.893429"
+        "BPU ACCURACY": "0.889703"
       },
       "src2": {
-        "IPC": "0.710898",
-        "REAL TIME": "980.814",
-        "ICACHE HIT": "0.995896",
-        "DCACHE HIT": "0.906889",
-        "RUN TIME": "10927",
+        "IPC": "0.708546",
+        "REAL TIME": "604.007",
+        "RUN TIME": "9366",
         "LED": "PASS √",
-        "BPU ACCURACY": "0.771193"
+        "BPU ACCURACY": "0.771976"
       },
       "womnew": {
-        "IPC": "0.707378",
-        "REAL TIME": "377.906",
-        "RUN TIME": "4389",
-        "BPU ACCURACY": "0.807299",
+        "IPC": "0.703362",
+        "REAL TIME": "259.801",
+        "RUN TIME": "3762",
+        "BPU ACCURACY": "0.810712",
         "LED": "FAIL x"
       }
     }

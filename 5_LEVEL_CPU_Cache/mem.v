@@ -4,8 +4,11 @@
 module mem(
     input               clk,
     input               rst,
+
+    // from dcache
     input               dcache_ack,
     input      [31:0]   dcache_rdata,
+    input               dcache_stall,
 
     // from ex_mem
     input      [4:0]    rd_addr_i,
@@ -76,6 +79,9 @@ module mem(
             mret_o                  <= 0;
             ecall_inst_o            <= 0;
         end
+        else if (dcache_stall) begin
+            // ...
+        end
         else begin
             mem2_req_load_i         <= mem1_req_load_o;
             mem2_rd_addr_i          <= mem1_rd_addr_oo;
@@ -98,8 +104,6 @@ module mem(
         mem2_regs_wen_o  = dcache_ack | mem2_regs_wen_i;
         mem2_is_load_o   = mem2_req_load_i;
     end
-
-
 
     // 函数：
     function [31:0] load_shift;

@@ -27,7 +27,7 @@ module pc(
     input      [31:0]   pred_pc,
     input               pred_taken
 );
-    wire        pc_hold_en       = (hazard_en | dcache_stall);
+    wire pc_hold_en = (hazard_en | dcache_stall);
 
     // 为冲刷 / 异常留的口
     reg [31:0] pc_sel;

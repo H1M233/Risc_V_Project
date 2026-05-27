@@ -137,15 +137,11 @@ def mem_ch(ch=[]):
             fenSai_ch = []
             fenSai_ret = False
             while not fenSai_ch and not fenSai_ret:
-                print("\r[1] withMext  [2] witMext_new  [3] withoutMext  [4] withoutMext_new: ", end='', flush=True)
+                print("\r[1] withMext_ne  [2] withoutMext_new: ", end='', flush=True)
                 fenSai_name_ask = getch()
                 if fenSai_name_ask == '1':
-                    fenSai_ch = ['wm']
-                elif fenSai_name_ask == '2':
                     fenSai_ch = ['wmnew']
-                elif fenSai_name_ask == '3':
-                    fenSai_ch = ['wom']
-                elif fenSai_name_ask == '4':
+                elif fenSai_name_ask == '2':
                     fenSai_ch = ['womnew']
                 elif mem_name_ask == 'ESC':
                     fenSai_ret = True
@@ -322,7 +318,7 @@ def instTest(prj_name, test_all=False):
 
 
 if __name__ == '__main__':
-    clkFreqList['5_LEVEL_CPU_Cache'] = 300
+    clkFreqList['5_LEVEL_CPU_Cache'] = 350
     clkFreqList['5_LEVEL_CPU_improved'] = 150
     clkFreqList['5_LEVEL_CPU_ooo'] = 250
 
