@@ -130,8 +130,7 @@ def prj_mem_ch(prj_ch=None, mem_ch=None):
         with open(json_filename, 'r', encoding='utf-8') as f:
             json_file = json.load(f)
     else:
-        print("settings.json not found")
-        sys.exit()
+        sys.exit("无法找到settings.json")
     
     '''选择工程'''
     if prj_ch == None:
@@ -152,8 +151,8 @@ def prj_mem_ch(prj_ch=None, mem_ch=None):
         # 获取按键
         prj_name_ask = getch()
         if prj_name_ask == 'ESC':
-            print("\033[96mESC\033[0m\r")
-            sys.exit()
+            print("\033[96mESC\033[0m")
+            sys.exit("程序被ESC终止")
         else:
             try:
                 key_num = int(prj_name_ask)
@@ -189,7 +188,7 @@ def prj_mem_ch(prj_ch=None, mem_ch=None):
         # 获取按键
         mem_name_ask = getch()
         if mem_name_ask == 'ESC':
-            print("\033[96mESC\033[0m\r")
+            print("\033[2K\033[A\033[2K", end='')
             return prj_ret, {}, testInst, testAll
         elif mem_name_ask == 'a':
             testInst = True
@@ -347,13 +346,14 @@ def instTest(prj_dict, test_all=False):
 
 def main():
     while True:
-        prj_dict, mem_dict, testInst, testAll = prj_mem_ch()
-
-        if testInst:
-            instTest(prj_dict, test_all=testAll)
-
-        if mem_dict:
-            softwareTest(prj_dict, mem_dict)
+        try:
+            prj_dict, mem_dict, testInst, testAll = prj_mem_ch()
+            if testInst:
+                instTest(prj_dict, test_all=testAll)
+            if mem_dict:
+                softwareTest(prj_dict, mem_dict)
+        except KeyboardInterrupt:
+            print("\n\n仿真进程被Ctrl + C终止")
 
 
 

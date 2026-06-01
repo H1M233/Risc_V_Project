@@ -3,8 +3,8 @@
     "INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.7719",
-        "REAL TIME": "9.40005",
+        "IPC": "0.77259",
+        "REAL TIME": "9.70002",
         "RUN TIME": "147",
         "BPU ACCURACY": "0.873637",
         "LED": "PASS √"

@@ -39,6 +39,10 @@ module counter(
         end
     endfunction
 
+    function automatic logic [31:0] bin_to_gray(input logic [31:0] bin);
+        bin_to_gray = bin ^ (bin >> 1);
+    endfunction
+
     logic [15:0] cnt_1ms;
     logic [31:0] cnt_ms_bin;
     logic [31:0] cnt_ms_gray;
@@ -80,7 +84,7 @@ module counter(
         end
     end
 
-    assign cnt_ms_gray = cnt_ms_bin ^ (cnt_ms_bin >> 1);
+    assign cnt_ms_gray = bin_to_gray(cnt_ms_bin);
 
     // Counter->CPU CDC: Gray code allows safe multi-bit crossing.
     always_ff @(posedge cpu_clk) begin

@@ -157,32 +157,27 @@ int main(int argc, char** argv) {
             std::cout << "\n\n";
 
             std::cout << "RUN TIME:"
-                      << std::right << std::setw(9) << std::fixed << std::setprecision(1) << current_time / 1000.0
-                      << std::left << std::setw(10) << " s"
-                      << "SIM TIME:"
-                      << std::right << std::setw(13) << std::fixed << std::setprecision(2) << sim_time_ns / NS2MS
-                      << std::left << std::setw(11) << " ms"
-                      << "SEG:"
-                      << std::right << std::setw(19) << std::hex << top->seg << std::dec
-                      << std::left << std::setw(13) << " " << std::endl << std::endl << "\033[2K"
+                      << std::right << std::setw(9) << std::fixed << std::setprecision(1) << current_time / 1000.0 << " s"
+                      << std::setw(18) << "SIM TIME:"
+                      << std::right << std::setw(13) << std::fixed << std::setprecision(2) << sim_time_ns / NS2MS << " ms"
+                      << std::setw(8) << "SEG:"
+                      << std::right << std::setw(18) << std::hex << top->seg << std::dec
+                      << std::endl << std::endl << "\033[2K"
+
                       << "IPC:" 
                       << std::right << std::setw(16) << std::fixed << std::setprecision(4) << commitCycle / totalCycle
-                      << std::left << std::setw(8) << " "
-                      << "BPU accuracy:"
-                      << std::right << std::setw(10) << (predTotal - predMiss) / predTotal
-                      << std::left << std::setw(8) << " %" 
-                      << "Branch:  " << (predTotal - predMissB) / predTotal << " %  "
-                      << "JALR:  " << (predTotal - predMissJr) / predTotal << " %  "
+                      << std::setw(22) << "BPU ACCURACY:"
+                      << std::right << std::setw(12) << (predTotal - predMiss) / predTotal
+                      << std::setw(13) << "BRANCH:  " << (predTotal - predMissB) / predTotal
+                      << std::setw(10) << "JALR:  " << (predTotal - predMissJr) / predTotal
                       << std::endl << std::endl << "\033[2K"
+
                       << "PC:" 
                       << std::right << std::setw(10) << std::hex << top->func_block_addr << " -> " 
                       << std::right << std::setw(8) << top->pc << std::dec
-                      << std::left << std::setw(3) << " "
-                      << "ETA: "
-                      << std::right << std::setw(13) << ETATime_ms / 60
-                      << std::left << std::setw(3) << " m"
-                      << std::right << std::setw(2) << ETATime_ms % 60
-                      << std::left << std::setw(3) << " s"
+                      << std::setw(9) << "ETA: "
+                      << std::right << std::setw(13) << ETATime_ms / 60 << " m"
+                      << std::right << std::setw(3) << ETATime_ms % 60 << " s"
 
                       << std::flush;
         }
