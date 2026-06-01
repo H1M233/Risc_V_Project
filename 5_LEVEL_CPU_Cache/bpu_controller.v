@@ -11,7 +11,8 @@
 // 数据冒险发生时 hazard_en 的暂停对预测器同样生效 以避免预测错位
 module bpu_controller #(
     // 分支预测
-    parameter BHR_WIDTH = 16,
+    parameter BHR_WIDTH = 8,
+    parameter PHT_IDX_WIDTH = 10,
 
     // BTB
     parameter BTB_INDEX_WIDTH = 4,
@@ -55,9 +56,9 @@ module bpu_controller #(
     input      [BHR_WIDTH - 1:0]    gshare_ghr_update,
 
     // Gshare - 更新
-    output reg                      gshare_update_en,
-    output reg [BHR_WIDTH - 1:0]    gshare_update_pht_index,
-    output reg                      gshare_actual_taken,
+    output                          gshare_update_en,
+    output     [BHR_WIDTH - 1:0]    gshare_update_pht_index,
+    output                          gshare_actual_taken,
 
     // ras - to bpu_controller
     (* max_fanout = 30 *)
@@ -78,14 +79,12 @@ module bpu_controller #(
     input      [31:0]                           btb_target_pc,
 
     // btb - 更新
-    output reg                                  btb_update_en,
+    output                                      btb_update_en,
     (* max_fanout = 20 *)
-    output reg [BTB_INDEX_WIDTH - 1:0]          btb_update_index,
-    output reg [31 - BTB_INDEX_WIDTH - 2:0]     btb_update_tag,
-    output reg [31:0]                           btb_update_target
+    output     [BTB_INDEX_WIDTH - 1:0]          btb_update_index,
+    output     [31 - BTB_INDEX_WIDTH - 2:0]     btb_update_tag,
+    output     [31:0]                           btb_update_target
 );
-    // 指令是否可用
-    wire inst_valid = ~pipe_flush;
 
     // 取出 rd 和 rs1 的地址
     wire    [4:0]   rd_addr     = pc_inst[11:7];
@@ -96,12 +95,12 @@ module bpu_controller #(
     wire    [31:0]  B_imm       = {{20{pc_inst[31]}}, pc_inst[7], pc_inst[30:25], pc_inst[11:8], 1'b0};
 
     // 处理 JALR
-    (* max_fanout = 20 *)
     wire            is_JALR     = (pc_inst[6:0] == `JALR);
-    wire    [31:0]  JALR_imm    = {{20{pc_inst[31]}}, pc_inst[31:20]};
-    wire            is_ret_JALR = (is_JALR && rd_addr == 5'b0 && rs1_addr == 5'b00001 && JALR_imm == 0);
-    (* max_fanout = 20 *)
-    wire            is_ras_pop  = (is_ret_JALR && !ras_isempty);
+    wire    [31:0]      JALR_imm    = {{20{pc_inst[31]}}, pc_inst[31:20]};
+    wire            check_ret   = (rd_addr == 5'b0 && rs1_addr == 5'b00001 && JALR_imm == 32'b0);
+    wire            is_ret_JALR = (is_JALR && check_ret);
+    wire            is_btb_JALR = (is_JALR && !check_ret);
+    wire            ras_can_pop = (is_ret_JALR && !ras_isempty);
 
     // 处理 JAL
     wire            is_JAL      = (pc_inst[6:0] == `JAL);
@@ -115,8 +114,8 @@ module bpu_controller #(
     wire    [31:0]  pc_add_B    = pc_addr_if2 + B_imm;
 
     // Gshare索引：取PC中间位与BHR异或
-    wire [BHR_WIDTH - 1:0]  pht_index           = pc_addr[BHR_WIDTH + 1:2] ^ gshare_ghr;
-    wire [BHR_WIDTH - 1:0]  update_pht_index    = update_pc[BHR_WIDTH + 1:2] ^ gshare_ghr_update;
+    wire [PHT_IDX_WIDTH - 1:0]  pht_index           = pc_addr[PHT_IDX_WIDTH + 1:2] ^ {{(PHT_IDX_WIDTH - BHR_WIDTH){1'b0}}, gshare_ghr};
+    wire [PHT_IDX_WIDTH - 1:0]  update_pht_index    = update_pc[PHT_IDX_WIDTH + 1:2] ^ {{(PHT_IDX_WIDTH - BHR_WIDTH){1'b0}}, gshare_ghr_update};
 
     // BTB索引和tag（tag取pc高位，用于区分映射到同一索引的不同地址）
     wire [BTB_INDEX_WIDTH - 1:0]        btb_query_index_w   = pc_addr[BTB_INDEX_WIDTH + 1:2];
@@ -126,7 +125,7 @@ module bpu_controller #(
 
     // 查询
     (* max_fanout = 30 *)
-    assign gshare_pht_index = (inst_valid) ? pht_index : 0;     // 预测跳转后屏蔽查询入口
+    assign gshare_pht_index = (pipe_flush) ? 0 : pht_index;     // 预测跳转后屏蔽查询入口
     always @(posedge clk) begin
         if (!rst) begin
             // RAS
@@ -162,21 +161,20 @@ module bpu_controller #(
         else if (pipe_hold) begin
             // ..
         end
-        else if (inst_valid) begin
+        else if (pipe_flush) begin
             // RAS
-            ras_pop_en      <= is_ras_pop;
+            ras_pop_en      <= 0;
+            ras_push_en     <= 0;
+            // GSHARE
+            gshare_prev_b   <= 0;
+        end
+        else begin
+            // RAS
+            ras_pop_en      <= ras_can_pop;
             ras_push_en     <= is_ras_push;
 
             // GSHARE
             gshare_prev_b   <= is_B_type;
-        end
-        else begin
-            // RAS
-            ras_pop_en      <= 0;
-            ras_push_en     <= 0;
-
-            // GSHARE
-            gshare_prev_b   <= 0;
         end
     end
     
@@ -186,17 +184,17 @@ module bpu_controller #(
     always @(*) begin
         (* parallel_case *)
         case (1'b1)
-            is_ras_pop: begin
+            ras_can_pop: begin
                 sel_pred_taken  = 1'b1;
                 sel_pred_pc     = ras_pop_addr;
+            end
+            is_btb_JALR: begin
+                sel_pred_taken  = btb_hit;
+                sel_pred_pc     = btb_target_pc;
             end
             is_B_type: begin
                 sel_pred_taken  = gshare_pred_taken;
                 sel_pred_pc     = pc_add_B;
-            end
-            is_JALR: begin
-                sel_pred_taken  = btb_hit;
-                sel_pred_pc     = btb_target_pc;
             end
             is_JAL: begin
                 sel_pred_taken  = 1'b1;
@@ -217,27 +215,24 @@ module bpu_controller #(
         else if (pipe_hold) begin   // 当暂停时预测器的结果需要保存
             // ...
         end
-        else if (inst_valid) begin
-            pred_taken  <= sel_pred_taken;
-            pred_pc     <= sel_pred_pc;
-        end
-        else begin
+        else if (pipe_flush) begin
             pred_taken  <= 0;
             pred_pc     <= 0;
         end
+        else begin
+            pred_taken  <= sel_pred_taken;
+            pred_pc     <= sel_pred_pc;
+        end
     end
 
-    // 更新
-    always @(*) begin
-        // Gshare更新
-        gshare_update_en         = update_gshare_en;
-        gshare_update_pht_index  = update_pht_index;
-        gshare_actual_taken      = actual_taken;
-        
-        // BTB更新
-        btb_update_en            = update_btb_en;
-        btb_update_index         = btb_update_index_w;
-        btb_update_tag           = btb_update_tag_w;
-        btb_update_target        = update_target;
-    end
+    // Gshare更新
+    assign gshare_update_en         = update_gshare_en;
+    assign gshare_update_pht_index  = update_pht_index;
+    assign gshare_actual_taken      = actual_taken;
+    
+    // BTB更新
+    assign btb_update_en            = update_btb_en;
+    assign btb_update_index         = btb_update_index_w;
+    assign btb_update_tag           = btb_update_tag_w;
+    assign btb_update_target        = update_target;
 endmodule

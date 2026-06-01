@@ -10,6 +10,7 @@
 module bpu_top #(
     // 分支预测
     parameter BHR_WIDTH = 8,            // BHR宽度：PHT索引根据
+    parameter PHT_IDX_WIDTH = 10,       // PHT宽度，应略大于 BHR 宽度
 
     // BTB
     parameter BTB_INDEX_WIDTH = 4,
@@ -75,6 +76,7 @@ module bpu_top #(
 
     bpu_controller #(
         .BHR_WIDTH          (BHR_WIDTH),
+        .PHT_IDX_WIDTH      (PHT_IDX_WIDTH),
 
         .BTB_INDEX_WIDTH    (BTB_INDEX_WIDTH),
 
@@ -138,7 +140,8 @@ module bpu_top #(
     );
 
     gshare #(
-        .BHR_WIDTH  (BHR_WIDTH)
+        .BHR_WIDTH      (BHR_WIDTH),
+        .PHT_IDX_WIDTH  (PHT_IDX_WIDTH)
     ) GSHARE(
         .clk                        (clk),
         .rst                        (rst),

@@ -33,12 +33,14 @@ module ras #(
         for(i = 0; i < DEPTH; i = i + 1) stack_mem[i] = 32'b0;
     end
 
+    // 压栈
     always @(posedge clk) begin
         if (rst & push_en_i & ptr != DEPTH) begin
             stack_mem[ptr]  <= push_addr_i;
         end
     end
 
+    // 指针控制
     always @(posedge clk) begin
         if (!rst) begin
             ptr <= 0;

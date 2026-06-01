@@ -129,11 +129,13 @@ module ex(
     // 纯数值计算独热 - 已提前至 id 计算
     wire request_value_only = inst_packaged_i[`REQUEST_VALUE_ONLY];
 
-    // 前推选择
+    // 前推选择 - 当为立即数时 fwd_rs2_data_i 代表 imm
     (* max_fanout = 20 *) wire [31:0] rs1_data_fwd = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
     (* max_fanout = 20 *) wire [31:0] rs2_data_fwd = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
-    (* max_fanout = 20 *) wire [31:0] value1_eff = rs1_data_fwd;
-    (* max_fanout = 20 *) wire [31:0] value2_eff = rs2_data_fwd;
+
+    // value1 & value2 仅用于 I & R 型运算
+    (* max_fanout = 20 *) wire [31:0] value1_eff = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
+    (* max_fanout = 20 *) wire [31:0] value2_eff = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
 
     // 计算
     wire [4:0]  shamt    = value2_eff[4:0];
@@ -145,43 +147,38 @@ module ex(
     wire [31:0] sll_res  = value1_eff << shamt;
     wire [31:0] srl_res  = value1_eff >> shamt;
     wire [31:0] sra_res  = $signed(value1_eff) >>> shamt;
+    wire [2:0]  alu_cmp  = fast_compare(value1_eff, value2_eff);    // 利用减法器进行快速比较
+    wire        ltu_res  = alu_cmp[1];
+    wire        lts_res  = alu_cmp[0];
 
-    //csr 计算
-    wire [31:0] csr_value1  = (inst_i[14]) ? value1_i : value1_eff; // CSR 写数据选择
-    wire [31:0] rw_res      = csr_value1; // 读写结果，写入 CSR 的值或原 CSR 值
-    wire [31:0] rs_res      = csr_rdata | csr_value1; // 读-置位结果
-    wire [31:0] rc_res      = csr_rdata & ~csr_value1; // 读-清零结果 
-
-    // 利用减法器进行快速比较
-    wire [31:0] IR_sub_result;
-    wire        IR_carry;
-
-    assign {IR_carry, IR_sub_result} = {1'b0, value1_eff} - {1'b0, value2_eff};     // 等同于例化减法器
-    wire        sign_diff   = (value1_eff[31] ^ value2_eff[31]);
-    wire        ltu_res     = IR_carry;
-    wire        lts_res     = (sign_diff) ? value1_eff[31] : IR_carry;
+    // csr 计算
+    wire [31:0] csr_value1  = (inst_i[14]) ? value1_i : rs1_data_fwd;   // CSR 写数据选择
+    wire [31:0] rw_res      = csr_value1;                               // 读写结果，写入 CSR 的值或原 CSR 值
+    wire [31:0] rs_res      = csr_rdata | csr_value1;                   // 读-置位结果
+    wire [31:0] rc_res      = csr_rdata & ~csr_value1;                  // 读-清零结果 
 
     // 分支计算
-    wire [31:0] branch_rs1_data = rs1_data_fwd;
-    wire [31:0] branch_rs2_data = rs2_data_fwd;
-
-    // 利用减法器进行快速比较
-    wire [31:0] branch_sub_result;
-    wire        branch_carry;          // 借位输出
-    assign {branch_carry, branch_sub_result} = {1'b0, branch_rs1_data} - {1'b0, branch_rs2_data};   // 等同于例化减法器
-    wire branch_sign_diff = (branch_rs1_data[31] ^ branch_rs2_data[31]);
-
-    (* max_fanout = 20 *) wire branch_eq_res    = (branch_rs1_data == branch_rs2_data);
-    (* max_fanout = 20 *) wire branch_ltu_res   = branch_carry;
-    (* max_fanout = 20 *) wire branch_lts_res   = (branch_sign_diff) ? branch_rs1_data[31] : branch_carry;
+    wire [31:0] branch_rs1_data = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
+    wire [31:0] branch_rs2_data = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
+    wire [2:0]  branch_cmp = fast_compare(branch_rs1_data, branch_rs2_data);    // 利用减法器进行快速比较
+    (* max_fanout = 20 *) wire branch_eq_res    = branch_cmp[2];
+    (* max_fanout = 20 *) wire branch_ltu_res   = branch_cmp[1];
+    (* max_fanout = 20 *) wire branch_lts_res   = branch_cmp[0];
 
     // Branch 计算
-    (* max_fanout = 20 *) wire branch_taken =   (sel_beq  & branch_eq_res  ) |
-                                                (sel_bne  & ~branch_eq_res ) |
-                                                (sel_blt  & branch_lts_res ) |
-                                                (sel_bge  & ~branch_lts_res) |
-                                                (sel_bltu & branch_ltu_res ) |
-                                                (sel_bgeu & ~branch_ltu_res);
+    reg branch_taken;
+    always @(*) begin
+        (* parallel_case *)
+        case (1'b1)
+            sel_beq  : branch_taken = branch_eq_res;
+            sel_bne  : branch_taken = ~branch_eq_res;
+            sel_blt  : branch_taken = branch_lts_res;
+            sel_bge  : branch_taken = ~branch_lts_res;
+            sel_bltu : branch_taken = branch_ltu_res;
+            sel_bgeu : branch_taken = ~branch_ltu_res;
+            default  : branch_taken = 1'b0;
+        endcase
+    end
 
     // 预测错误判断
     wire jalr_pred_mispredict    = (is_jalr && rs1_data_fwd != jump2_i);            // rs1 == pred_pc - imm
@@ -213,10 +210,9 @@ module ex(
             sel_sra  : alu_result = sra_res;
             sel_or   : alu_result = or_res;
             sel_and  : alu_result = and_res;
+            is_zicsr : alu_result = csr_rdata;
 
             request_value_only: alu_result = value1_i;
-
-            is_zicsr : alu_result = csr_rdata;
             default  : alu_result = 32'b0;
         endcase
     end
@@ -331,4 +327,23 @@ module ex(
     assign mret_o       = mret_i;
     assign ecall_inst   = (ecall_i) ? pc_addr_i : 32'b0; // 传递 ecall 指令给 csr_regs 模块以保存 mepc
     assign csr_addr_o   = csr_addr_i;   //打拍
+
+    // 快速比较器
+    function [2:0] fast_compare;    // {eq, ltu, lts}
+        input [31:0] a;
+        input [31:0] b;
+        reg   [31:0] diff;
+        reg          borrow;
+        begin
+            {borrow, diff} = {1'b0, a} - {1'b0, b};
+            // eq
+            fast_compare[2] = (a == b);
+
+            // ltu (a < b unsigned)
+            fast_compare[1] = borrow;
+
+            // lts (a < b signed)
+            fast_compare[0] = (a[31] ^ b[31]) ? a[31] : borrow;
+        end
+    endfunction
 endmodule

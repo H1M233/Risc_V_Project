@@ -3,10 +3,45 @@
     "INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.785624",
-        "REAL TIME": "9.20019",
-        "RUN TIME": "142",
-        "BPU ACCURACY": "0.915205",
+        "IPC": "0.7719",
+        "REAL TIME": "9.40005",
+        "RUN TIME": "147",
+        "BPU ACCURACY": "0.873637",
+        "LED": "PASS √"
+      },
+      "src0": {
+        "IPC": "0.675694",
+        "REAL TIME": "446.005",
+        "RUN TIME": "7078",
+        "BPU ACCURACY": "0.748216",
+        "LED": "PASS √"
+      },
+      "src1": {
+        "IPC": "0.586633",
+        "REAL TIME": "461.404",
+        "RUN TIME": "7417",
+        "BPU ACCURACY": "0.832963",
+        "LED": "PASS √"
+      },
+      "src2": {
+        "IPC": "0.708616",
+        "REAL TIME": "618.724",
+        "RUN TIME": "9395",
+        "BPU ACCURACY": "0.758273",
+        "LED": "PASS √"
+      },
+      "withMext": {
+        "IPC": "0.639467",
+        "REAL TIME": "110.902",
+        "RUN TIME": "6f6",
+        "BPU ACCURACY": "0.975406",
+        "LED": "FAIL x"
+      },
+      "withoutMext": {
+        "IPC": "0.700109",
+        "REAL TIME": "249.801",
+        "RUN TIME": "3821",
+        "BPU ACCURACY": "0.732028",
         "LED": "PASS √"
       }
     }

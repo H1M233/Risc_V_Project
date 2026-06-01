@@ -8,7 +8,8 @@ module dram_BRAM(
     input               dram_wen_i,
     input      [31:0]   dram_wdata_i,
     output reg [31:0]   dram_rdata_d1_o,
-    output reg [31:0]   dram_rdata_d2_o
+    output reg [31:0]   dram_rdata_d2_o,
+    output reg [31:0]   dram_rdata_d3_o
 );
 
     // 设置65536个32位空间
@@ -27,14 +28,13 @@ module dram_BRAM(
     always @(posedge clk) begin
         dram_rdata_d1_o <= (dram_wen_i) ? pre_wdata : dram_rdata_raw;
         dram_rdata_d2_o <= dram_rdata_d1_o;
+        dram_rdata_d3_o <= dram_rdata_d2_o;
     end
-
 
     always @(posedge clk) begin
         if(dram_wen_i) ram_mem[dram_word_addr] <= pre_wdata;
     end
 endmodule
-
 
 module blk_mem_gen_0(
     input      [15:0]   addra,
@@ -50,24 +50,7 @@ module blk_mem_gen_0(
         .dram_wen_i         (wea != 4'b0),
         .dram_wdata_i       (dina),
         .dram_rdata_d1_o    (),
-        .dram_rdata_d2_o    (douta)
-    );
-endmodule
-
-module DRAM_d1(
-    input      [15:0]   addra,
-    input               clka,
-    input      [31:0]   dina,
-    output reg [31:0]   douta,
-    input      [3:0]    wea
-);
-    dram_BRAM dram_inst(
-        .clk                (clka),
-        .dram_addr_i        ({14'b0, addra, 2'b0}),
-        .dram_we_i          (wea),
-        .dram_wen_i         (wea != 4'b0),
-        .dram_wdata_i       (dina),
-        .dram_rdata_d1_o    (),
-        .dram_rdata_d2_o    (douta)
+        .dram_rdata_d2_o    (),
+        .dram_rdata_d3_o    (douta)
     );
 endmodule

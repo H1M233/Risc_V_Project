@@ -305,8 +305,8 @@ def instTest(prj_dict, test_all=False):
 
     # 遍历所有文件
     for file_bin in all_bin_files:
-        index = file_bin.index('-p-')
-        print_name = file_bin[index + 3:-4]
+        index = file_bin.index('rv')
+        print_name = file_bin[index:-4]
 
         bin_to_mem(file_bin, 'inst_test')
 
@@ -325,15 +325,15 @@ def instTest(prj_dict, test_all=False):
 
             findPass, findFail = "PASS!!!" in sim_stdout, "FAIL!!!" in sim_stdout
             if findFail:
-                print('\033[2K指令  ' + print_name.ljust(10, ' ') + '      !!!FAIL!!!')
+                print('\033[2K指令  ' + print_name.ljust(20, ' ') + '!!!FAIL!!!')
                 print(bar, end='\r')
                 failCnt += 1
             elif findPass:
-                print('\033[2K指令  ' + print_name.ljust(10, ' ') + '      PASS')
+                print('\033[2K指令  ' + print_name.ljust(20, ' ') + 'PASS')
                 print(bar, end='\033[A\r')
                 passCnt += 1
             else:
-                print('\033[2K指令  ' + print_name.ljust(10, ' ') + '      NO ANSWER')
+                print('\033[2K指令  ' + print_name.ljust(20, ' ') + 'NO ANSWER')
                 print(bar, end='\r')
         else:
             print('\n')

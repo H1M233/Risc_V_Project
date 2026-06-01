@@ -37,7 +37,7 @@ module regs(
         end
     end
     always @(posedge clk) begin
-        if (rst && regs_wen)  begin
+        if (regs_wen)  begin
             regs_p1[rd_addr_i] <= rd_data_i;
             regs_p2[rd_addr_i] <= rd_data_i;
         end

@@ -815,7 +815,8 @@ module top_riscv(
     );
 
     bpu_top #(
-        .BHR_WIDTH          (14),
+        .BHR_WIDTH          (`GSHARE_BHR_WIDTH),
+        .PHT_IDX_WIDTH      (`GSHARE_PHT_IDX_WIDTH),
         .BTB_INDEX_WIDTH    (4),
         .RAS_DEPTH          (8)
     ) BPU(

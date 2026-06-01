@@ -75,7 +75,7 @@ module id(
     wire forwarding_rs1_mem2 = (rs1_i == mem2_rd_addr_i) & mem2_regs_wen_i;
     wire forwarding_rs1_wb   = (rs1_i == wb_rd_addr_i) & wb_regs_wen_i;
 
-    wire forwarding_rs2_ex   = (rs2_i == ex_rd_addr_i) & ex_regs_wen_i & !is_alu_i;
+    wire forwarding_rs2_ex   = (rs2_i == ex_rd_addr_i) & ex_regs_wen_i & !is_alu_i; // 当为立即数时，不启用前推
     wire forwarding_rs2_mem1 = (rs2_i == mem1_rd_addr_i) & mem1_regs_wen_i;
     wire forwarding_rs2_mem2 = (rs2_i == mem2_rd_addr_i) & mem2_regs_wen_i;
     wire forwarding_rs2_wb   = (rs2_i == wb_rd_addr_i) & wb_regs_wen_i;
@@ -191,7 +191,7 @@ module id(
         inst_o           = inst_i;
         pred_taken_o     = pred_taken_i;
         fwd_rs1_data_o   = forwarding_rs1_data_hit;
-        fwd_rs2_data_o   = (is_alu_i) ? {{20{inst_i[31]}}, inst_i[31:20]} : forwarding_rs2_data_hit;
+        fwd_rs2_data_o   = (is_alu_i) ? {{20{inst_i[31]}}, inst_i[31:20]} : forwarding_rs2_data_hit;    // 立即数时返回 imm
         fwd_rs1_hit_ex_o = forwarding_rs1_ex;
         fwd_rs2_hit_ex_o = forwarding_rs2_ex & !is_alu_i;
 
@@ -358,4 +358,4 @@ module id(
             end
         endcase
     end
-endmodule
+endmodule                       

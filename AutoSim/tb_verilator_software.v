@@ -30,7 +30,7 @@ module tb_verilator_software(
         end
         assign seg = tb_verilator_software.uut.student_top_inst.bridge_inst.seg_driver.s;
         wire hazard_en = tb_verilator_software.uut.student_top_inst.Core_cpu.hazard_hazard_en;
-        wire ex_valid = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.valid_i;
+        wire ex_valid = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.valid_o;
         assign commit = ex_valid & tb_verilator_software.uut.student_top_inst.Core_cpu.EX.inst_packaged_i != 0;
 
         assign pc = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.pc_addr_i;
@@ -38,9 +38,9 @@ module tb_verilator_software(
         wire ex_is_jalr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.is_jalr;
         wire ex_is_branch = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.is_branch;
         assign pred_miss = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.update_gshare_en_o | tb_verilator_software.uut.student_top_inst.Core_cpu.EX.update_btb_en_o;
-        assign pred_total = ex_is_jalr | ex_is_branch;
-        assign pred_total_b = ex_is_branch;
-        assign pred_total_jr = ex_is_jalr;
+        assign pred_total = (ex_is_jalr | ex_is_branch) & ex_valid;
+        assign pred_total_b = ex_is_branch & ex_valid;
+        assign pred_total_jr = ex_is_jalr & ex_valid;
         assign pred_miss_b = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.update_gshare_en_o;
         assign pred_miss_jr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.update_btb_en_o;
 

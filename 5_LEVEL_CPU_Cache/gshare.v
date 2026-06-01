@@ -2,7 +2,8 @@
 
 module gshare #(
     parameter BHR_WIDTH = 8,
-    parameter PHT_SIZE = 2 ** BHR_WIDTH
+    parameter PHT_IDX_WIDTH = 10,
+    parameter PHT_SIZE = 2 ** PHT_IDX_WIDTH
 ) (
     input                           clk,
     input                           rst,

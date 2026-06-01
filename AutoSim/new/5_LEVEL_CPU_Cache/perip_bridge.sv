@@ -54,11 +54,10 @@ module perip_bridge(
     logic cnt_enable_cfg;
     
     // delay
-    localparam READ_DELAY = 2;
+    localparam READ_DELAY = 3;
+
     logic [31:0] perip_addr_d [0: READ_DELAY - 1];
     logic        perip_wen_d  [0: READ_DELAY - 1];
-
-    // assign       dram_ready        = (|{dram_en, perip_d[0].en, perip_d[1].en}) ? 1'b0 : 1'b1;
     logic [31:0] perip_addr_delay;
     logic [3:0]  perip_wen_delay;
     logic        perip_hit_dram;
@@ -80,16 +79,16 @@ module perip_bridge(
         else begin
             perip_addr_d[0] <= perip_addr;
             perip_wen_d[0]  <= perip_wen;
-            perip_hit_dram  <= (perip_addr_d[0] >= DRAM_ADDR_START && perip_addr_d[0] < DRAM_ADDR_END);
-            perip_hit_mmio  <=  (perip_addr_d[0] == SW0_ADDR) | 
-                                (perip_addr_d[0] == SW1_ADDR) | 
-                                (perip_addr_d[0] == KEY_ADDR) | 
-                                (perip_addr_d[0] == SEG_ADDR);
-            perip_hit_cnt   <=  (perip_addr_d[0] == CNT_ADDR);
+            perip_hit_dram  <= (perip_addr_d[READ_DELAY - 2] >= DRAM_ADDR_START && perip_addr_d[READ_DELAY - 2] < DRAM_ADDR_END);
+            perip_hit_mmio  <=  (perip_addr_d[READ_DELAY - 2] == SW0_ADDR) | 
+                                (perip_addr_d[READ_DELAY - 2] == SW1_ADDR) | 
+                                (perip_addr_d[READ_DELAY - 2] == KEY_ADDR) | 
+                                (perip_addr_d[READ_DELAY - 2] == SEG_ADDR);
+            perip_hit_cnt   <=  (perip_addr_d[READ_DELAY - 2] == CNT_ADDR);
 
             for (int i = 1; i < READ_DELAY; i++) begin
-                perip_addr_d[i]     <= perip_addr_d[i-1];
-                perip_wen_d[i]      <= perip_wen_d[i-1];
+                perip_addr_d[i]     <= perip_addr_d[i - 1];
+                perip_wen_d[i]      <= perip_wen_d[i - 1];
             end
         end
     end
@@ -118,8 +117,8 @@ module perip_bridge(
 
     // read process: in one cycle
     always_ff @(posedge clk) begin
-        if (~perip_wen_d[0]) begin
-            case (perip_addr_d[0])
+        if (~perip_wen_d[READ_DELAY - 2]) begin
+            case (perip_addr_d[READ_DELAY - 2])
                 SW0_ADDR:  mmio_rdata <= virtual_sw_input[31:0];
                 SW1_ADDR:  mmio_rdata <= virtual_sw_input[63:32];
                 KEY_ADDR:  mmio_rdata <= {24'd0, virtual_key_input};
@@ -177,7 +176,7 @@ module perip_bridge(
             perip_hit_cnt:  perip_rdata = cnt_rdata;
             default:        perip_rdata = 32'b0;
         endcase
-    end    
+    end
     assign virtual_led_output = LED;
     assign virtual_seg_output = seg_output;
 

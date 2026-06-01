@@ -12,6 +12,9 @@
 # set_property EXCLUDE_PLACEMENT false    [get_pblocks pblock_EX_stage]
 # set_property SNAPPING_MODE ON           [get_pblocks pblock_EX_stage]
 
+set_false_path -from [get_clocks clk_out1_pll] -to [get_clocks clk_out2_pll]
+set_false_path -from [get_clocks clk_out2_pll] -to [get_clocks clk_out1_pll]
+
 set_property KEEP_HIERARCHY SOFT [get_cells -hierarchical *pll_inst*]
 set_property KEEP_HIERARCHY SOFT [get_cells -hierarchical *Mem_IROM*]
 set_property KEEP_HIERARCHY SOFT [get_cells -hierarchical *Mem_DRAM*]

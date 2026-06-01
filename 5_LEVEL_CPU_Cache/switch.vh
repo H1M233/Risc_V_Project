@@ -1,7 +1,11 @@
-`define DCACHE_INDEX_WIDTH 2
+// BPU
+`define GSHARE_BHR_WIDTH 10
+`define GSHARE_PHT_IDX_WIDTH 12
 
+// D-CACHE
+`define DCACHE_INDEX_WIDTH 6
 
-`define DRAM_READ_DELAY  2
+// Perip Range
 `ifdef VERILATOR_INST_TEST
     `define DRAM_ADDR_START  32'h0000_0000
     `define DRAM_ADDR_END    32'hFFFF_FFFF

@@ -42,7 +42,7 @@ module dcache(
 
     // 状态寄存
     reg hit_r, miss_r, hit_way_r;
-    reg miss_wait;
+    reg miss_wait1, miss_wait2;
     reg [INDEX_WIDTH-1:0] miss_index;
     reg [TAG_WIDTH - 1:0] miss_tag;
     reg miss_way;
@@ -170,20 +170,25 @@ module dcache(
     // 未命中状态转换
     always @(posedge clk) begin
         if (!rst) begin
-            miss_wait   <= 0;
+            miss_wait1  <= 0;
+            miss_wait2  <= 0;
             miss_index  <= 0;
             miss_tag    <= 0;
             miss_way    <= 0;
         end
         else begin
-            if (!dcache_hit && cpu_req_load && !miss_wait) begin
-                miss_wait   <= 1'b1;
+            if (!dcache_hit && cpu_req_load && !miss_wait1 && !miss_wait2) begin
+                miss_wait1  <= 1'b1;
                 miss_index  <= query_index;
                 miss_tag    <= query_tag;
                 miss_way    <= miss_replace_way;
             end
-            else if (miss_wait) begin
-                miss_wait   <= 1'b0;
+            else if (miss_wait1) begin
+                miss_wait1  <= 1'b0;
+                miss_wait2  <= 1'b1;
+            end
+            else if (miss_wait2) begin
+                miss_wait2  <= 1'b0;
             end
         end
     end
@@ -197,7 +202,7 @@ module dcache(
         end
         else begin
             hit_r       <= dcache_hit;
-            miss_r      <= miss_wait;
+            miss_r      <= miss_wait2;
             hit_way_r   <= hit_way1;
         end
     end
@@ -209,7 +214,7 @@ module dcache(
     assign mem_wdata  = cpu_wdata;
 
     // 暂停
-    assign stall = miss_wait;
+    assign stall = miss_wait1 | miss_wait2;
 
     // 读数据
     assign cpu_rdata  = (miss_r) ? mem_rdata : hit_data;
