@@ -3,17 +3,17 @@
     "INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.772065",
-        "REAL TIME": "9.60013",
-        "RUN TIME": "147",
-        "BPU ACCURACY": "0.873637",
+        "IPC": "0.781311",
+        "REAL TIME": "10.3538",
+        "RUN TIME": "143",
+        "BPU ACCURACY": "0.902758",
         "LED": "PASS √"
       },
       "src0": {
-        "IPC": "0.690823",
-        "REAL TIME": "434.702",
-        "RUN TIME": "6873",
-        "BPU ACCURACY": "0.748232",
+        "IPC": "0.686402",
+        "REAL TIME": "342.267",
+        "RUN TIME": "6894",
+        "BPU ACCURACY": "0.779465",
         "LED": "PASS √"
       },
       "src1": {
@@ -42,6 +42,18 @@
         "REAL TIME": "249.801",
         "RUN TIME": "3821",
         "BPU ACCURACY": "0.732028",
+        "LED": "PASS √"
+      }
+    }
+  },
+  "RV_Superscalar": {
+    "INST TEST": "FAIL x",
+    "SOFTWARE TEST": {
+      "init": {
+        "IPC": "0.781424",
+        "REAL TIME": "7.14461",
+        "RUN TIME": "167",
+        "BPU ACCURACY": "0.902758",
         "LED": "PASS √"
       }
     }

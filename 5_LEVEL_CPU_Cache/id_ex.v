@@ -88,7 +88,7 @@ module id_ex(
             mret_o              <= 1'b0;
             csr_addr_o          <= 12'b0;
         end
-        else if(id_ex_ecall_mret_flush) begin
+        else if (id_ex_ecall_mret_flush) begin
             pc_addr_o           <= 32'b0;
             regs_wen_o          <= 1'b0;
             inst_o              <= `NOP;

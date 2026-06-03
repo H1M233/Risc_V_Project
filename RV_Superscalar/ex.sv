@@ -4,35 +4,13 @@
 
 module ex(
     // from id_ex
-    input      [31:0]           pc_addr_i,
-    input      [31:0]           inst_i,
-    input      [31:0]           jump1_i,
-    input      [31:0]           jump2_i,
-    input      [4:0]            rd_addr_i,
-    input                       regs_wen_i,
-    (* max_fanout = 30 *)
-    input      [31:0]           value1_i,
-    (* max_fanout = 30 *)
-    input      [31:0]           value2_i,
-    input                       pred_taken_i,
-    input      [`OP_INST_NUM - 1:0]  inst_packaged_i,
-    (* max_fanout = 30 *)
-    input                       valid_i,
-    input                       ecall_i,
-    input                       mret_i,
-    input      [11:0]           csr_addr_i,
+    input data_t            data_packaged_i,
+    input decode_t          inst_packaged_i,
+    input logic             valid_i,
 
-    // from fowarding - fanout set
-    (* max_fanout = 20 *)
-    input      [31:0]   fwd_rs1_data_i,
-    (* max_fanout = 20 *)
-    input      [31:0]   fwd_rs2_data_i,
-    (* max_fanout = 20 *)
-    input               fwd_rs1_hit_ex_i,
-    (* max_fanout = 20 *)
-    input               fwd_rs2_hit_ex_i,
-    (* max_fanout = 20 *)
-    input      [31:0]   fwd_ex_rd_data_i,
+    // forwarding
+    input logic [31:0] fwd_slot0_ex_rd_data_i,
+    input logic [31:0] fwd_slot1_ex_rd_data_i,
 
     // from csr_regs
     input      [31:0]   csr_rdata,
@@ -47,7 +25,6 @@ module ex(
     output              mem_load_is_signed,
     output              valid_o,
     output     [4:0]    rd_addr_o,
-    (* max_fanout = 30 *)
     output     [31:0]   rd_data_o,
 
     // to ex_dcache & hazard
@@ -73,75 +50,95 @@ module ex(
     output reg [31:0]   csr_wdata_o,
     output     [31:0]   ecall_inst
 );
+    // 解码
+    wire [31:0] pc_addr_i       = data_packaged_i.pc;
+    wire [31:0] inst_i          = data_packaged_i.inst;
+    wire        regs_wen_i      = data_packaged_i.regs_wen;
+    wire [31:0] value1_i        = data_packaged_i.value1;
+    wire [31:0] value2_i        = data_packaged_i.value2;
+    wire [31:0] jump1_i         = data_packaged_i.jump1;
+    wire [31:0] jump2_i         = data_packaged_i.jump2;
+    wire [4:0]  rd_addr_i       = data_packaged_i.rd_addr;
+    wire        pred_taken_i    = data_packaged_i.pred_taken;
+    wire [11:0] csr_addr_i      = data_packaged_i.csr_addr;
+    wire        ecall_i         = data_packaged_i.ecall;
+    wire        mret_i          = data_packaged_i.mret;
 
     // 主操作码独热
-    wire is_alu_i  = inst_packaged_i[`OP_I];
-    wire is_alu_r  = inst_packaged_i[`OP_R];
-    wire is_auipc  = inst_packaged_i[`OP_AUIPC];
-    wire is_lui    = inst_packaged_i[`OP_LUI];
-    wire is_jal    = inst_packaged_i[`OP_JAL];
-    wire is_jalr   = inst_packaged_i[`OP_JALR];
-    wire is_branch = inst_packaged_i[`OP_BRANCH];
-    wire is_load   = inst_packaged_i[`OP_LOAD];
-    wire is_store  = inst_packaged_i[`OP_STORE];
-    wire is_zicsr  = inst_packaged_i[`OP_ZICSR];
+    wire is_alu_i  = inst_packaged_i.is_alu_i;
+    wire is_alu_r  = inst_packaged_i.is_alu_r;
+    wire is_auipc  = inst_packaged_i.is_auipc;
+    wire is_lui    = inst_packaged_i.is_lui;
+    wire is_jal    = inst_packaged_i.is_jal;
+    wire is_jalr   = inst_packaged_i.is_jalr;
+    wire is_branch = inst_packaged_i.is_branch;
+    wire is_load   = inst_packaged_i.is_load;
+    wire is_store  = inst_packaged_i.is_store;
+    wire is_zicsr  = inst_packaged_i.is_zicsr;
 
     // IR-type
-    wire sel_add   = inst_packaged_i[`INST_IR_ADD];
-    wire sel_sub   = inst_packaged_i[`INST_R_SUB];
-    wire sel_xor   = inst_packaged_i[`INST_IR_XOR];
-    wire sel_or    = inst_packaged_i[`INST_IR_OR];
-    wire sel_and   = inst_packaged_i[`INST_IR_AND];
-    wire sel_sll   = inst_packaged_i[`INST_IR_SLL];
-    wire sel_srl   = inst_packaged_i[`INST_IR_SRL];
-    wire sel_sra   = inst_packaged_i[`INST_IR_SRA];
-    wire sel_slt   = inst_packaged_i[`INST_IR_SLT];
-    wire sel_sltu  = inst_packaged_i[`INST_IR_SLTU];
+    wire sel_add   = inst_packaged_i.sel_add;
+    wire sel_sub   = inst_packaged_i.sel_sub;
+    wire sel_xor   = inst_packaged_i.sel_xor;
+    wire sel_or    = inst_packaged_i.sel_or;
+    wire sel_and   = inst_packaged_i.sel_and;
+    wire sel_sll   = inst_packaged_i.sel_sll;
+    wire sel_srl   = inst_packaged_i.sel_srl;
+    wire sel_sra   = inst_packaged_i.sel_sra;
+    wire sel_slt   = inst_packaged_i.sel_slt;
+    wire sel_sltu  = inst_packaged_i.sel_sltu;
 
     // Load & Store
-    wire sel_lb    = inst_packaged_i[`INST_LB];
-    wire sel_lh    = inst_packaged_i[`INST_LH];
-    wire sel_lw    = inst_packaged_i[`INST_LW];
-    wire sel_lbu   = inst_packaged_i[`INST_LBU];
-    wire sel_lhu   = inst_packaged_i[`INST_LHU];
-    wire sel_sb    = inst_packaged_i[`INST_SB];
-    wire sel_sh    = inst_packaged_i[`INST_SH];
-    wire sel_sw    = inst_packaged_i[`INST_SW];
+    wire sel_lb    = inst_packaged_i.sel_lb;
+    wire sel_lh    = inst_packaged_i.sel_lh;
+    wire sel_lw    = inst_packaged_i.sel_lw;
+    wire sel_lbu   = inst_packaged_i.sel_lbu;
+    wire sel_lhu   = inst_packaged_i.sel_lhu;
+    wire sel_sb    = inst_packaged_i.sel_sb;
+    wire sel_sh    = inst_packaged_i.sel_sh;
+    wire sel_sw    = inst_packaged_i.sel_sw;
 
     // Branch
-    wire sel_beq   = inst_packaged_i[`INST_BEQ];
-    wire sel_bne   = inst_packaged_i[`INST_BNE];
-    wire sel_blt   = inst_packaged_i[`INST_BLT];
-    wire sel_bge   = inst_packaged_i[`INST_BGE];
-    wire sel_bltu  = inst_packaged_i[`INST_BLTU];
-    wire sel_bgeu  = inst_packaged_i[`INST_BGEU];
+    wire sel_beq   = inst_packaged_i.sel_beq;
+    wire sel_bne   = inst_packaged_i.sel_bne;
+    wire sel_blt   = inst_packaged_i.sel_blt;
+    wire sel_bge   = inst_packaged_i.sel_bge;
+    wire sel_bltu  = inst_packaged_i.sel_bltu;
+    wire sel_bgeu  = inst_packaged_i.sel_bgeu;
     
     // CSR
-    wire sel_csrrw  = inst_packaged_i[`INST_CSRRW];
-    wire sel_csrrs  = inst_packaged_i[`INST_CSRRS];
-    wire sel_csrrc  = inst_packaged_i[`INST_CSRRC];
-    wire sel_csrrwi = inst_packaged_i[`INST_CSRRWI];
-    wire sel_csrrsi = inst_packaged_i[`INST_CSRRSI];
-    wire sel_csrrci = inst_packaged_i[`INST_CSRRCI];
-    wire sel_ecall  = inst_packaged_i[`INST_ECALL];
-    wire sel_mret   = inst_packaged_i[`INST_MRET];
+    wire sel_csrrw  = inst_packaged_i.sel_csrrw;
+    wire sel_csrrs  = inst_packaged_i.sel_csrrs;
+    wire sel_csrrc  = inst_packaged_i.sel_csrrc;
+    wire sel_csrrwi = inst_packaged_i.sel_csrrwi;
+    wire sel_csrrsi = inst_packaged_i.sel_csrrsi;
+    wire sel_csrrci = inst_packaged_i.sel_csrrci;
+    wire sel_ecall  = inst_packaged_i.sel_ecall;
+    wire sel_mret   = inst_packaged_i.sel_mret;
 
     // 纯数值计算独热 - 已提前至 id 计算
-    wire request_value_only = inst_packaged_i[`REQUEST_VALUE_ONLY];
+    wire request_value_only = inst_packaged_i.request_value_only;
 
     // 前推选择 - 当为立即数时 fwd_rs2_data_i 代表 imm
-    (* max_fanout = 20 *) wire [31:0] rs1_data_fwd = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
-    (* max_fanout = 20 *) wire [31:0] rs2_data_fwd = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
+    wire fwd_rs1_hit_slot0_ex_i = data_packaged_i.fwd_rs1_hit_slot0_ex;
+    wire fwd_rs1_hit_slot1_ex_i = data_packaged_i.fwd_rs1_hit_slot1_ex;
+    wire fwd_rs2_hit_slot0_ex_i = data_packaged_i.fwd_rs2_hit_slot0_ex;
+    wire fwd_rs2_hit_slot1_ex_i = data_packaged_i.fwd_rs2_hit_slot1_ex;
+    wire [31:0] fwd_rs1_data_i = data_packaged_i.fwd_rs1_data;
+    wire [31:0] fwd_rs2_data_i = data_packaged_i.fwd_rs2_data;
+
+    (* max_fanout = 20 *) wire [31:0] rs1_data_fwd = (fwd_rs1_hit_slot1_ex_i) ? fwd_slot1_ex_rd_data_i : (fwd_rs1_hit_slot0_ex_i) ? fwd_slot0_ex_rd_data_i : fwd_rs1_data_i;
+    (* max_fanout = 20 *) wire [31:0] rs2_data_fwd = (fwd_rs2_hit_slot1_ex_i) ? fwd_slot1_ex_rd_data_i : (fwd_rs2_hit_slot0_ex_i) ? fwd_slot0_ex_rd_data_i : fwd_rs2_data_i;
 
     // value1 & value2 仅用于 I & R 型运算
-    (* max_fanout = 20 *) wire [31:0] value1_eff = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
-    (* max_fanout = 20 *) wire [31:0] value2_eff = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
+    (* max_fanout = 20 *) wire [31:0] value1_eff = (fwd_rs1_hit_slot1_ex_i) ? fwd_slot1_ex_rd_data_i : (fwd_rs1_hit_slot0_ex_i) ? fwd_slot0_ex_rd_data_i : fwd_rs1_data_i;
+    (* max_fanout = 20 *) wire [31:0] value2_eff = (fwd_rs2_hit_slot1_ex_i) ? fwd_slot1_ex_rd_data_i : (fwd_rs2_hit_slot0_ex_i) ? fwd_slot0_ex_rd_data_i : fwd_rs2_data_i;
 
     // 加减法专用前推
-    wire [31:0] value1_eff_add = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
-    wire [31:0] value2_eff_add = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
-    wire [31:0] value1_eff_sub = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
-    wire [31:0] value2_eff_sub = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
+    wire [31:0] value1_eff_add = (fwd_rs1_hit_slot1_ex_i) ? fwd_slot1_ex_rd_data_i : (fwd_rs1_hit_slot0_ex_i) ? fwd_slot0_ex_rd_data_i : fwd_rs1_data_i;
+    wire [31:0] value2_eff_add = (fwd_rs2_hit_slot1_ex_i) ? fwd_slot1_ex_rd_data_i : (fwd_rs2_hit_slot0_ex_i) ? fwd_slot0_ex_rd_data_i : fwd_rs2_data_i;
+    wire [31:0] value1_eff_sub = (fwd_rs1_hit_slot1_ex_i) ? fwd_slot1_ex_rd_data_i : (fwd_rs1_hit_slot0_ex_i) ? fwd_slot0_ex_rd_data_i : fwd_rs1_data_i;
+    wire [31:0] value2_eff_sub = (fwd_rs2_hit_slot1_ex_i) ? fwd_slot1_ex_rd_data_i : (fwd_rs2_hit_slot0_ex_i) ? fwd_slot0_ex_rd_data_i : fwd_rs2_data_i;
 
     // 计算
     wire [4:0]  shamt    = value2_eff[4:0];
@@ -164,8 +161,8 @@ module ex(
     wire [31:0] rc_res      = csr_rdata & ~csr_value1;                  // 读-清零结果 
 
     // 分支计算
-    wire [31:0] branch_rs1_data = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
-    wire [31:0] branch_rs2_data = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
+    wire [31:0] branch_rs1_data = (fwd_rs1_hit_slot1_ex_i) ? fwd_slot1_ex_rd_data_i : (fwd_rs1_hit_slot0_ex_i) ? fwd_slot0_ex_rd_data_i : fwd_rs1_data_i;
+    wire [31:0] branch_rs2_data = (fwd_rs2_hit_slot1_ex_i) ? fwd_slot1_ex_rd_data_i : (fwd_rs2_hit_slot0_ex_i) ? fwd_slot0_ex_rd_data_i : fwd_rs2_data_i;
     wire [1:0]  branch_cmp = fast_compare(branch_rs1_data, branch_rs2_data);    // 利用减法器进行快速比较
     (* max_fanout = 20 *) wire branch_eq_res  = branch_rs1_data == branch_rs2_data;
     (* max_fanout = 20 *) wire branch_ltu_res = branch_cmp[1];
@@ -173,9 +170,8 @@ module ex(
 
     // Branch 计算
     reg branch_taken;
-    always @(*) begin
-        (* parallel_case *)
-        case (1'b1)
+    always_comb begin
+        unique case (1'b1)
             sel_beq  : branch_taken = branch_eq_res;
             sel_bne  : branch_taken = ~branch_eq_res;
             sel_blt  : branch_taken = branch_lts_res;
@@ -203,9 +199,8 @@ module ex(
 
     // 分指令返回
     (* max_fanout = 30 *) reg [31:0] alu_result;
-    always @(*) begin
-        (* parallel_case *)
-        case (1'b1)
+    always_comb begin
+        unique case (1'b1)
             sel_add  : alu_result = add_res;
             sel_sub  : alu_result = sub_res;
             sel_sll  : alu_result = sll_res;
@@ -244,9 +239,8 @@ module ex(
     assign mem_load_is_signed  = (sel_lb | sel_lh | sel_lw);
     assign mem_load_addr_low   = mem_addr_calc_low;
 
-    always @(*) begin        
-        (* parallel_case *)
-        case (1'b1)
+    always_comb begin        
+        unique case (1'b1)
             sel_lb:  mem_load_mask = 2'b01;
             sel_lh:  mem_load_mask = 2'b10;
             sel_lw:  mem_load_mask = 2'b11;
@@ -255,8 +249,7 @@ module ex(
             default: mem_load_mask = 2'b00;
         endcase     
 
-        (* parallel_case *)
-        case (1'b1)
+        unique case (1'b1)
             sel_sb: begin // byte
                 case (mem_addr_calc_low)
                     2'b00: begin 
@@ -315,9 +308,8 @@ module ex(
     assign valid_o     = valid_i;
 
     // CSR 控制
-    always @(*) begin: ALU_CSR_CTRL
-        (* parallel_case *)
-        case (1'b1)
+    always_comb begin: ALU_CSR_CTRL
+        unique case (1'b1)
             sel_csrrw:  csr_wdata_o = rw_res;
             sel_csrrs:  csr_wdata_o = rs_res;
             sel_csrrc:  csr_wdata_o = rc_res;

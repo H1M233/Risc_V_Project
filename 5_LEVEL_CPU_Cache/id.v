@@ -34,19 +34,19 @@ module id(
     output reg [`OP_INST_NUM - 1:0] inst_packaged_o,
 
     // to regs & hazard
-    (* max_fanout = 30 *)
     output reg [4:0]    rs1_addr_o,
-    (* max_fanout = 30 *)
     output reg [4:0]    rs2_addr_o,
 
     // from ex
     input               ex_regs_wen_i,
     input      [4:0]    ex_rd_addr_i,
+    input               ex_is_load_i,
 
     // from mem1
     input               mem1_regs_wen_i,
     input      [4:0]    mem1_rd_addr_i,
     input      [31:0]   mem1_rd_data_i,
+    input               mem1_is_load_i,
 
     // from mem2
     input               mem2_regs_wen_i,
@@ -64,30 +64,48 @@ module id(
     output reg          fwd_rs1_hit_ex_o,
     output reg          fwd_rs2_hit_ex_o,
 
+    // hazard
+    output              hazard_en,
+
     //ecall, mret
     output reg [11:0]   csr_addr_o,
     output reg          ecall,
     output reg          mret
 );  
+    // Hazard
+    wire rs1_hit_ex   = (ex_rd_addr_i == rs1_i);
+    wire rs2_hit_ex   = (ex_rd_addr_i == rs2_i);
+    wire id_need_ex   = ex_is_load_i & (rs1_hit_ex | rs2_hit_ex);
+
+    wire rs1_hit_mem1 = (mem1_rd_addr_i == rs1_i);
+    wire rs2_hit_mem1 = (mem1_rd_addr_i == rs2_i);
+    wire id_need_mem1 = mem1_is_load_i & (rs1_hit_mem1 | rs2_hit_mem1);
+
+    assign hazard_en = id_need_ex | id_need_mem1;
+
     // 前推
-    wire forwarding_rs1_ex   = (rs1_i == ex_rd_addr_i) & ex_regs_wen_i;
-    wire forwarding_rs1_mem1 = (rs1_i == mem1_rd_addr_i) & mem1_regs_wen_i;
-    wire forwarding_rs1_mem2 = (rs1_i == mem2_rd_addr_i) & mem2_regs_wen_i;
-    wire forwarding_rs1_wb   = (rs1_i == wb_rd_addr_i) & wb_regs_wen_i;
+    wire forwarding_rs1_ex   = (rs1_i == ex_rd_addr_i) && ex_regs_wen_i;
+    wire forwarding_rs1_mem1 = (rs1_i == mem1_rd_addr_i) && mem1_regs_wen_i;
+    wire forwarding_rs1_mem2 = (rs1_i == mem2_rd_addr_i) && mem2_regs_wen_i;
+    wire forwarding_rs1_wb   = (rs1_i == wb_rd_addr_i) && wb_regs_wen_i;
 
-    wire forwarding_rs2_ex   = (rs2_i == ex_rd_addr_i) & ex_regs_wen_i & !is_alu_i; // 当为立即数时，不启用前推
-    wire forwarding_rs2_mem1 = (rs2_i == mem1_rd_addr_i) & mem1_regs_wen_i;
-    wire forwarding_rs2_mem2 = (rs2_i == mem2_rd_addr_i) & mem2_regs_wen_i;
-    wire forwarding_rs2_wb   = (rs2_i == wb_rd_addr_i) & wb_regs_wen_i;
+    wire forwarding_rs2_ex   = (rs2_i == ex_rd_addr_i) && ex_regs_wen_i;
+    wire forwarding_rs2_mem1 = (rs2_i == mem1_rd_addr_i) && mem1_regs_wen_i;
+    wire forwarding_rs2_mem2 = (rs2_i == mem2_rd_addr_i) && mem2_regs_wen_i;
+    wire forwarding_rs2_wb   = (rs2_i == wb_rd_addr_i) && wb_regs_wen_i;
 
-    wire [31:0] forwarding_rs1_data_hit =   (forwarding_rs1_mem1) ? mem1_rd_data_i :
-                                            (forwarding_rs1_mem2) ? mem2_rd_data_i :
-                                            (forwarding_rs1_wb)   ? wb_rd_data_i :
-                                            rs1_data_i;
-    wire [31:0] forwarding_rs2_data_hit =   (forwarding_rs2_mem1) ? mem1_rd_data_i :
-                                            (forwarding_rs2_mem2) ? mem2_rd_data_i :
-                                            (forwarding_rs2_wb)   ? wb_rd_data_i :
-                                            rs2_data_i;
+    // 并行判断减少 MUX 级数
+    wire forwarding_rs1_hit_mem = forwarding_rs1_mem1 | forwarding_rs1_mem2;
+    wire [31:0] forwarding_rs1_hit_mem_data  = (forwarding_rs1_mem1) ? mem1_rd_data_i : mem2_rd_data_i;
+    wire [31:0] forwarding_rs1_hit_regs_data = (forwarding_rs1_wb) ? wb_rd_data_i : rs1_data_i;
+
+    wire forwarding_rs2_hit_mem = forwarding_rs2_mem1 | forwarding_rs2_mem2;
+    wire [31:0] forwarding_rs2_hit_mem_data  = (forwarding_rs2_mem1) ? mem1_rd_data_i : mem2_rd_data_i;
+    wire [31:0] forwarding_rs2_hit_regs_data = (forwarding_rs2_wb) ? wb_rd_data_i : rs2_data_i;
+
+    // 前推结果
+    wire [31:0] forwarding_rs1_data_hit = (forwarding_rs1_hit_mem) ? forwarding_rs1_hit_mem_data : forwarding_rs1_hit_regs_data;
+    wire [31:0] forwarding_rs2_data_hit = (forwarding_rs2_hit_mem) ? forwarding_rs2_hit_mem_data : forwarding_rs2_hit_regs_data;
 
     // opcode
     (* max_fanout = 30 *) wire is_alu_i  = (opcode_i == `TYPE_I);
@@ -193,7 +211,7 @@ module id(
         fwd_rs1_data_o   = forwarding_rs1_data_hit;
         fwd_rs2_data_o   = (is_alu_i) ? {{20{inst_i[31]}}, inst_i[31:20]} : forwarding_rs2_data_hit;    // 立即数时返回 imm
         fwd_rs1_hit_ex_o = forwarding_rs1_ex;
-        fwd_rs2_hit_ex_o = forwarding_rs2_ex & !is_alu_i;
+        fwd_rs2_hit_ex_o = forwarding_rs2_ex & !is_alu_i;    // 当为立即数时，不启用前推
 
         // CSR
         csr_addr_o       = is_zicsr ? inst_i[31:20] : 12'h520;

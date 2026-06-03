@@ -6,7 +6,7 @@ module tb_verilator_software(
     input rst,
 
     output [31:0] seg,
-    output [31:0] commit,
+    output        commit,
     output pred_total, pred_miss, pred_total_b, pred_total_jr, pred_miss_b, pred_miss_jr,
     output [31:0] pc,
     output reg [31:0] func_block_addr,
@@ -22,8 +22,41 @@ module tb_verilator_software(
         .virtual_led    (LED),  
         .virtual_seg    ()
     );
+    `ifdef PROJECT_RV_SUPERSCALAR
+        initial begin
+            $readmemh("./mem_init/irom.txt", tb_verilator_software.uut.student_top_inst.Mem_IROM_s0.rom_mem);
+            $readmemh("./mem_init/irom.txt", tb_verilator_software.uut.student_top_inst.Mem_IROM_s1.rom_mem);
+            $readmemh("./mem_init/dram.txt", tb_verilator_software.uut.student_top_inst.bridge_inst.dram_driver_inst.Mem_DRAM.dram_inst.ram_mem);
+        end
+        assign seg = tb_verilator_software.uut.student_top_inst.bridge_inst.seg_driver.s;
+        // wire hazard_en = tb_verilator_software.uut.student_top_inst.Core_cpu.hazard_hazard_en;
+        // wire ex_valid = tb_verilator_software.uut.student_top_inst.Core_cpu.EX_SLOT0.valid_o;
+        // assign commit = ex_valid & tb_verilator_software.uut.student_top_inst.Core_cpu.EX_SLOT0.inst_packaged_i != 0;
+        wire hazard_en = 1'b0;
+        wire ex_valid = 1'b0;
+        assign commit = 1'b0;
 
-    `ifdef PROJECT_5_LEVEL_CPU_CACHE
+        assign pc = tb_verilator_software.uut.student_top_inst.Core_cpu.EX_SLOT0.pc_addr_i;
+        wire ex_is_jal = tb_verilator_software.uut.student_top_inst.Core_cpu.EX_SLOT0.is_jal;
+        wire ex_is_jalr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX_SLOT0.is_jalr;
+        wire ex_is_branch = tb_verilator_software.uut.student_top_inst.Core_cpu.EX_SLOT0.is_branch;
+        assign pred_miss = tb_verilator_software.uut.student_top_inst.Core_cpu.EX_SLOT0.update_gshare_en_o | tb_verilator_software.uut.student_top_inst.Core_cpu.EX_SLOT0.update_btb_en_o;
+        assign pred_total = (ex_is_jalr | ex_is_branch) & ex_valid;
+        assign pred_total_b = ex_is_branch & ex_valid;
+        assign pred_total_jr = ex_is_jalr & ex_valid;
+        assign pred_miss_b = tb_verilator_software.uut.student_top_inst.Core_cpu.EX_SLOT0.update_gshare_en_o;
+        assign pred_miss_jr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX_SLOT0.update_btb_en_o;
+
+        always @(posedge clk_cpu) begin
+            if (ex_is_jal)
+                func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX_SLOT0.add_res;
+            else if (ex_is_jalr)
+                func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX_SLOT0.jalr_target;
+            else if (ex_is_branch & tb_verilator_software.uut.student_top_inst.Core_cpu.EX_SLOT0.branch_taken == 1'b1)
+                func_block_addr <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX_SLOT0.branch_jump_addr;
+        end
+
+    `elsif PROJECT_5_LEVEL_CPU_CACHE
         initial begin
             $readmemh("./mem_init/irom.txt", tb_verilator_software.uut.student_top_inst.Mem_IROM.rom_mem);
             $readmemh("./mem_init/dram.txt", tb_verilator_software.uut.student_top_inst.bridge_inst.dram_driver_inst.Mem_DRAM.dram_inst.ram_mem);

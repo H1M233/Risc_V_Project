@@ -3,6 +3,10 @@
     "5_LEVEL_CPU_Cache": {
       "folder": "5_LEVEL_CPU_Cache",
       "clockFreq": 350
+    },
+    "RV_Superscalar": {
+      "folder": "RV_Superscalar",
+      "clockFreq": 300
     }
   },
   "mem_init": {

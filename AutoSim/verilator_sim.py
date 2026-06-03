@@ -36,6 +36,7 @@ def compile(prj_dict, sim_type, macros):
     source_file = []
     source_file.append(AutoSim_dir / f'tb_verilator_{sim_type}.v')
     source_file.extend(rtl_dir.glob('*.v'))
+    source_file.extend(rtl_dir.glob('*.sv'))
     source_file.extend(rtl_dir.glob('*.vh'))
     source_file.extend(new_dir.glob('*.sv'))
 
@@ -331,7 +332,6 @@ def instTest(prj_dict, testAll=False):
         if success:
             # 环境变量定义
             env=os.environ.copy()
-            env['CLK_FREQ'] = str(prj_dict['clockFreq'])
             env['INST_NAME'] = print_name
             sim_stdout = sim('inst', stdout=False, env=env)
 

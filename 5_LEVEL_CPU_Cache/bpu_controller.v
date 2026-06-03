@@ -96,8 +96,8 @@ module bpu_controller #(
 
     // ¥¶¿Ì JALR
     wire            is_JALR     = (pc_inst[6:0] == `JALR);
-    wire    [31:0]  JALR_imm    = {{20{pc_inst[31]}}, pc_inst[31:20]};
-    wire            check_ret   = (rd_addr == 5'b0 && rs1_addr == 5'b00001 && JALR_imm == 32'b0);
+    wire    [11:0]  JALR_imm_u  = pc_inst[31:20];
+    wire            check_ret   = (rd_addr == 5'b0 && rs1_addr == 5'b00001 && JALR_imm_u == 12'b0);
     wire            is_ret_JALR = (is_JALR && check_ret);
     wire            is_btb_JALR = (is_JALR && !check_ret);
     wire            ras_can_pop = (is_ret_JALR && !ras_isempty);

@@ -15,19 +15,17 @@ module regs(
 
     // to id
     (* max_fanout = 30 *)
-    output reg [31:0]   rs1_data_o,
+    output     [31:0]   rs1_data_o,
     (* max_fanout = 30 *)
-    output reg [31:0]   rs2_data_o
+    output     [31:0]   rs2_data_o
 );
     // 32个32位寄存器
     reg [31:0] regs_p1[31:0];
     reg [31:0] regs_p2[31:0];
 
     // 读寄存器
-    always@(*) begin
-        rs1_data_o  = regs_p1[rs1_addr_i];
-        rs2_data_o  = regs_p2[rs2_addr_i];
-    end
+    assign rs1_data_o = regs_p1[rs1_addr_i];
+    assign rs2_data_o = regs_p2[rs2_addr_i];
 
     integer i;
     initial begin
