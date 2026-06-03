@@ -31,7 +31,7 @@ module dcache(
     localparam TAG_WIDTH = 30 - INDEX_WIDTH;
     localparam LINE_NUM = 2 ** INDEX_WIDTH;
 
-    // 两路 FIFO
+    // 两路 D-cache
     (* ram_style = "distributed" *) reg [31:0] data_w0 [0:LINE_NUM - 1];
     (* ram_style = "distributed" *) reg [31:0] data_w1 [0:LINE_NUM - 1];
 
@@ -40,12 +40,35 @@ module dcache(
     (* ram_style = "distributed" *) reg [TAG_WIDTH:0] tagv_w1 [0:LINE_NUM - 1];
     reg replace_way [0:LINE_NUM - 1];
 
+    // 地址解码
+    (* max_fanout = 20 *) wire [INDEX_WIDTH - 1:0] query_index = cpu_addr[INDEX_WIDTH + 1:2];
+    (* max_fanout = 20 *) wire [TAG_WIDTH - 1:0]   query_tag   = cpu_addr[31:INDEX_WIDTH + 2];
+
     // 状态寄存
-    reg hit_r, miss_r, hit_way_r;
-    reg miss_wait1, miss_wait2;
-    reg [INDEX_WIDTH-1:0] miss_index;
-    reg [TAG_WIDTH - 1:0] miss_tag;
+    reg miss_ready;
+    reg tagv_wait, miss_wait;
     reg miss_way;
+    reg [INDEX_WIDTH - 1:0] query_index_r;
+    reg [TAG_WIDTH - 1:0] query_tag_r;
+    reg [3:0] cpu_we_r;
+    reg [31:0] cpu_wdata_r;
+    reg cpu_req_store_r;
+    always @(posedge clk) begin
+        if (!rst) begin
+            query_index_r   <= 0;
+            query_tag_r     <= 0;
+            cpu_we_r        <= 0;
+            cpu_wdata_r     <= 0;
+            cpu_req_store_r <= 0;
+        end
+        else begin
+            query_index_r   <= query_index;
+            query_tag_r     <= query_tag;
+            cpu_we_r        <= cpu_we;
+            cpu_wdata_r     <= cpu_wdata;
+            cpu_req_store_r <= cpu_req_store;
+        end
+    end
 
     // 初始化
     integer i;
@@ -57,59 +80,47 @@ module dcache(
         end
     end
 
-    // 地址解码
-    (* max_fanout = 20 *) wire [INDEX_WIDTH - 1:0] query_index = cpu_addr[INDEX_WIDTH + 1:2];
-    (* max_fanout = 20 *) wire [TAG_WIDTH - 1:0]   query_tag   = cpu_addr[31:INDEX_WIDTH + 2];
-
-    // 判断命中
+    // 判断命中 & replace_way & D-cache 读寄存器
     wire [TAG_WIDTH:0] hit_tagv_w0 = tagv_w0[query_index];
     wire [TAG_WIDTH:0] hit_tagv_w1 = tagv_w1[query_index];
     wire hit_way0 = (hit_tagv_w0 == {1'b1, query_tag});
     wire hit_way1 = (hit_tagv_w1 == {1'b1, query_tag});
-    wire dcache_hit = (hit_way0 | hit_way1);
-    wire miss_replace_way = replace_way[query_index];
-
-    // Dcache 读寄存器
-    reg [31:0] data_rdata_w0;
-    reg [31:0] data_rdata_w1;
-
+    reg hit_way_r;
+    reg dcache_hit, dcache_miss;
+    reg replace_way_r;
+    reg [31:0] data_rdata_w0, data_rdata_w1;
     always @(posedge clk) begin
-        data_rdata_w0 <= data_w0[query_index];
-        data_rdata_w1 <= data_w1[query_index];
+        hit_way_r       <= hit_way1;
+        dcache_hit      <= (hit_way0 | hit_way1);
+        dcache_miss     <= ~(hit_way0 | hit_way1);
+        replace_way_r   <= replace_way[query_index];
+        data_rdata_w0   <= data_w0[query_index];
+        data_rdata_w1   <= data_w1[query_index];
     end
 
     // Store Buffer 状态传递
-    reg store_buffer_en;
-    reg store_buffer_hit_way;
-    reg [3:0] store_buffer_we;
-    reg [INDEX_WIDTH - 1:0] store_buffer_index;
-    reg [31:0] store_buffer_wdata;
-
+    wire store_buffer_en = dcache_hit & cpu_req_store_r;
+    reg store_buffer_hit;
+    reg [31:0] store_buffer_hit_data;
     always @(posedge clk) begin
-        if (dcache_hit & cpu_req_store) begin
-            store_buffer_en         <= 1'b1;
-            store_buffer_hit_way    <= hit_way1;
-            store_buffer_we         <= cpu_we;
-            store_buffer_index      <= query_index;
-            store_buffer_wdata      <= cpu_wdata;
+        if (!rst) begin
+            store_buffer_hit        <= 0;
+            store_buffer_hit_data   <= 0;
         end
         else begin
-            store_buffer_en         <= 0;
-            store_buffer_hit_way    <= 0;
-            store_buffer_we         <= 0;
-            store_buffer_index      <= 0;
-            store_buffer_wdata      <= 0;
+            store_buffer_hit        <= (store_buffer_en && query_index == query_index_r && query_tag == query_tag_r);
+            store_buffer_hit_data   <= store_buffer_data_merge;
         end
     end
 
     // Store Buffer 更新数据
     reg [31:0] store_buffer_data_merge;
     always @(*) begin
-        store_buffer_data_merge = (store_buffer_hit_way) ? data_rdata_w1 : data_rdata_w0;
-        if (store_buffer_we[3]) store_buffer_data_merge[31:24] = store_buffer_wdata[31:24];
-        if (store_buffer_we[2]) store_buffer_data_merge[23:16] = store_buffer_wdata[23:16];
-        if (store_buffer_we[1]) store_buffer_data_merge[15:8]  = store_buffer_wdata[15:8];
-        if (store_buffer_we[0]) store_buffer_data_merge[7:0]   = store_buffer_wdata[7:0];
+        store_buffer_data_merge = (hit_way_r) ? data_rdata_w1 : data_rdata_w0;
+        if (cpu_we_r[3]) store_buffer_data_merge[31:24] = cpu_wdata_r[31:24];
+        if (cpu_we_r[2]) store_buffer_data_merge[23:16] = cpu_wdata_r[23:16];
+        if (cpu_we_r[1]) store_buffer_data_merge[15:8]  = cpu_wdata_r[15:8];
+        if (cpu_we_r[0]) store_buffer_data_merge[7:0]   = cpu_wdata_r[7:0];
     end
 
     // Dcache 写回
@@ -118,77 +129,61 @@ module dcache(
     wire [31:0] dcache_wdata;
     wire dcache_wway;
 
-    assign dcache_wen   = (store_buffer_en | miss_r);
-    assign dcache_waddr = (store_buffer_en) ? store_buffer_index : miss_index;
-    assign dcache_wdata = (store_buffer_en) ? store_buffer_data_merge : mem_rdata;
-    assign dcache_wway  = (store_buffer_en) ? store_buffer_hit_way : miss_way;
-
-    always @(posedge clk) begin: dcache_Read_And_Write
-        if (dcache_wen) begin
-            if (dcache_wway == 1'b0) begin
-                data_w0[dcache_waddr] <= dcache_wdata;
-            end
-            else begin
-                data_w1[dcache_waddr] <= dcache_wdata;
-            end
+    // Dcache 写使能
+    assign dcache_wen   = (store_buffer_en | miss_ready);
+    assign dcache_waddr = (miss_ready) ? miss_index : query_index_r;
+    assign dcache_wdata = (miss_ready) ? mem_rdata : store_buffer_data_merge;
+    assign dcache_wway  = (miss_ready) ? miss_way : hit_way_r;
+    always @(posedge clk) begin: dcache_Write
+        if (dcache_wen && dcache_wway == 1'b0) begin
+            data_w0[dcache_waddr] <= dcache_wdata;
+        end
+        if (dcache_wen && dcache_wway == 1'b1) begin
+            data_w1[dcache_waddr] <= dcache_wdata;
         end
     end
 
     // tagv 更新
     always @(posedge clk) begin
-        if (miss_r) begin
+        if (miss_ready) begin
             replace_way[miss_index] <= ~miss_way;    // FIFO 替换指针更新
-            if (miss_way == 1'b0) begin
-                tagv_w0[miss_index] <= {1'b1, miss_tag};
-            end
-            else begin
-                tagv_w1[miss_index] <= {1'b1, miss_tag};
-            end
         end
-    end
-
-    // 为 Load 寄存一拍 Store Buffer 数据
-    wire store_buffer_hit = (dcache_hit && query_index == store_buffer_index && store_buffer_hit_way == hit_way1);
-    reg store_buffer_hit_r;
-    reg [31:0] store_buffer_hit_data;
-
-    always @(posedge clk) begin
-        if (store_buffer_en) begin
-            store_buffer_hit_r      <= store_buffer_hit;
-            store_buffer_hit_data   <= store_buffer_data_merge;
+        if (miss_ready && miss_way == 1'b0) begin
+            tagv_w0[miss_index] <= {1'b1, miss_tag};
         end
-        else begin
-            store_buffer_hit_r      <= 0;
-            store_buffer_hit_data   <= 0;
-        end 
+        if (miss_ready && miss_way == 1'b1) begin
+            tagv_w1[miss_index] <= {1'b1, miss_tag};
+        end
     end
 
     // 命中数据
-    wire [31:0] hit_data  = (store_buffer_hit_r) ? store_buffer_hit_data :
+    wire [31:0] hit_data  = (store_buffer_hit) ? store_buffer_hit_data :
                             (hit_way_r) ? data_rdata_w1 : data_rdata_w0;
 
     // 未命中状态转换
+    reg [INDEX_WIDTH - 1:0] miss_index;
+    reg [TAG_WIDTH - 1:0] miss_tag;
     always @(posedge clk) begin
         if (!rst) begin
-            miss_wait1  <= 0;
-            miss_wait2  <= 0;
-            miss_index  <= 0;
-            miss_tag    <= 0;
-            miss_way    <= 0;
+            tagv_wait       <= 0;
+            miss_wait       <= 0;
+            miss_way        <= 0;
+            miss_index      <= 0;
+            miss_tag        <= 0;
         end
         else begin
-            if (!dcache_hit && cpu_req_load && !miss_wait1 && !miss_wait2) begin
-                miss_wait1  <= 1'b1;
-                miss_index  <= query_index;
-                miss_tag    <= query_tag;
-                miss_way    <= miss_replace_way;
+            if (tagv_wait && dcache_miss) begin
+                tagv_wait   <= 1'b0;
+                miss_wait   <= 1'b1;
+                miss_way    <= replace_way_r;
+                miss_index  <= query_index_r;
+                miss_tag    <= query_tag_r;
             end
-            else if (miss_wait1) begin
-                miss_wait1  <= 1'b0;
-                miss_wait2  <= 1'b1;
+            else if (miss_wait) begin
+                miss_wait   <= 1'b0;
             end
-            else if (miss_wait2) begin
-                miss_wait2  <= 1'b0;
+            else begin
+                tagv_wait <= cpu_req_load;
             end
         end
     end
@@ -196,14 +191,10 @@ module dcache(
     // 输出状态寄存
     always @(posedge clk) begin
         if (!rst) begin
-            hit_r       <= 1'b0;
-            miss_r      <= 1'b0;
-            hit_way_r   <= 1'b0;
+            miss_ready  <= 1'b0;
         end
         else begin
-            hit_r       <= dcache_hit;
-            miss_r      <= miss_wait2;
-            hit_way_r   <= hit_way1;
+            miss_ready  <= miss_wait;
         end
     end
 
@@ -214,9 +205,9 @@ module dcache(
     assign mem_wdata  = cpu_wdata;
 
     // 暂停
-    assign stall = miss_wait1 | miss_wait2;
+    assign stall = (tagv_wait && dcache_miss) | miss_wait;
 
     // 读数据
-    assign cpu_rdata  = (miss_r) ? mem_rdata : hit_data;
-    assign mem_ack    = hit_r | miss_r;
+    assign cpu_rdata  = (miss_ready) ? mem_rdata : hit_data;
+    assign mem_ack    = dcache_hit | miss_ready;
 endmodule

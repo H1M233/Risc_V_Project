@@ -2,7 +2,7 @@
   "Project": {
     "5_LEVEL_CPU_Cache": {
       "folder": "5_LEVEL_CPU_Cache",
-      "clockFreq": "350"
+      "clockFreq": 350
     }
   },
   "mem_init": {

@@ -10,6 +10,28 @@
 #include <fstream>
 
 int main(int argc, char** argv) {
+    // 宏传递：
+    // ENABLE_TRACE:        启用波形记录
+    // TRACE_START_TIME:    波形记录起始时间
+    // TRACE_END_TIME:      波形记录结束时间
+    
+    // 环境变量传递：
+    // CLK_FREQ:            时钟频率
+    // PREV_TIME:           上次仿真的计时器结果
+
+    // 仿真配置
+    const double CLK_FREQ = std::stoi(std::getenv("CLK_FREQ"));
+    const double CLK_CPU_HALF_PERIOD = 500.0 / CLK_FREQ;
+    const double CLK_50MHz_HALF_PERIOD = 10.0;          // 50 MHz
+    const double NS2MS = 1000000.0;
+    const double SIM_TIME = 30.0 * 1000.0 * NS2MS;
+    double sim_time_ns = 0.0;                           // 定义 sim_time_ns
+    double time_ms = 0.0;
+    double next_clk_50MHz_edge = 0.0;
+    double next_clk_CPU_edge = 0.0;
+    int SEG_getTime = 0;
+    const double PREV_TIME = std::stoi(std::getenv("PREV_TIME"));
+
     // 初始化
     Verilated::commandArgs(argc, argv);
     
@@ -21,23 +43,13 @@ int main(int argc, char** argv) {
     // 创建顶层模块
     Vtb_verilator_software* top = new Vtb_verilator_software{contextp, "TOP"};
 
-    // // 记录波形
-    // Verilated::traceEverOn(true);
-    // VerilatedVcdC* tfp = new VerilatedVcdC;
-    // top->trace(tfp, 99);                    // 追踪99层深度
-    // tfp->open("wave_verilator.vcd");        // 打开波形文件
-
-    // 仿真配置
-    const double CLK_CPU = std::stoi(std::getenv("CLK_FREQ"));
-    const double CLK_CPU_HALF_PERIOD = 500.0 / CLK_CPU;
-    const double CLK_50MHz_HALF_PERIOD = 10.0;          // 50 MHz
-    const double NS2MS = 1000000.0;
-    const double SIM_TIME = 30.0 * 1000.0 * NS2MS;
-    double sim_time_ns = 0.0;                           // 定义 sim_time_ns
-    double time_ms = 0.0;
-    double next_clk_50MHz_edge = 0.0;
-    double next_clk_CPU_edge = 0.0;
-    int SEG_getTime = 0;
+    // 记录波形
+    #ifdef ENABLE_TRACE
+        Verilated::traceEverOn(true);
+        VerilatedVcdC* tfp = new VerilatedVcdC;
+        top->trace(tfp, 99);                    // 追踪99层深度
+        tfp->open("vcd/verilator_software.vcd");        // 打开波形文件
+    #endif
 
     // 计算 IPC
     double totalCycle = 0.0;
@@ -61,16 +73,19 @@ int main(int argc, char** argv) {
 
     // 记录函数
     auto step_and_advance = [&](double delta_time_ns) {
-        contextp->time(sim_time_ns * 1000);
-        top->eval();
-        // if (delta_time_ns > 0 && sim_time_ns > 12 * NS2MS) tfp->dump(sim_time_ns * 1000);
-        sim_time_ns += delta_time_ns;
+        if (delta_time_ns > 0.0) {
+            contextp->time(sim_time_ns * 1000);
+            top->eval();
+            #ifdef ENABLE_TRACE
+                if (sim_time_ns > TRACE_START_TIME * NS2MS && sim_time_ns < TRACE_END_TIME * NS2MS) tfp->dump(sim_time_ns * 1000);
+            #endif
+            sim_time_ns += delta_time_ns;
+        }
     };
     
     std::cout << "=================================== Simulation Started ===================================\n\n\n\n\n\n";
 
     // 计时器
-    const double PREV_TIME = std::stof(std::getenv("PREV_TIME"));
     std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();;
     double current_time;
     auto get_elapsed_ms = [&]() -> double {
@@ -213,9 +228,16 @@ int main(int argc, char** argv) {
       << "LED=" << (isTick ? "PASS √" : "FAIL x");
     f.close();
 
-    // tfp->close();
+    #ifdef ENABLE_TRACE 
+        tfp->close();
+    #endif
+
     delete top;
-    // delete tfp;
+
+    #ifdef ENABLE_TRACE 
+        delete tfp;
+    #endif
+
     delete contextp;
     return 0;
 }

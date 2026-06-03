@@ -1,1 +1,0 @@
-mem_name_ask

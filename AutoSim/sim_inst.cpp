@@ -7,8 +7,26 @@
 #include <cstdio>
 #include <cmath>
 #include <chrono>
+#include <string>
 
 int main(int argc, char** argv) {
+    // 宏变量传递: 
+    // ENABLE_TRACE:        启用波形记录
+
+    // 环境变量传递：
+    // CLK_FREQ:            时钟频率
+    // INST_NAME:           指令名称
+
+    // 仿真配置
+    const double CLK_FREQ = std::stoi(std::getenv("CLK_FREQ"));
+    const double CLK_CPU_HALF_PERIOD = 500.0 / CLK_FREQ;
+    const double NS2MS = 1000000.0;
+    const double SIM_TIME = 4.0 * NS2MS;
+    double sim_time_ns = 0.0;                           // 定义 sim_time_ns
+    double next_clk_50MHz_edge = 0.0;
+    double next_clk_CPU_edge = 0.0;
+    const std::string INST_NAME = std::getenv("INST_NAME");
+
     // 初始化
     Verilated::commandArgs(argc, argv);
     
@@ -21,19 +39,13 @@ int main(int argc, char** argv) {
     Vtb_verilator_inst* top = new Vtb_verilator_inst{contextp, "TOP"};
 
     // 记录波形
-    Verilated::traceEverOn(true);
-    VerilatedVcdC* tfp = new VerilatedVcdC;
-    top->trace(tfp, 99);                    // 追踪99层深度
-    tfp->open("wave_verilator.vcd");        // 打开波形文件
-
-    // 仿真配置
-    const double CLK_CPU = std::stoi(std::getenv("CLK_FREQ"));
-    const double CLK_CPU_HALF_PERIOD = 500.0 / CLK_CPU;
-    const double NS2MS = 1000000.0;
-    const double SIM_TIME = 4.0 * NS2MS;
-    double sim_time_ns = 0.0;                           // 定义 sim_time_ns
-    double next_clk_50MHz_edge = 0.0;
-    double next_clk_CPU_edge = 0.0;
+    #ifdef ENABLE_TRACE
+        Verilated::traceEverOn(true);
+        VerilatedVcdC* tfp = new VerilatedVcdC;
+        top->trace(tfp, 99);                    // 追踪99层深度
+        std::string filename = "vcd/verilator_inst_" + INST_NAME + ".vcd";
+        tfp->open(filename.c_str());   // 打开波形文件
+    #endif
 
     // 验证成功 / 失败
     bool x26_isTrue = false;
@@ -42,10 +54,14 @@ int main(int argc, char** argv) {
 
     // 记录函数
     auto step_and_advance = [&](double delta_time_ns) {
-        contextp->time(sim_time_ns * 1000);
-        top->eval();
-        tfp->dump(sim_time_ns * 1000);
-        sim_time_ns += delta_time_ns;
+        if (delta_time_ns > 0) {
+            contextp->time(sim_time_ns * 1000);
+            top->eval();
+            #ifdef ENABLE_TRACE
+                tfp->dump(sim_time_ns * 1000);
+            #endif
+            sim_time_ns += delta_time_ns;
+        }
     };
     
     // 试探脉冲
@@ -81,9 +97,16 @@ int main(int argc, char** argv) {
 
     if (!Finished) std::cout << "FAIL!!!" << std::endl;
 
-    tfp->close();
+    #ifdef ENABLE_TRACE
+        tfp->close();
+    #endif
+
     delete top;
-    delete tfp;
+
+    #ifdef ENABLE_TRACE
+        delete tfp;
+    #endif
+
     delete contextp;
     return 0;
 }

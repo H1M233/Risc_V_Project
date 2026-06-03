@@ -11,8 +11,8 @@
 // 数据冒险发生时 hazard_en 的暂停对预测器同样生效 以避免预测错位
 module bpu_controller #(
     // 分支预测
-    parameter BHR_WIDTH = 8,
-    parameter PHT_IDX_WIDTH = 10,
+    parameter BHR_WIDTH = 10,
+    parameter PHT_IDX_WIDTH = 12,
 
     // BTB
     parameter BTB_INDEX_WIDTH = 4,
@@ -96,7 +96,7 @@ module bpu_controller #(
 
     // 处理 JALR
     wire            is_JALR     = (pc_inst[6:0] == `JALR);
-    wire    [31:0]      JALR_imm    = {{20{pc_inst[31]}}, pc_inst[31:20]};
+    wire    [31:0]  JALR_imm    = {{20{pc_inst[31]}}, pc_inst[31:20]};
     wire            check_ret   = (rd_addr == 5'b0 && rs1_addr == 5'b00001 && JALR_imm == 32'b0);
     wire            is_ret_JALR = (is_JALR && check_ret);
     wire            is_btb_JALR = (is_JALR && !check_ret);

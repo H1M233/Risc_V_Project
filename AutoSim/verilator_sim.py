@@ -7,7 +7,6 @@ import os
 
 '''全局变量'''
 AutoSim_dir = Path.cwd()    # 当前文件夹
-clkFreqList = {}    # 时钟频率字典
 
 
 def bin_to_mem(infile, mem_type):
@@ -26,7 +25,7 @@ def bin_to_mem(infile, mem_type):
             datafile.write(chunk[::-1].hex() + '\n')
 
 
-def compile(prj_dict, sim_type, enableTrace=True):
+def compile(prj_dict, sim_type, macros):
     '''编译 rtl 代码并输出到 obj_dir'''
     prj_folder = prj_dict['folder']
     # 获取目标工程路径
@@ -42,21 +41,31 @@ def compile(prj_dict, sim_type, enableTrace=True):
 
     # Verilator 程序
     verilator_cmd = ['verilator',
-                    f'-DPROJECT_{prj_folder.upper()}',    # 传递宏给.v
+                    f'-DPROJECT_{prj_folder.upper()}',      # 传递宏给.v
                     '-cc', '-exe', '-build',
                     '-j', '0',
+                    '-trace',
+
+                    # Verilator 转换优化
+                    '-O3',
+                    '--x-assign', 'fast',                   # 加速未初始化变量的处理
+                    '--x-initial', 'fast',                  # 加速初始区块的处理
+                    '--no-assert',                          # 关闭断言检查
+
+                    # C++ 编译优化
                     '-CFLAGS', '-O3 -march=native', 
                     '-top-module', f'tb_verilator_{sim_type}',
-                    '-Wno-TIMESCALEMOD',     # 忽略timescale警告
-                    '-Wno-WIDTHTRUNC',       # 忽略位宽截断警告
-                    '-Wno-WIDTHEXPAND',      # 忽略位宽扩展警告
-                    '-Wno-CASEINCOMPLETE',   # 忽略case不完全警告
-                    '-Wno-UNOPTFLAT',        # 忽略组合逻辑环警告
-                    '-Wno-UNSIGNED'          # 忽略判断逻辑永远为真警告
+
+                    # 警告控制
+                    '-Wno-TIMESCALEMOD',                    # 忽略timescale警告
+                    '-Wno-WIDTHTRUNC',                      # 忽略位宽截断警告
+                    '-Wno-WIDTHEXPAND',                     # 忽略位宽扩展警告
+                    '-Wno-CASEINCOMPLETE',                  # 忽略case不完全警告
+                    '-Wno-UNSIGNED'                         # 忽略判断逻辑永远为真警告
     ]
 
-    if enableTrace:
-        verilator_cmd.append('-trace')
+    for macroName, macroValue in macros.items():
+        verilator_cmd.extend(['-CFLAGS', f'-D{macroName}={macroValue}'])
 
     # 添加代码文件
     for file in source_file:
@@ -139,14 +148,10 @@ def prj_mem_ch(prj_ch=None, mem_ch=None):
     prj_dict = dict(enumerate([key for key in json_file['Project']], start=1))
     while True:
         # 打印信息
-        print('\r', end='', flush=True)
+        print('\r', end='')
         for index, prj_name in prj_dict.items():
             print(f'[{index}] {prj_name}', end='', flush=True)
             print('  ' if index != len(prj_dict) else ': ', end='', flush=True)
-
-        # 判断循环
-        if prj_ch:
-            break
 
         # 获取按键
         prj_name_ask = getch()
@@ -157,6 +162,7 @@ def prj_mem_ch(prj_ch=None, mem_ch=None):
             try:
                 key_num = int(prj_name_ask)
                 prj_ch = prj_dict[key_num] if key_num in prj_dict else ''
+                break
             except ValueError:
                 pass
 
@@ -175,34 +181,31 @@ def prj_mem_ch(prj_ch=None, mem_ch=None):
     mem_dict = dict(enumerate([key for key in json_file['mem_init']], start=1))
     while True:
         # 打印信息
-        print('\r', end='', flush=True)
-        print('[i] Inst Test  [a] ALL  ', end='', flush=True)
+        print('\r[i] Inst Test  [a] ALL  ', end='')
         for index, prj_name in mem_dict.items():
             print(f'[{index}] {prj_name}', end='', flush=True)
             print('  ' if index != len(mem_dict) else ': ', end='', flush=True)
-
-        # 判断循环
-        if mem_ch:
-            break
 
         # 获取按键
         mem_name_ask = getch()
         if mem_name_ask == 'ESC':
             print("\033[2K\033[A\033[2K", end='')
-            return prj_ret, {}, testInst, testAll
+            break
         elif mem_name_ask == 'a':
+            mem_ret = json_file['mem_init']
             testInst = True
             testAll = True
             print("\033[96mALL\033[0m")
-            return prj_ret, json_file['mem_init'], testInst, testAll
+            break
         elif mem_name_ask == 'i':
             testInst = True
             print("\033[96mInst Test\033[0m")
-            return prj_ret, {}, testInst, testAll
+            break
         else:
             try:
                 key_num = int(mem_name_ask)
                 mem_ch.append(mem_dict[key_num] if key_num in mem_dict else '')
+                break
             except ValueError:
                 pass
 
@@ -252,9 +255,10 @@ def getPrevTimeJson(prj_name, mem_name):
         return float(json_file[prj_name]['SOFTWARE TEST'][mem_name]['RUN TIME'])
     except:
         return 0
+    
 
 
-def softwareTest(prj_dict, mem_dict):
+def softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(-1, -1)):
     for mem_name, mem_file in mem_dict.items():
         irom_bin_dir = AutoSim_dir / 'mem_init' / mem_file['irom']
         dram_bin_dir = AutoSim_dir / 'mem_init' / mem_file['dram']
@@ -262,13 +266,21 @@ def softwareTest(prj_dict, mem_dict):
         bin_to_mem(dram_bin_dir, 'dram')
         print(f"\n加载 \033[96m{mem_name}\033[0m 至 IROM & DRAM...")
 
-        success, error_msg = compile(prj_dict, 'software')
-        if(success):
+        # 宏定义
+        macros = {}
+        if enableTrace:
+            macros['ENABLE_TRACE'] = 1
+            traceStartTime, traceEndTime = traceRange
+            macros['TRACE_START_TIME'] = '2147483647' if traceStartTime < 0 else str(traceStartTime)
+            macros['TRACE_END_TIME'] = '0' if traceEndTime < 0 else str(traceEndTime)
+
+        success, error_msg = compile(prj_dict, 'software', macros)
+        if success:
             print(f'编译成功...')
 
-            # 添加环境变量
+            # 环境变量定义
             env = os.environ.copy()
-            env['CLK_FREQ'] = prj_dict['clockFreq']
+            env['CLK_FREQ'] = str(prj_dict['clockFreq'])
             env['PREV_TIME'] = str(getPrevTimeJson(prj_dict['prj_name'], mem_name))
             sim('software', stdout=True, env=env)
 
@@ -281,23 +293,25 @@ def softwareTest(prj_dict, mem_dict):
             print('=' * 40)
 
 
-def instTest(prj_dict, test_all=False):
+def instTest(prj_dict, testAll=False):
     inst_name = ' '
+    enableTrace = False
     while True:
-        if not test_all:
+        if not testAll:
             print('\r\033[2KINST Name (Press Enter or ALL): ', end='')
             inst_name = input().lower()
 
         # 获取路径下所有bin文件
-        if inst_name == 'all' or test_all:
+        if inst_name == 'all' or inst_name == '' or testAll:
             all_bin_files = [str(p) for p in Path(AutoSim_dir / 'generated').rglob('*.bin')]
             break
-        else:
+        elif inst_name:
             all_bin_files = [str(p) for p in Path(AutoSim_dir / 'generated').rglob(f'*{inst_name}.bin')]
             if all_bin_files:
+                enableTrace = True
                 break
 
-    print("\n编译中...", end='\r')
+    print("\n编译中...", end='\r', flush=True)
 
     # 成功失败计数器
     passCnt, failCnt = 0, 0
@@ -309,31 +323,37 @@ def instTest(prj_dict, test_all=False):
 
         bin_to_mem(file_bin, 'inst_test')
 
-        success, error_msg = compile(prj_dict, 'inst', enableTrace=True)
-        if(success):
-            # 添加环境变量
-            env = os.environ.copy()
-            env['CLK_FREQ'] = prj_dict['clockFreq']
+        # 宏定义
+        macros = {}
+        if enableTrace:
+            macros['ENABLE_TRACE'] = '1'
+        success, error_msg = compile(prj_dict, 'inst', macros=macros)
+        if success:
+            # 环境变量定义
+            env=os.environ.copy()
+            env['CLK_FREQ'] = str(prj_dict['clockFreq'])
+            env['INST_NAME'] = print_name
             sim_stdout = sim('inst', stdout=False, env=env)
+
+            findPass, findFail = "PASS!!!" in sim_stdout, "FAIL!!!" in sim_stdout
+            passCnt += findPass
+            failCnt += findFail
 
             # 进度条
             width = 50
             percent = (passCnt + failCnt) / len(all_bin_files)
             filled = int(width * percent)
             bar = '█' * filled + '░' * (width - filled) + f'  {passCnt + failCnt} / {len(all_bin_files)}'
-
-            findPass, findFail = "PASS!!!" in sim_stdout, "FAIL!!!" in sim_stdout
+            
             if findFail:
-                print('\033[2K指令  ' + print_name.ljust(20, ' ') + '!!!FAIL!!!')
-                print(bar, end='\r')
-                failCnt += 1
+                print('\033[2K指令  ' + print_name.ljust(20, ' ') + '!!!FAIL!!!', flush=True)
+                print(bar, end='\r', flush=True)
             elif findPass:
-                print('\033[2K指令  ' + print_name.ljust(20, ' ') + 'PASS')
-                print(bar, end='\033[A\r')
-                passCnt += 1
+                print('\033[2K指令  ' + print_name.ljust(20, ' ') + 'PASS', flush=True)
+                print(bar, end='\033[A\r', flush=True)
             else:
-                print('\033[2K指令  ' + print_name.ljust(20, ' ') + 'NO ANSWER')
-                print(bar, end='\r')
+                print('\033[2K指令  ' + print_name.ljust(20, ' ') + 'NO ANSWER', flush=True)
+                print(bar, end='\r', flush=True)
         else:
             print('\n')
             print('=' * 40)
@@ -349,9 +369,9 @@ def main():
         try:
             prj_dict, mem_dict, testInst, testAll = prj_mem_ch()
             if testInst:
-                instTest(prj_dict, test_all=testAll)
+                instTest(prj_dict, testAll=testAll)
             if mem_dict:
-                softwareTest(prj_dict, mem_dict)
+                softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(0, 200))
         except KeyboardInterrupt:
             print("\n\n仿真进程被Ctrl + C终止")
 

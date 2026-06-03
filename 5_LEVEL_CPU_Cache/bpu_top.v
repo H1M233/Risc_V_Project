@@ -9,8 +9,8 @@
 
 module bpu_top #(
     // 分支预测
-    parameter BHR_WIDTH = 8,            // BHR宽度：PHT索引根据
-    parameter PHT_IDX_WIDTH = 10,       // PHT宽度，应略大于 BHR 宽度
+    parameter BHR_WIDTH = 10,            // BHR宽度：PHT索引根据
+    parameter PHT_IDX_WIDTH = 12,       // PHT宽度，应略大于 BHR 宽度
 
     // BTB
     parameter BTB_INDEX_WIDTH = 4,

@@ -3,31 +3,31 @@
     "INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.77259",
-        "REAL TIME": "9.70002",
+        "IPC": "0.772065",
+        "REAL TIME": "9.60013",
         "RUN TIME": "147",
         "BPU ACCURACY": "0.873637",
         "LED": "PASS √"
       },
       "src0": {
-        "IPC": "0.675694",
-        "REAL TIME": "446.005",
-        "RUN TIME": "7078",
-        "BPU ACCURACY": "0.748216",
+        "IPC": "0.690823",
+        "REAL TIME": "434.702",
+        "RUN TIME": "6873",
+        "BPU ACCURACY": "0.748232",
         "LED": "PASS √"
       },
       "src1": {
-        "IPC": "0.586633",
-        "REAL TIME": "461.404",
-        "RUN TIME": "7417",
-        "BPU ACCURACY": "0.832963",
+        "IPC": "0.602424",
+        "REAL TIME": "458.309",
+        "RUN TIME": "7223",
+        "BPU ACCURACY": "0.832964",
         "LED": "PASS √"
       },
       "src2": {
-        "IPC": "0.708616",
-        "REAL TIME": "618.724",
-        "RUN TIME": "9395",
-        "BPU ACCURACY": "0.758273",
+        "IPC": "0.708708",
+        "REAL TIME": "652.903",
+        "RUN TIME": "9387",
+        "BPU ACCURACY": "0.757197",
         "LED": "PASS √"
       },
       "withMext": {

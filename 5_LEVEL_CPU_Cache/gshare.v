@@ -1,8 +1,8 @@
 `include "rv32I.vh"
 
 module gshare #(
-    parameter BHR_WIDTH = 8,
-    parameter PHT_IDX_WIDTH = 10,
+    parameter BHR_WIDTH = 10,
+    parameter PHT_IDX_WIDTH = 12,
     parameter PHT_SIZE = 2 ** PHT_IDX_WIDTH
 ) (
     input                           clk,
@@ -53,7 +53,7 @@ module gshare #(
         pht_update_old  <= pht[update_pht_index_i];
 
         // �?
-        if (rst & pht_update_en_r) begin
+        if (pht_update_en_r) begin
             pht[pht_index_update_r] <= pht_update_new;
         end
     end
