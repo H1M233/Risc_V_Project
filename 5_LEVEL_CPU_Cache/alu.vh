@@ -1,7 +1,7 @@
 `ifndef ALU_DEF
 `define ALU_DEF
 
-`define OP_INST_NUM     43
+`define OP_INST_NUM     51
 
 // opcode
 `define OP_I            0
@@ -56,8 +56,18 @@
 `define INST_ECALL      40
 `define INST_MRET       41
 
+// M-type
+`define INST_R_MUL      42
+`define INST_R_MULH     43
+`define INST_R_MULHSU   44
+`define INST_R_MULHU    45
+`define INST_R_DIV      46
+`define INST_R_DIVU     47
+`define INST_R_REM      48
+`define INST_R_REMU     49
+
 // 纯数值计算独热
-`define REQUEST_VALUE_ONLY   42
+`define REQUEST_VALUE_ONLY   50
 
 // Load for ex to mem
 `define IS_LB   0

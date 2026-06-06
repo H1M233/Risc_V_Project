@@ -97,6 +97,8 @@ module top_riscv(
     wire            id_ecall_o;
     wire            id_mret_o;
 
+    // id to if1_if2 & if2_id
+    wire            id_stall_o;
 
     // ============================================================
     // ex to dcache
@@ -167,6 +169,9 @@ module top_riscv(
     wire [31:0]     ex_rd_data_o;
     wire [4:0]      ex_rd_addr_o;
     wire            ex_req_load_o;
+
+    // ex to if1_if2 & if2_id
+    wire            ex_ctrl_stall_o;
 
     // ============================================================
     // ex_mem to mem
@@ -370,6 +375,9 @@ module top_riscv(
         .pipe_hold          (pipe_hold_if1_if2),
         .pipe_flush         (pipe_flush_if1_if2),
 
+        .stall              (id_stall_o),
+        .ctrl_stall         (ex_ctrl_stall_o),
+
         .ecall_flush        (wb_ecall_flush),
         .mret_flush         (wb_mret_flush),
 
@@ -411,6 +419,9 @@ module top_riscv(
         .rs1_i              (if2_rs1_o),
         .rs2_i              (if2_rs2_o),
 
+        .stall              (id_stall_o),
+        .ctrl_stall         (ex_ctrl_stall_o),
+        
         .ecall_flush        (wb_ecall_flush),
         .mret_flush         (wb_mret_flush),
 
@@ -484,7 +495,9 @@ module top_riscv(
 
         .csr_addr_o         (id_csr_addr_o),
         .ecall              (id_ecall_o),
-        .mret               (id_mret_o)
+        .mret               (id_mret_o),
+
+        .stall              (id_stall_o)
     );
 
     // ============================================================
@@ -550,6 +563,8 @@ module top_riscv(
     // EX
     // ============================================================
     ex EX(
+        .clk                (cpu_clk),
+        .rst                (cpu_rst),
         // from id_ex
         .pc_addr_i          (ex_pc_addr_i),
         .inst_i             (ex_inst_i),
@@ -607,7 +622,10 @@ module top_riscv(
         .csr_addr_o         (ex_csr_addr_o),
         .csr_wen_o          (ex_csr_wen_o),
         .csr_wdata_o        (ex_csr_wdata_o),
-        .ecall_inst         (ex_ecall_inst)
+        .ecall_inst         (ex_ecall_inst),
+
+        // to if1_if2,if2_id
+        .ctrl_stall         (ex_ctrl_stall_o)
     );
 
     // ============================================================

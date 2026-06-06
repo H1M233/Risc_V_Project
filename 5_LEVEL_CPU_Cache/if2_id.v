@@ -17,6 +17,12 @@ module if2_id(
     input      [4:0]    rd_i,
     input      [4:0]    rs1_i,
     input      [4:0]    rs2_i,
+    
+    // from id
+    input               stall,
+
+    // from ex
+    input               ctrl_stall,
 
     // from wb
     input               ecall_flush,
@@ -34,6 +40,7 @@ module if2_id(
 
 );
     wire if2_id_flush_en = (ecall_flush | mret_flush);
+    wire div_stall = (!ctrl_stall)? stall : 1'b0;
 
     always @(posedge clk) begin
         if (!rst) begin
@@ -68,6 +75,9 @@ module if2_id(
             rd_o        <= 5'b0;
             rs1_o       <= 5'b0;
             rs2_o       <= 5'b0;
+        end
+        else if (div_stall) begin
+            // ...
         end
         else begin
             pc_o        <= pc_i;

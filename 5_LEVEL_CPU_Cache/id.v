@@ -70,7 +70,10 @@ module id(
     //ecall, mret
     output reg [11:0]   csr_addr_o,
     output reg          ecall,
-    output reg          mret
+    output reg          mret,
+
+    // to if1_if2,if2_id
+    output reg          stall
 );  
     // Hazard
     wire rs1_hit_ex   = (ex_rd_addr_i == rs1_i);
@@ -132,6 +135,7 @@ module id(
     // f7
     (* max_fanout = 30 *) wire f7_0000000 = (funct7_i == 7'b0000000);
     (* max_fanout = 30 *) wire f7_0100000 = (funct7_i == 7'b0100000);
+    (* max_fanout = 30 *) wire f7_0000001 = (funct7_i == 7'b0000001);
 
     //区分ecall和mret
     (* max_fanout = 30 *) wire is_ecall = (inst_i[31:20] == 12'b000000000000);
@@ -153,14 +157,24 @@ module id(
         // IR-type
         inst_packaged_o[`INST_IR_ADD]  = (is_alu_r & f3_000 & f7_0000000) | (is_alu_i & f3_000);
         inst_packaged_o[`INST_R_SUB]   = is_alu_r & f3_000 & f7_0100000;
-        inst_packaged_o[`INST_IR_XOR]  = (is_alu_r | is_alu_i) & f3_100;
-        inst_packaged_o[`INST_IR_OR]   = (is_alu_r | is_alu_i) & f3_110;
-        inst_packaged_o[`INST_IR_AND]  = (is_alu_r | is_alu_i) & f3_111;
-        inst_packaged_o[`INST_IR_SLL]  = (is_alu_r | is_alu_i) & f3_001;
+        inst_packaged_o[`INST_IR_XOR]  = (is_alu_r & f3_100 & f7_0000000) | (is_alu_i & f3_100);
+        inst_packaged_o[`INST_IR_OR]   = (is_alu_r & f3_000 & f7_0000000) | (is_alu_i & f3_110);
+        inst_packaged_o[`INST_IR_AND]  = (is_alu_r & f3_111 & f7_0000000) | (is_alu_i & f3_111);
+        inst_packaged_o[`INST_IR_SLL]  = (is_alu_r | is_alu_i) & f3_001 & f7_0000000;
         inst_packaged_o[`INST_IR_SRL]  = (is_alu_r | is_alu_i) & f3_101 & f7_0000000;
         inst_packaged_o[`INST_IR_SRA]  = (is_alu_r | is_alu_i) & f3_101 & f7_0100000;
-        inst_packaged_o[`INST_IR_SLT]  = (is_alu_r | is_alu_i) & f3_010;
-        inst_packaged_o[`INST_IR_SLTU] = (is_alu_r | is_alu_i) & f3_011;
+        inst_packaged_o[`INST_IR_SLT]  = (is_alu_r & f3_010 & f7_0000000) | (is_alu_i & f3_010);
+        inst_packaged_o[`INST_IR_SLTU] = (is_alu_r & f3_011 & f7_0000000) | (is_alu_i & f3_011);
+
+        // M-type
+        inst_packaged_o[`INST_R_MUL]    = is_alu_r & f3_000 & f7_0000001;
+        inst_packaged_o[`INST_R_MULH]   = is_alu_r & f3_001 & f7_0000001;
+        inst_packaged_o[`INST_R_MULHSU] = is_alu_r & f3_010 & f7_0000001;
+        inst_packaged_o[`INST_R_MULHU]  = is_alu_r & f3_011 & f7_0000001;
+        inst_packaged_o[`INST_R_DIV]    = is_alu_r & f3_100 & f7_0000001;
+        inst_packaged_o[`INST_R_DIVU]   = is_alu_r & f3_101 & f7_0000001;
+        inst_packaged_o[`INST_R_REM]    = is_alu_r & f3_110 & f7_0000001;
+        inst_packaged_o[`INST_R_REMU]   = is_alu_r & f3_111 & f7_0000001;
 
         // Load & Store
         inst_packaged_o[`INST_LB]  = is_load & f3_000;
@@ -317,6 +331,7 @@ module id(
                 rs1_addr_o  = rs1_i;
                 rs2_addr_o  = rs2_i;
                 rd_addr_o   = rd_i;
+                stall       = f7_0000001;
             end
 
             is_zicsr: begin
