@@ -12,6 +12,12 @@ module pc(
     input      [31:0]   pred_flush_pc,
     input               dcache_stall,
 
+    // from id
+    input               stall,
+
+    // from ex
+    input               ctrl_stall,
+
     // from wb
     input               wb_ecall,
     input               wb_mret,
@@ -28,7 +34,7 @@ module pc(
     input               pred_taken
 );
     wire pc_hold_en = (hazard_en | dcache_stall);
-
+    wire div_stall = (!ctrl_stall)? stall : 1'b0;
     // 为冲刷 / 异常留的口
     reg [31:0] pc_sel;
     always @(*) begin
@@ -51,6 +57,9 @@ module pc(
             pc_addr_o <= 32'h8000_0000;
         end
         else if (pc_hold_en) begin
+            // ...
+        end
+        else if (div_stall) begin
             // ...
         end
         else begin

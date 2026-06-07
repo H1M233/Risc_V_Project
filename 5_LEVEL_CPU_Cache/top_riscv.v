@@ -295,6 +295,9 @@ module top_riscv(
         .pred_flush         (pred_flush_en),
         .pred_flush_pc      (pred_flush_pc),
 
+        .stall              (id_stall_o),
+        .ctrl_stall         (ex_ctrl_stall_o),
+
         .wb_ecall           (wb_ecall_o),
         .wb_mret            (wb_mret_o),
 
@@ -421,7 +424,7 @@ module top_riscv(
 
         .stall              (id_stall_o),
         .ctrl_stall         (ex_ctrl_stall_o),
-        
+
         .ecall_flush        (wb_ecall_flush),
         .mret_flush         (wb_mret_flush),
 

@@ -53,6 +53,10 @@ module mul(
                 valid_o <= valid_o; // 保持之前的valid状态，直到乘法结果准备好
             end
         end
+        else begin
+            mul_cnt <= 32'b0;
+            valid_o <= 1'b0;
+        end
     end
     
 endmodule

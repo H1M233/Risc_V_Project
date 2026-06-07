@@ -76,7 +76,7 @@ module ex(
     output     [31:0]   ecall_inst,
 
     //to if1_if2,if2_id
-    output reg          ctrl_stall
+    output              ctrl_stall
 );
 
     // 主操作码独热
@@ -104,14 +104,14 @@ module ex(
     wire sel_sltu  = inst_packaged_i[`INST_IR_SLTU];
 
     // M-type
-    wire sel_mul   = inst_packaged_i[`INST_MUL];
-    wire sel_mulh  = inst_packaged_i[`INST_MULH];
-    wire sel_mulhu = inst_packaged_i[`INST_MULHU];
-    wire sel_mulhsu= inst_packaged_i[`INST_MULHSU];
-    wire sel_div   = inst_packaged_i[`INST_DIV];
-    wire sel_divu  = inst_packaged_i[`INST_DIVU];
-    wire sel_rem   = inst_packaged_i[`INST_REM];
-    wire sel_remu  = inst_packaged_i[`INST_REMU];
+    wire sel_mul   = inst_packaged_i[`INST_R_MUL];
+    wire sel_mulh  = inst_packaged_i[`INST_R_MULH];
+    wire sel_mulhu = inst_packaged_i[`INST_R_MULHU];
+    wire sel_mulhsu= inst_packaged_i[`INST_R_MULHSU];
+    wire sel_div   = inst_packaged_i[`INST_R_DIV];
+    wire sel_divu  = inst_packaged_i[`INST_R_DIVU];
+    wire sel_rem   = inst_packaged_i[`INST_R_REM];
+    wire sel_remu  = inst_packaged_i[`INST_R_REMU];
 
     // Load & Store
     wire sel_lb    = inst_packaged_i[`INST_LB];
@@ -175,11 +175,14 @@ module ex(
     // M扩展乘除法运算
     wire [31:0] div_res;
     wire [31:0] mul_res;
+    wire div_ctrl_stall;
+    wire mul_ctrl_stall;
+    wire div_valid = valid_i && (sel_div | sel_divu | sel_rem | sel_remu);
     
-    DIVIDER divider(
+    divider DIVIDER(
         .clk          (clk),         
         .rst          (rst),          
-        .valid_i      (valid_i),
+        .valid_i      (div_valid),
         .dividend_i   (value1_eff),
         .divisor_i    (value2_eff),
         .is_div_i     (sel_div),
@@ -187,12 +190,12 @@ module ex(
         .is_rem_i     (sel_rem),
         .is_remu_i    (sel_remu),
         .flush_i      (1'b0),
-        .valid_o      (ctrl_stall), 
+        .valid_o      (div_ctrl_stall), 
         .result_o     (div_res),
         .busy_o       ()            
     );
 
-    MUL mul(
+    mul MUL(
         .clk          (clk),
         .rst          (rst),
         .mul_1_i      (value1_eff),
@@ -202,10 +205,12 @@ module ex(
         .is_mulhu_i   (sel_mulhu),
         .is_mulhsu_i  (sel_mulhsu),
         .flush_i      (1'b0),
-        .valid_o      (ctrl_stall), 
+        .valid_o      (mul_ctrl_stall), 
         .mul_result_o (mul_res)
     );
     
+    assign ctrl_stall = div_ctrl_stall | mul_ctrl_stall; 
+
     // csr 计算
     wire [31:0] csr_value1  = (inst_i[14]) ? value1_i : rs1_data_fwd;   // CSR 写数据选择
     wire [31:0] rw_res      = csr_value1;                               // 读写结果，写入 CSR 的值或原 CSR 值

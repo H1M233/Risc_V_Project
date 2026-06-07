@@ -158,7 +158,7 @@ module id(
         inst_packaged_o[`INST_IR_ADD]  = (is_alu_r & f3_000 & f7_0000000) | (is_alu_i & f3_000);
         inst_packaged_o[`INST_R_SUB]   = is_alu_r & f3_000 & f7_0100000;
         inst_packaged_o[`INST_IR_XOR]  = (is_alu_r & f3_100 & f7_0000000) | (is_alu_i & f3_100);
-        inst_packaged_o[`INST_IR_OR]   = (is_alu_r & f3_000 & f7_0000000) | (is_alu_i & f3_110);
+        inst_packaged_o[`INST_IR_OR]   = (is_alu_r & f3_110 & f7_0000000) | (is_alu_i & f3_110);
         inst_packaged_o[`INST_IR_AND]  = (is_alu_r & f3_111 & f7_0000000) | (is_alu_i & f3_111);
         inst_packaged_o[`INST_IR_SLL]  = (is_alu_r | is_alu_i) & f3_001 & f7_0000000;
         inst_packaged_o[`INST_IR_SRL]  = (is_alu_r | is_alu_i) & f3_101 & f7_0000000;
@@ -231,6 +231,8 @@ module id(
         csr_addr_o       = is_zicsr ? inst_i[31:20] : 12'h520;
         ecall            = is_zicsr & is_ecall;
         mret             = is_zicsr & is_mret;
+        // M扩展
+        stall            = 1'b0; 
 
         (* parallel_case *)
         case(1'b1)
