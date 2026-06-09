@@ -35,7 +35,7 @@ module top_riscv(
     (* max_fanout = 30 *)
     logic           hazard_hazard_en;
     logic           dual_stall;
-    logic           dual_stall_r;
+    logic           dual_stall_finish;
     
     // ============================================================
     // regs to id
@@ -48,7 +48,7 @@ module top_riscv(
     // ============================================================
     // csr_regs to pc & ex
     // ============================================================
-    wire [31:0]     csr_regs_csr_rdata;
+    wire [31:0]     slot0_csr_regs_csr_rdata;
     wire [31:0]     csr_regs_ecall_mret_addr;
     
     // ============================================================
@@ -103,6 +103,8 @@ module top_riscv(
     // ============================================================
     data_t          slot0_id_data_packaged_o, slot1_id_data_packaged_o;
     decode_t        slot0_id_inst_packaged_o, slot1_id_inst_packaged_o;
+    logic           slot0_id_regs_wen_o, slot1_id_regs_wen_o;
+    logic           slot0_using_rs_data_o, slot1_using_rs_data_o;
     
     // ============================================================
     // ex to dcache
@@ -121,27 +123,34 @@ module top_riscv(
     data_t          slot1_ex_data_packaged_i;
     decode_t        slot0_ex_inst_packaged_i;
     decode_t        slot1_ex_inst_packaged_i;
+    logic           slot0_ex_regs_wen_i;
+    logic           slot1_ex_regs_wen_i;
     logic           slot0_ex_valid_i;
     logic           slot1_ex_valid_i;
     
     // ============================================================
     // ex-pred_flush
     // ============================================================
-    wire            ex_pred_flush_en_o;
-    wire [31:0]     ex_pred_flush_pc_o;
-    wire            pred_flush_en;
-    wire [31:0]     pred_flush_pc;
+    logic           slot0_ex_pred_flush_en_o;
+    logic           slot1_ex_pred_flush_en_o;
+    logic [31:0]    slot0_ex_pred_flush_pc_o;
+    logic [31:0]    slot1_ex_pred_flush_pc_o;
+    logic           slot0_pred_flush_en;
+    logic           slot1_pred_flush_en;
+    logic [31:0]    slot0_pred_flush_pc;
+    logic [31:0]    slot1_pred_flush_pc;
+    logic           pred_flush_en;
+    logic [31:0]    pred_flush_pc;
+    assign pred_flush_en = slot0_pred_flush_en | slot1_pred_flush_en;
+    assign pred_flush_pc = (slot0_pred_flush_en) ? slot0_pred_flush_pc : slot1_pred_flush_pc;
     
     // ============================================================
     // ex to ex_mem
     // ============================================================
     logic           slot0_ex_regs_wen_o, slot1_ex_regs_wen_o;
     logic           slot0_ex_ecall_o;
-    logic           slot1_ex_ecall_o;
     logic           slot0_ex_mret_o;
-    logic           slot1_ex_mret_o;
     logic [31:0]    slot0_ex_ecall_inst;
-    logic [31:0]    slot1_ex_ecall_inst;
     logic           slot0_ex_valid_o;
     logic           slot1_ex_valid_o;
     logic [1:0]     ex_load_addr_low_o;
@@ -156,11 +165,8 @@ module top_riscv(
     
     // ex to csr_regs
     logic           slot0_ex_csr_wen_o;
-    logic           slot1_ex_csr_wen_o;
     logic [31:0]    slot0_ex_csr_wdata_o;
-    logic [31:0]    slot1_ex_csr_wdata_o;
     logic [11:0]    slot0_ex_csr_addr_o;
-    logic [11:0]    slot1_ex_csr_addr_o;
     
     // ex to ex_mem & hazard
     wire [31:0]     slot0_ex_rd_data_o, slot1_ex_rd_data_o;
@@ -177,11 +183,8 @@ module top_riscv(
     logic [4:0]     slot0_mem_rd_addr_i;
     logic [4:0]     slot1_mem_rd_addr_i;
     logic           slot0_mem_ecall_i;
-    logic           slot1_mem_ecall_i;
     logic           slot0_mem_mret_i;
-    logic           slot1_mem_mret_i;
     logic [31:0]    slot0_mem_ecall_inst_i;
-    logic [31:0]    slot1_mem_ecall_inst_i;
     logic           mem_req_load_i;
     logic [1:0]     mem_load_addr_low_i;
     logic [1:0]     mem_load_mask_i;
@@ -202,11 +205,8 @@ module top_riscv(
     logic           mem2_is_load_o;
     
     logic           slot0_mem_ecall_o;
-    logic           slot1_mem_ecall_o;
     logic           slot0_mem_mret_o;
-    logic           slot1_mem_mret_o;
     logic [31:0]    slot0_mem_ecall_inst_o;
-    logic [31:0]    slot1_mem_ecall_inst_o;
 
     // ============================================================
     // mem to D-cache
@@ -228,11 +228,8 @@ module top_riscv(
 
     logic           wb_is_load_i;
     logic           slot0_wb_ecall_i;
-    logic           slot1_wb_ecall_i;
     logic           slot0_wb_mret_i;
-    logic           slot1_wb_mret_i;
     logic [31:0]    slot0_wb_ecall_inst_i;
-    logic [31:0]    slot1_wb_ecall_inst_i;
 
     // ============================================================
     // wb to regs
@@ -248,23 +245,13 @@ module top_riscv(
     // wb to pc & csg_regs
     // ============================================================
     wire            slot0_wb_ecall_o;
-    wire            slot1_wb_ecall_o;
     wire            slot0_wb_mret_o;
-    wire            slot1_wb_mret_o;
     wire [31:0]     slot0_wb_ecall_inst_o;
-    wire [31:0]     slot1_wb_ecall_inst_o;
 
     // ============================================================
     // wb to flush 
     // ============================================================
-
-    logic           slot0_wb_ecall_flush;
-    logic           slot1_wb_ecall_flush;
-    logic           slot0_wb_mret_flush;
-    logic           slot1_wb_mret_flush;
-
-    wire            wb_ecall_flush = slot0_wb_ecall_flush | slot1_wb_ecall_flush;
-    wire            wb_mret_flush;
+    wire            ecall_mret_flush = slot0_wb_ecall_o | slot0_wb_mret_o;
 
     // ============================================================
     // bpu to pc & id
@@ -275,59 +262,74 @@ module top_riscv(
     logic           bpu_slot1_pred_taken;
     logic [31:0]    bpu_slot0_pred_pc;
     logic [31:0]    bpu_slot1_pred_pc;
+    logic [3:0]     bpu_ras_snapshot;
+    logic           bpu_slot0_id_is_ret;
+    logic           bpu_slot1_id_is_ret;
 
     // ��ˮ����ͣ����
-    (* max_fanout = 30 *) wire pipe_hold_icache = dcache_stall | hazard_hazard_en | dual_stall;
-    (* max_fanout = 30 *) wire pipe_hold_if1_if2 = dcache_stall | hazard_hazard_en | dual_stall;
-    (* max_fanout = 30 *) wire pipe_hold_if2_id = dcache_stall | hazard_hazard_en | dual_stall;
-    (* max_fanout = 30 *) wire pipe_hold_bpu = dcache_stall | hazard_hazard_en;
-    (* max_fanout = 30 *) wire pipe_hold_ex_mem = dcache_stall;
-    (* max_fanout = 30 *) wire pipe_hold_ex_bpu = dcache_stall;
+    wire pipe_hold_pc = dcache_stall | hazard_hazard_en | dual_stall;
+    wire pipe_hold_icache = dcache_stall | hazard_hazard_en | dual_stall;
+    wire pipe_hold_if1_if2 = dcache_stall | hazard_hazard_en | dual_stall;
+    wire pipe_hold_if2_id = dcache_stall | hazard_hazard_en | dual_stall;
+    wire pipe_hold_bpu = dcache_stall | hazard_hazard_en | dual_stall;
+    wire pipe_hold_ex_mem = dcache_stall;
+    wire pipe_hold_ex_bpu = dcache_stall;
 
-    (* max_fanout = 30 *) wire pipe_flush_icache = bpu_pred_taken | pred_flush_en | wb_ecall_flush | wb_mret_flush;
-    (* max_fanout = 30 *) wire pipe_flush_if1_if2 = bpu_pred_taken | pred_flush_en | wb_ecall_flush | wb_mret_flush;
-    (* max_fanout = 30 *) wire pipe_flush_if2_id = bpu_pred_taken | pred_flush_en | wb_ecall_flush | wb_mret_flush;
-    (* max_fanout = 30 *) wire pipe_flush_bpu = bpu_pred_taken | pred_flush_en | wb_ecall_flush | wb_mret_flush;
-    (* max_fanout = 30 *) wire pipe_flush_ex_mem = pred_flush_en | wb_ecall_flush | wb_mret_flush;
-    (* max_fanout = 30 *) wire pipe_flush_ex_bpu = pred_flush_en | wb_ecall_flush | wb_mret_flush;
+    wire pipe_flush_icache = bpu_pred_taken | pred_flush_en | ecall_mret_flush;
+    wire pipe_flush_if1_if2 = bpu_pred_taken | pred_flush_en | ecall_mret_flush;
+    wire pipe_flush_if2_id = bpu_pred_taken | pred_flush_en | ecall_mret_flush;
+    wire pipe_flush_bpu = bpu_pred_taken | pred_flush_en | ecall_mret_flush;
+    wire pipe_flush_ex_mem = pred_flush_en | ecall_mret_flush;
+    wire pipe_flush_ex_bpu = pred_flush_en | ecall_mret_flush;
 
     // ============================================================
     // ex to bpu
     // ============================================================
-    wire            ex_update_btb_en_o;
-    wire            ex_update_gshare_en_o;
-    wire [31:0]     ex_update_pc_o;
-    wire [31:0]     ex_update_target_o;
-    wire            ex_actual_taken_o;
+    wire            slot0_ex_update_ras_o;
+    wire            slot1_ex_update_ras_o;
+    wire [3:0]      slot0_ex_ras_snapshot_o;
+    wire [3:0]      slot1_ex_ras_snapshot_o;
+    wire            slot0_ex_update_gshare_en_o;
+    wire            slot1_ex_update_gshare_en_o;
+    wire            slot0_ex_actual_taken_o;
+    wire            slot1_ex_actual_taken_o;
+    wire            slot0_ex_update_btb_en_o;
+    wire            slot1_ex_update_btb_en_o;
+    wire [31:0]     slot0_ex_update_target_o;
+    wire [31:0]     slot1_ex_update_target_o;
 
     // ex_bpu to bpu
-    wire            bpu_update_btb_en_i;
+    wire            bpu_update_ras_i;
+    wire [3:0]      bpu_ras_snapshot_i;
     wire            bpu_update_gshare_en_i;
-    wire [31:0]     bpu_update_pc_i;
-    wire [31:0]     bpu_update_target_i;
     wire            bpu_actual_taken_i;
+    wire            bpu_update_btb_en_i;
+    wire [31:0]     bpu_update_target_i;
+    wire [31:0]     bpu_update_btb_pc_i;
+    wire [31:0]     bpu_update_gshare_pc_i;
 
     // hazard
     wire ex_valid_req_load = (pipe_flush_ex_mem) ? 1'b0 : slot0_ex_req_load_o;
     hazard HAZARD (
-        .clk                    (cpu_clk),
-
         .slot0_id_rs1_addr_i    (slot0_id_rs1_i),
         .slot0_id_rs2_addr_i    (slot0_id_rs2_i),
         .slot0_id_rd_addr_i     (slot0_id_rd_i),
-
+        .slot0_id_regs_wen_i    (slot0_id_regs_wen_o),
+        
         .slot1_id_rs1_addr_i    (slot1_id_rs1_i),
         .slot1_id_rs2_addr_i    (slot1_id_rs2_i),
-        .slot1_id_regs_wen_i    (slot1_id_data_packaged_o.regs_wen),
+        .slot1_using_rs_data_i  (slot1_using_rs_data_o),
         .slot1_id_is_load_i     (slot1_id_inst_packaged_o.is_load),
-
+        .slot1_id_is_store_i    (slot1_id_inst_packaged_o.is_store),
+        .slot1_id_is_zicsr_i    (slot1_id_inst_packaged_o.is_zicsr),
+        
         .ex_rd_addr_i           (slot0_ex_rd_addr_o),
         .ex_is_load_i           (ex_valid_req_load),
         .mem1_rd_addr_i         (slot0_mem1_rd_addr_o),
         .mem1_is_load_i         (mem1_is_load_o),
         .hazard_en              (hazard_hazard_en),
         .dual_stall             (dual_stall),
-        .dual_stall_r           (dual_stall_r)
+        .dual_stall_finish      (dual_stall_finish)
     );
 
     // ============================================================
@@ -336,15 +338,14 @@ module top_riscv(
     pc PC(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
-
-        .hazard_en          (hazard_hazard_en),
-        .dcache_stall       (dcache_stall),
+        .pipe_hold          (pipe_hold_pc),
+        .dual_stall         (dual_stall),
 
         .pred_flush         (pred_flush_en),
         .pred_flush_pc      (pred_flush_pc),
 
-        .wb_ecall           (wb_ecall_flush),
-        .wb_mret            (wb_mret_flush),
+        .wb_ecall           (slot0_wb_ecall_o),
+        .wb_mret            (slot0_wb_mret_o),
 
         .ecall_mret_addr    (csr_regs_ecall_mret_addr),
 
@@ -403,34 +404,31 @@ module top_riscv(
     // ============================================================
     // CSR_Regfile
     // ============================================================
-    // csr_regs CSR_REGS(
-    //     .clk                (cpu_clk),
-    //     .rst                (cpu_rst),
+    csr_regs CSR_REGS(
+        .clk                (cpu_clk),
+        .rst                (cpu_rst),
 
-    //     .csr_addr           (ex_csr_addr_o),        
-    //     .csr_wdata          (ex_csr_wdata_o),     
-    //     .csr_wen            (ex_csr_wen_o),
+        .csr_addr           (slot0_ex_csr_addr_o),
+        .csr_wdata          (slot0_ex_csr_wdata_o),
+        .csr_wen            (slot0_ex_csr_wen_o),
 
-    //     .csr_rdata          (csr_regs_csr_rdata),
+        .csr_rdata          (slot0_csr_regs_csr_rdata),
 
-    //     .ecall              (mem_ecall_o),      
-    //     .mret               (mem_mret_o),       
-    //     .ecall_inst         (mem_ecall_inst_o),     
-    //     .ecall_mret_addr    (csr_regs_ecall_mret_addr)
-    // );
+        .ecall              (slot0_mem_ecall_o),      
+        .mret               (slot0_mem_mret_o),       
+        .ecall_inst         (slot0_mem_ecall_inst_o),     
+        .ecall_mret_addr    (csr_regs_ecall_mret_addr)
+    );
 
     // ============================================================
     // IF
     // ============================================================
     ifetch IF(
-        .clk                (cpu_clk),
-        .rst                (cpu_rst),
-        .pipe_hold          (pipe_hold_if1_if2),
-        .pipe_flush         (pipe_flush_if1_if2),
-
-        // from wb
-        .ecall_flush        (wb_ecall_flush),
-        .mret_flush         (wb_mret_flush),
+        .clk                   (cpu_clk),
+        .rst                   (cpu_rst),
+        .pipe_hold             (pipe_hold_if1_if2),
+        .pipe_flush            (pipe_flush_if1_if2),
+        .ecall_mret_flush      (ecall_mret_flush),
 
         // from pc
         .slot0_pc_i            (slot0_pc_pc_o),
@@ -474,9 +472,7 @@ module top_riscv(
         .rst                (cpu_rst),
         .pipe_hold          (pipe_hold_if2_id),
         .pipe_flush         (pipe_flush_if2_id),
-
-        .ecall_flush        (wb_ecall_flush),
-        .mret_flush         (wb_mret_flush),
+        .ecall_mret_flush   (ecall_mret_flush),
 
         .slot0_pc_i         (slot0_if2_pc_o),
         .slot0_inst_i       (slot0_if2_inst_o),
@@ -530,6 +526,8 @@ module top_riscv(
 
         .pred_taken_i       (bpu_slot0_pred_taken),
         .pred_pc_i          (bpu_slot0_pred_pc),
+        .ras_snapshot       (bpu_ras_snapshot),
+        .is_ret             (bpu_slot0_id_is_ret),
 
         .rs1_data_i         (slot0_reg_rs1_data_o),
         .rs2_data_i         (slot0_reg_rs2_data_o),
@@ -537,6 +535,10 @@ module top_riscv(
         // to id_ex
         .data_packaged_o    (slot0_id_data_packaged_o),
         .inst_packaged_o    (slot0_id_inst_packaged_o),
+        .regs_wen_o         (slot0_id_regs_wen_o),
+
+        // to hazard
+        .using_rs_data_o    (slot0_using_rs_data_o),
 
         // from ex
         .slot0_ex_regs_wen_i    (slot0_ex_regs_wen_o),
@@ -581,6 +583,8 @@ module top_riscv(
 
         .pred_taken_i       (bpu_slot1_pred_taken),
         .pred_pc_i          (bpu_slot1_pred_pc),
+        .ras_snapshot       (bpu_ras_snapshot),
+        .is_ret             (bpu_slot1_id_is_ret),
 
         .rs1_data_i         (slot1_reg_rs1_data_o),
         .rs2_data_i         (slot1_reg_rs2_data_o),
@@ -588,6 +592,10 @@ module top_riscv(
         // to id_ex
         .data_packaged_o    (slot1_id_data_packaged_o),
         .inst_packaged_o    (slot1_id_inst_packaged_o),
+        .regs_wen_o         (slot1_id_regs_wen_o),
+
+        // to hazard
+        .using_rs_data_o    (slot1_using_rs_data_o),
 
         // from ex
         .slot0_ex_regs_wen_i    (slot0_ex_regs_wen_o),
@@ -630,25 +638,30 @@ module top_riscv(
         .pred_flush         (pred_flush_en),
         .hazard_en          (hazard_hazard_en),
         .dcache_stall       (dcache_stall),
-        .ecall_flush        (wb_ecall_flush),
-        .mret_flush         (wb_mret_flush),
+        .ecall_mret_flush   (ecall_mret_flush),
         .dual_stall         (dual_stall),
-        .dual_stall_r       (dual_stall_r),
+        .dual_stall_finish  (dual_stall_finish),
 
-        .slot0_data_packaged_i    (slot0_id_data_packaged_o),
-        .slot1_data_packaged_i    (slot1_id_data_packaged_o),
+        .slot0_data_packaged_i      (slot0_id_data_packaged_o),
+        .slot1_data_packaged_i      (slot1_id_data_packaged_o),
         
-        .slot0_inst_packaged_i    (slot0_id_inst_packaged_o),
-        .slot1_inst_packaged_i    (slot1_id_inst_packaged_o),
-        
-        .slot0_data_packaged_o    (slot0_ex_data_packaged_i),
-        .slot1_data_packaged_o    (slot1_ex_data_packaged_i),
-        
-        .slot0_inst_packaged_o    (slot0_ex_inst_packaged_i),
-        .slot1_inst_packaged_o    (slot1_ex_inst_packaged_i),
+        .slot0_inst_packaged_i      (slot0_id_inst_packaged_o),
+        .slot1_inst_packaged_i      (slot1_id_inst_packaged_o),
 
-        .slot0_valid_o            (slot0_ex_valid_i),
-        .slot1_valid_o            (slot1_ex_valid_i)
+        .slot0_regs_wen_i           (slot0_id_regs_wen_o),
+        .slot1_regs_wen_i           (slot1_id_regs_wen_o),
+        
+        .slot0_data_packaged_o      (slot0_ex_data_packaged_i),
+        .slot1_data_packaged_o      (slot1_ex_data_packaged_i),
+        
+        .slot0_inst_packaged_o      (slot0_ex_inst_packaged_i),
+        .slot1_inst_packaged_o      (slot1_ex_inst_packaged_i),
+
+        .slot0_regs_wen_o           (slot0_ex_regs_wen_i),
+        .slot1_regs_wen_o           (slot1_ex_regs_wen_i),
+
+        .slot0_valid_o              (slot0_ex_valid_i),
+        .slot1_valid_o              (slot1_ex_valid_i)
     );
 
     // ============================================================
@@ -658,6 +671,7 @@ module top_riscv(
         // from id_ex
         .data_packaged_i    (slot0_ex_data_packaged_i),
         .inst_packaged_i    (slot0_ex_inst_packaged_i),
+        .regs_wen_i         (slot0_ex_regs_wen_i),
         .valid_i            (slot0_ex_valid_i),
 
         // forwarding
@@ -665,7 +679,7 @@ module top_riscv(
         .fwd_slot1_ex_rd_data_i(slot1_mem_rd_data_i),
 
         // from csr_regs
-        .csr_rdata          (csr_regs_csr_rdata),
+        .csr_rdata          (slot0_csr_regs_csr_rdata),
 
         // to ex_mem & hazard
         .regs_wen_o         (slot0_ex_regs_wen_o),
@@ -686,13 +700,14 @@ module top_riscv(
         .dcache_write_dram  (ex_dcache_write_dram_o),
 
         // to ex_bpu
-        .update_btb_en_o    (ex_update_btb_en_o),
-        .update_gshare_en_o (ex_update_gshare_en_o),
-        .update_pc_o        (ex_update_pc_o),
-        .update_target_o    (ex_update_target_o),
-        .actual_taken_o     (ex_actual_taken_o),
-        .pred_flush_en      (ex_pred_flush_en_o),
-        .pred_flush_pc      (ex_pred_flush_pc_o),
+        .update_ras_o       (slot0_ex_update_ras_o),
+        .ras_snapshot_o     (slot0_ex_ras_snapshot_o),
+        .update_gshare_en_o (slot0_ex_update_gshare_en_o),
+        .actual_taken_o     (slot0_ex_actual_taken_o),
+        .update_btb_en_o    (slot0_ex_update_btb_en_o),
+        .update_target_o    (slot0_ex_update_target_o),
+        .pred_flush_en      (slot0_ex_pred_flush_en_o),
+        .pred_flush_pc      (slot0_ex_pred_flush_pc_o),
 
         // to csr_regs
         .csr_addr_o         (slot0_ex_csr_addr_o),
@@ -705,6 +720,7 @@ module top_riscv(
         // from id_ex
         .data_packaged_i    (slot1_ex_data_packaged_i),
         .inst_packaged_i    (slot1_ex_inst_packaged_i),
+        .regs_wen_i         (slot1_ex_regs_wen_i),
         .valid_i            (slot1_ex_valid_i),
 
         // forwarding
@@ -712,12 +728,12 @@ module top_riscv(
         .fwd_slot1_ex_rd_data_i(slot1_mem_rd_data_i),
 
         // from csr_regs
-        .csr_rdata          (csr_regs_csr_rdata),
+        .csr_rdata          (),
 
         // to ex_mem & hazard
         .regs_wen_o         (slot1_ex_regs_wen_o),
-        .ecall_o            (slot1_ex_ecall_o),
-        .mret_o             (slot1_ex_mret_o),
+        .ecall_o            (),
+        .mret_o             (),
         .mem_req_load       (),
         .mem_load_mask      (),
         .mem_load_addr_low  (),
@@ -733,19 +749,20 @@ module top_riscv(
         .dcache_write_dram  (),
 
         // to ex_bpu
-        .update_btb_en_o    (),
-        .update_gshare_en_o (),
-        .update_pc_o        (),
-        .update_target_o    (),
-        .actual_taken_o     (),
-        .pred_flush_en      (),
-        .pred_flush_pc      (),
+        .update_ras_o       (slot1_ex_update_ras_o),
+        .ras_snapshot_o     (slot1_ex_ras_snapshot_o),
+        .update_gshare_en_o (slot1_ex_update_gshare_en_o),
+        .actual_taken_o     (slot1_ex_actual_taken_o),
+        .update_btb_en_o    (slot1_ex_update_btb_en_o),
+        .update_target_o    (slot1_ex_update_target_o),
+        .pred_flush_en      (slot1_ex_pred_flush_en_o),
+        .pred_flush_pc      (slot1_ex_pred_flush_pc_o),
 
         // to csr_regs
-        .csr_addr_o         (slot1_ex_csr_addr_o),
-        .csr_wen_o          (slot1_ex_csr_wen_o),
-        .csr_wdata_o        (slot1_ex_csr_wdata_o),
-        .ecall_inst         (slot1_ex_ecall_inst)
+        .csr_addr_o         (),
+        .csr_wen_o          (),
+        .csr_wdata_o        (),
+        .ecall_inst         ()
     );
 
     // ============================================================
@@ -801,9 +818,9 @@ module top_riscv(
         .rd_addr_i          (slot1_ex_rd_addr_o),
         .rd_data_i          (slot1_ex_rd_data_o),
         .regs_wen_i         (slot1_ex_regs_wen_o),
-        .ecall_i            (slot1_ex_ecall_o),
-        .mret_i             (slot1_ex_mret_o),
-        .ecall_inst_i       (slot1_ex_ecall_inst),
+        .ecall_i            (),
+        .mret_i             (),
+        .ecall_inst_i       (),
         .mem_req_load_i     (),
         .load_mask_i        (),
         .load_addr_low_i    (),
@@ -818,9 +835,9 @@ module top_riscv(
         .rd_addr_o          (slot1_mem_rd_addr_i),
         .rd_data_o          (slot1_mem_rd_data_i),
         .regs_wen_o         (slot1_mem_regs_wen_i),
-        .ecall_o            (slot1_mem_ecall_i),
-        .mret_o             (slot1_mem_mret_i),
-        .ecall_inst_o       (slot1_mem_ecall_inst_i),
+        .ecall_o            (),
+        .mret_o             (),
+        .ecall_inst_o       (),
         .mem_req_load_o     (),
         .load_mask_o        (),
         .load_addr_low_o    (),
@@ -839,6 +856,8 @@ module top_riscv(
     mem MEM_SLOT0(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
+
+        .forward_flush      (1'b0),
 
         .dcache_ack         (dcache_ack_mem),
         .dcache_rdata       (dcache_rdata),
@@ -874,17 +893,19 @@ module top_riscv(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
 
-        .dcache_ack         (dcache_ack_mem),
-        .dcache_rdata       (dcache_rdata),
+        .forward_flush      (slot0_pred_flush_en),
+
+        .dcache_ack         (0),
+        .dcache_rdata       (0),
         .dcache_stall       (dcache_stall),
 
         .rd_addr_i          (slot1_mem_rd_addr_i),
         .rd_data_i          (slot1_mem_rd_data_i),
         .regs_wen           (slot1_mem_regs_wen_i),
-        .ecall_i            (slot1_mem_ecall_i),
-        .mret_i             (slot1_mem_mret_i),
-        .ecall_inst_i       (slot1_mem_ecall_inst_i),
-        .mem_req_load_i     (),
+        .ecall_i            (0),
+        .mret_i             (0),
+        .ecall_inst_i       (0),
+        .mem_req_load_i     (0),
         .load_mask_i        (),
         .load_addr_low_i    (),
         .load_is_signed_i   (),
@@ -899,9 +920,9 @@ module top_riscv(
         .mem2_rd_addr_o     (slot1_mem2_rd_addr_o),
         .mem2_rd_data_o     (slot1_mem2_rd_data_o),
         .mem2_regs_wen_o    (slot1_mem2_regs_wen_o),
-        .ecall_o            (slot1_mem_ecall_o),
-        .mret_o             (slot1_mem_mret_o),
-        .ecall_inst_o       (slot1_mem_ecall_inst_o)
+        .ecall_o            (),
+        .mret_o             (),
+        .ecall_inst_o       ()
     );
 
     // ============================================================
@@ -937,8 +958,7 @@ module top_riscv(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
 
-        .ecall_flush        (wb_ecall_flush),
-        .mret_flush         (wb_mret_flush),
+        .ecall_mret_flush   (ecall_mret_flush),
 
         .rd_addr_i          (slot0_mem2_rd_addr_o),
         .rd_data_i          (slot0_mem2_rd_data_o),
@@ -961,24 +981,23 @@ module top_riscv(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
 
-        .ecall_flush        (wb_ecall_flush),
-        .mret_flush         (wb_mret_flush),
+        .ecall_mret_flush   (ecall_mret_flush),
 
         .rd_addr_i          (slot1_mem2_rd_addr_o),
         .rd_data_i          (slot1_mem2_rd_data_o),
         .regs_wen_i         (slot1_mem2_regs_wen_o),
         .is_load_i          (),
-        .ecall_i            (slot1_mem_ecall_o),
-        .mret_i             (slot1_mem_mret_o),
-        .ecall_inst_i       (slot1_mem_ecall_inst_o),
+        .ecall_i            (0),
+        .mret_i             (0),
+        .ecall_inst_i       (0),
 
         .rd_addr_o          (slot1_wb_rd_addr_i),
         .rd_data_o          (slot1_wb_rd_data_i),
         .regs_wen_o         (slot1_wb_regs_wen_i),
         .is_load_o          (wb_is_load_i),
-        .ecall_o            (slot1_wb_ecall_i),
-        .mret_o             (slot1_wb_mret_i),
-        .ecall_inst_o       (slot1_wb_ecall_inst_i)
+        .ecall_o            (),
+        .mret_o             (),
+        .ecall_inst_o       ()
     );
 
     // ============================================================
@@ -997,8 +1016,6 @@ module top_riscv(
 
         .ecall_o            (slot0_wb_ecall_o),
         .mret_o             (slot0_wb_mret_o),
-        .ecall_flush        (slot0_wb_ecall_flush),
-        .mret_flush         (slot0_wb_mret_flush),
         .ecall_inst_o       (slot0_wb_ecall_inst_o)
     );
 
@@ -1006,18 +1023,16 @@ module top_riscv(
         .rd_addr_i          (slot1_wb_rd_addr_i),
         .rd_data_i          (slot1_wb_rd_data_i),
         .regs_wen_i         (slot1_wb_regs_wen_i),
-        .ecall_i            (slot1_wb_ecall_i),
-        .mret_i             (slot1_wb_mret_i),
-        .ecall_inst_i       (slot1_wb_ecall_inst_i),
+        .ecall_i            (0),
+        .mret_i             (0),
+        .ecall_inst_i       (0),
         .rd_addr_o          (slot1_wb_rd_addr_o),
         .rd_data_o          (slot1_wb_rd_data_o),
         .regs_wen_o         (slot1_wb_regs_wen_o),
 
-        .ecall_o            (slot1_wb_ecall_o),
-        .mret_o             (slot1_wb_mret_o),
-        .ecall_flush        (slot1_wb_ecall_flush),
-        .mret_flush         (slot1_wb_mret_flush),
-        .ecall_inst_o       (slot1_wb_ecall_inst_o)
+        .ecall_o            (),
+        .mret_o             (),
+        .ecall_inst_o       ()
     );
 
     // ============================================================
@@ -1027,32 +1042,46 @@ module top_riscv(
         .rst                (cpu_rst),
         .clk                (cpu_clk),
 
-        .pipe_hold          (pipe_hold_ex_bpu),
         .pipe_flush         (pipe_flush_ex_bpu),
+        .pipe_hold          (pipe_hold_ex_bpu),
 
-        .update_btb_en_i    (ex_update_btb_en_o),
-        .update_gshare_en_i (ex_update_gshare_en_o),
-        .update_pc_i        (ex_update_pc_o),
-        .update_target_i    (ex_update_target_o),
-        .actual_taken_i     (ex_actual_taken_o),
+        .slot0_update_ras_i         (slot0_ex_update_ras_o),
+        .slot1_update_ras_i         (slot1_ex_update_ras_o),
+        .slot0_ras_snapshot_i       (slot0_ex_ras_snapshot_o),
+        .slot1_ras_snapshot_i       (slot1_ex_ras_snapshot_o),
+        .slot0_update_gshare_en_i   (slot0_ex_update_gshare_en_o),
+        .slot0_actual_taken_i       (slot0_ex_actual_taken_o),
+        .slot0_update_btb_en_i      (slot0_ex_update_btb_en_o),
+        .slot1_update_btb_en_i      (slot1_ex_update_btb_en_o),
+        .slot0_update_target_i      (slot0_ex_update_target_o),
+        .slot1_update_target_i      (slot1_ex_update_target_o),
+        .slot0_update_pc_i          (slot0_ex_data_packaged_i.pc),
+        .slot1_update_pc_i          (slot1_ex_data_packaged_i.pc),
 
-        .pred_flush_en_i    (ex_pred_flush_en_o),
-        .pred_flush_pc_i    (ex_pred_flush_pc_o),
+        .slot0_pred_flush_en_i (slot0_ex_pred_flush_en_o),
+        .slot1_pred_flush_en_i (slot1_ex_pred_flush_en_o),
+        .slot0_pred_flush_pc_i (slot0_ex_pred_flush_pc_o),
+        .slot1_pred_flush_pc_i (slot1_ex_pred_flush_pc_o),
 
-        .update_btb_en_o    (bpu_update_btb_en_i),
+        .update_ras_o       (bpu_update_ras_i),
+        .ras_snapshot_o     (bpu_ras_snapshot_i),
         .update_gshare_en_o (bpu_update_gshare_en_i),
-        .update_pc_o        (bpu_update_pc_i),
-        .update_target_o    (bpu_update_target_i),
         .actual_taken_o     (bpu_actual_taken_i),
+        .update_btb_en_o    (bpu_update_btb_en_i),
+        .update_target_o    (bpu_update_target_i),
+        .btb_update_pc_o    (bpu_update_btb_pc_i),
+        .gshare_update_pc_o (bpu_update_gshare_pc_i),
 
-        .pred_flush_en_o    (pred_flush_en),
-        .pred_flush_pc_o    (pred_flush_pc)
+        .slot0_pred_flush_en_o (slot0_pred_flush_en),
+        .slot1_pred_flush_en_o (slot1_pred_flush_en),
+        .slot0_pred_flush_pc_o (slot0_pred_flush_pc),
+        .slot1_pred_flush_pc_o (slot1_pred_flush_pc)
     );
 
     bpu_top #(
         .BHR_WIDTH          (`GSHARE_BHR_WIDTH),
         .PHT_IDX_WIDTH      (`GSHARE_PHT_IDX_WIDTH),
-        .BTB_INDEX_WIDTH    (4),
+        .BTB_INDEX_WIDTH    (6),
         .RAS_DEPTH          (8)
     ) BPU(
         .clk                (cpu_clk),
@@ -1073,12 +1102,18 @@ module top_riscv(
         .slot1_pred_taken   (bpu_slot1_pred_taken),
         .slot0_pred_pc      (bpu_slot0_pred_pc),
         .slot1_pred_pc      (bpu_slot1_pred_pc),
+        .ras_snapshot       (bpu_ras_snapshot),
+        .slot0_is_ret       (bpu_slot0_id_is_ret),
+        .slot1_is_ret       (bpu_slot1_id_is_ret),
 
-        .update_btb_en      (bpu_update_btb_en_i),
+        .update_ras_i       (bpu_update_ras_i),
+        .ras_snapshot_i     (bpu_ras_snapshot_i),
         .update_gshare_en   (bpu_update_gshare_en_i),
-        .update_pc          (bpu_update_pc_i),
-        .update_target      (bpu_update_target_i),
         .actual_taken       (bpu_actual_taken_i),
+        .update_btb_en      (bpu_update_btb_en_i),
+        .btb_update_pc      (bpu_update_btb_pc_i),
+        .update_target      (bpu_update_target_i),
+        .gshare_update_pc   (bpu_update_gshare_pc_i),
 
         .pipe_hold          (pipe_hold_bpu),
         .pipe_flush         (pipe_flush_bpu)

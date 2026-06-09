@@ -40,13 +40,17 @@ module bpu_controller #(
     output logic                    slot1_pred_taken,
     output logic [31:0]             slot0_pred_pc,
     output logic [31:0]             slot1_pred_pc,
+    output logic [3:0]              ras_snapshot,
+    output logic                    slot0_is_ret,
+    output logic                    slot1_is_ret,
     
     // from ex
-    input                           update_btb_en,      // ex 阶段返回的 BTB 更新使能
     input                           update_gshare_en,   // ex 阶段返回的 PHT 更新使能
-    input      [31:0]               update_pc,          // ex 阶段返回更新的指令地址
-    input      [31:0]               update_target,      // ex 阶段返回的实际跳转地址
     input                           actual_taken,       // ex 阶段判断跳转为真
+    input                           update_btb_en,      // ex 阶段返回的 BTB 更新使能
+    input      [31:0]               btb_update_pc,      // ex 阶段返回更新 BTB 的指令地址
+    input      [31:0]               update_target,      // ex 阶段返回的实际跳转地址
+    input      [31:0]               gshare_update_pc,   // ex 阶段返回更新的指令地址
 
     (* max_fanout = 20 *)
     input                           pipe_hold,
@@ -65,23 +69,28 @@ module bpu_controller #(
     output     [BHR_WIDTH - 1:0]    gshare_update_pht_index,
     output                          gshare_actual_taken,
 
-    // ras - to bpu_controller
+    // ras - from bpu_controller
     (* max_fanout = 30 *)
     output reg                      ras_push_en,
     output reg                      ras_pop_en,
     output reg [31:0]               ras_push_addr,
 
-    // ras - from bpu_controller
+    // ras - to bpu_controller
     input      [31:0]               ras_pop_addr,
     input                           ras_isempty,
     input                           ras_isfull,
+    input      [3:0]                ras_ptr,
 
     // btb - 查询
     (* max_fanout = 20 *)
-    output reg [BTB_INDEX_WIDTH - 1:0]          btb_query_index,
-    output reg [31 - BTB_INDEX_WIDTH - 2:0]     btb_query_tag,
-    input                                       btb_hit,
-    input      [31:0]                           btb_target_pc,
+    output reg [BTB_INDEX_WIDTH - 1:0]          slot0_btb_query_index,
+    output reg [BTB_INDEX_WIDTH - 1:0]          slot1_btb_query_index,
+    output reg [31 - BTB_INDEX_WIDTH - 2:0]     slot0_btb_query_tag,
+    output reg [31 - BTB_INDEX_WIDTH - 2:0]     slot1_btb_query_tag,
+    input                                       slot0_btb_hit,
+    input                                       slot1_btb_hit,
+    input      [31:0]                           slot0_btb_target_pc,
+    input      [31:0]                           slot1_btb_target_pc,
 
     // btb - 更新
     output                                      btb_update_en,
@@ -111,7 +120,7 @@ module bpu_controller #(
     wire    [4:0]   slot1_rs1_addr  = slot1_pc_inst[19:15];
 
     // 处理 TYPE_B
-    wire            is_B_type   = (slot0_pc_inst[6:0] == `TYPE_B);
+    wire            slot0_is_B   = (slot0_pc_inst[6:0] == `TYPE_B);
     wire    [31:0]  B_imm       = {{20{slot0_pc_inst[31]}}, slot0_pc_inst[7], slot0_pc_inst[30:25], slot0_pc_inst[11:8], 1'b0};
 
     // 处理 JALR
@@ -121,26 +130,26 @@ module bpu_controller #(
     wire            slot0_check_ret = (slot0_rd_addr == 5'b0 && slot0_rs1_addr == 5'b00001 && slot0_pc_inst[31:20] == 12'b0);
     wire            slot1_check_ret = (slot1_rd_addr == 5'b0 && slot1_rs1_addr == 5'b00001 && slot1_pc_inst[31:20] == 12'b0);
 
-    wire            slot0_is_ret    = (slot0_is_JALR && slot0_check_ret);
-    wire            slot1_is_ret    = (slot1_is_JALR && slot1_check_ret);
-    wire            is_ret          = slot0_is_ret || slot1_is_ret;
+    assign          slot0_is_ret    = (slot0_is_JALR && slot0_check_ret);
+    assign          slot1_is_ret    = (slot1_is_JALR && slot1_check_ret);
+    wire            is_ret          = slot0_is_ret || (!slot0_sel_pred_taken && slot1_is_ret);
 
-    wire            is_btb_JALR     = (slot0_is_JALR && !slot0_check_ret);
+    wire            slot0_is_btb_JALR = (slot0_is_JALR && !slot0_check_ret);
+    wire            slot1_is_btb_JALR = (!slot0_sel_pred_taken && slot1_is_JALR && !slot1_check_ret);
     wire            slot0_ras_can_pop = (slot0_is_ret && !ras_isempty);
-    wire            slot1_ras_can_pop = (slot1_is_ret && !ras_isempty);
+    wire            slot1_ras_can_pop = (!slot0_sel_pred_taken && slot1_is_ret && !ras_isempty);
     wire            ras_can_pop     = (is_ret && !ras_isempty);
 
     // 处理 JAL
     wire            slot0_is_JAL    = (slot0_pc_inst[6:0] == `JAL);
     wire            slot1_is_JAL    = (slot1_pc_inst[6:0] == `JAL);
-    wire            is_JAL          = slot0_is_JAL | slot1_is_JAL;
 
     wire    [31:0]  slot0_JAL_imm   = {{12{slot0_pc_inst[31]}}, slot0_pc_inst[19:12], slot0_pc_inst[20], slot0_pc_inst[30:21], 1'b0};
     wire    [31:0]  slot1_JAL_imm   = {{12{slot1_pc_inst[31]}}, slot1_pc_inst[19:12], slot1_pc_inst[20], slot1_pc_inst[30:21], 1'b0};
 
     wire            slot0_is_call   = (slot0_is_JAL && slot0_rd_addr == 5'b00001);
     wire            slot1_is_call   = (slot1_is_JAL && slot1_rd_addr == 5'b00001);
-    wire            is_call         = slot0_is_call | slot1_is_call;
+    wire            is_call         = slot0_is_call || (!slot0_sel_pred_taken && slot1_is_call);
 
     wire            is_ras_push     = (is_call && !ras_isfull);
 
@@ -151,19 +160,20 @@ module bpu_controller #(
 
     wire    [31:0]  pc_add_slot0_JAL    = slot0_pc_addr_if2 + slot0_JAL_imm;
     wire    [31:0]  pc_add_slot1_JAL    = slot1_pc_addr_if2 + slot1_JAL_imm;
-    wire    [31:0]  pc_add_JAL          = (slot0_is_JAL) ? pc_add_slot0_JAL : pc_add_slot1_JAL;
 
     wire    [31:0]  pc_add_B            = slot0_pc_addr_if2 + B_imm;
 
     // Gshare索引：取PC中间位与BHR异或
     wire [PHT_IDX_WIDTH - 1:0]  pht_index           = slot0_pc_addr[PHT_IDX_WIDTH + 1:2] ^ {{(PHT_IDX_WIDTH - BHR_WIDTH){1'b0}}, gshare_ghr};
-    wire [PHT_IDX_WIDTH - 1:0]  update_pht_index    = update_pc[PHT_IDX_WIDTH + 1:2] ^ {{(PHT_IDX_WIDTH - BHR_WIDTH){1'b0}}, gshare_ghr_update};
+    wire [PHT_IDX_WIDTH - 1:0]  update_pht_index    = gshare_update_pc[PHT_IDX_WIDTH + 1:2] ^ {{(PHT_IDX_WIDTH - BHR_WIDTH){1'b0}}, gshare_ghr_update};
 
     // BTB索引和tag（tag取pc高位，用于区分映射到同一索引的不同地址）
-    wire [BTB_INDEX_WIDTH - 1:0]        btb_query_index_w   = slot0_pc_addr[BTB_INDEX_WIDTH + 1:2];
-    wire [31 - BTB_INDEX_WIDTH - 2:0]   btb_query_tag_w     = slot0_pc_addr[31:BTB_INDEX_WIDTH + 2];
-    wire [BTB_INDEX_WIDTH - 1:0]        btb_update_index_w  = update_pc[BTB_INDEX_WIDTH + 1:2];
-    wire [31 - BTB_INDEX_WIDTH - 2:0]   btb_update_tag_w    = update_pc[31:BTB_INDEX_WIDTH + 2];
+    wire [BTB_INDEX_WIDTH - 1:0]        slot0_btb_query_index_w   = slot0_pc_addr[BTB_INDEX_WIDTH + 1:2];
+    wire [31 - BTB_INDEX_WIDTH - 2:0]   slot0_btb_query_tag_w     = slot0_pc_addr[31:BTB_INDEX_WIDTH + 2];
+    wire [BTB_INDEX_WIDTH - 1:0]        slot1_btb_query_index_w   = slot1_pc_addr[BTB_INDEX_WIDTH + 1:2];
+    wire [31 - BTB_INDEX_WIDTH - 2:0]   slot1_btb_query_tag_w     = slot1_pc_addr[31:BTB_INDEX_WIDTH + 2];
+    wire [BTB_INDEX_WIDTH - 1:0]        btb_update_index_w  = btb_update_pc[BTB_INDEX_WIDTH + 1:2];
+    wire [31 - BTB_INDEX_WIDTH - 2:0]   btb_update_tag_w    = btb_update_pc[31:BTB_INDEX_WIDTH + 2];
 
     // 查询
     (* max_fanout = 30 *)
@@ -174,8 +184,10 @@ module bpu_controller #(
             ras_push_addr   <= 0;
 
             // BTB
-            btb_query_index <= 0;
-            btb_query_tag   <= 0;
+            slot0_btb_query_index <= 0;
+            slot1_btb_query_index <= 0;
+            slot0_btb_query_tag   <= 0;
+            slot1_btb_query_tag   <= 0;
         end
         else if (pipe_hold) begin
             // ...
@@ -185,8 +197,10 @@ module bpu_controller #(
             ras_push_addr   <= pc_add_4;
 
             // BTB
-            btb_query_index <= btb_query_index_w;
-            btb_query_tag   <= btb_query_tag_w;
+            slot0_btb_query_index <= slot0_btb_query_index_w;
+            slot1_btb_query_index <= slot1_btb_query_index_w;
+            slot0_btb_query_tag   <= slot0_btb_query_tag_w;
+            slot1_btb_query_tag   <= slot1_btb_query_tag_w;
         end
     end
 
@@ -216,38 +230,11 @@ module bpu_controller #(
             ras_push_en     <= is_ras_push;
 
             // GSHARE
-            gshare_prev_b   <= is_B_type;
+            gshare_prev_b   <= slot0_is_B;
         end
     end
     
     // 预测结果
-    logic sel_pred_taken;
-    logic [31:0] sel_pred_pc;
-    always_comb begin
-        unique case (1'b1)
-            ras_can_pop: begin
-                sel_pred_taken  = 1'b1;
-                sel_pred_pc     = ras_pop_addr;
-            end
-            is_btb_JALR: begin
-                sel_pred_taken  = btb_hit;
-                sel_pred_pc     = btb_target_pc;
-            end
-            is_B_type: begin
-                sel_pred_taken  = gshare_pred_taken;
-                sel_pred_pc     = pc_add_B;
-            end
-            is_JAL: begin
-                sel_pred_taken  = 1'b1;
-                sel_pred_pc     = pc_add_JAL;
-            end
-            default: begin
-                sel_pred_taken  = 1'b0;
-                sel_pred_pc     = 32'b0;
-            end
-        endcase
-    end
-
     logic slot0_sel_pred_taken;
     logic [31:0] slot0_sel_pred_pc;
     always_comb begin
@@ -256,11 +243,11 @@ module bpu_controller #(
                 slot0_sel_pred_taken = 1'b1;
                 slot0_sel_pred_pc    = ras_pop_addr;
             end
-            is_btb_JALR: begin
-                slot0_sel_pred_taken = btb_hit;
-                slot0_sel_pred_pc    = btb_target_pc;
+            slot0_is_btb_JALR: begin
+                slot0_sel_pred_taken = slot0_btb_hit;
+                slot0_sel_pred_pc    = slot0_btb_target_pc;
             end
-            is_B_type: begin
+            slot0_is_B: begin
                 slot0_sel_pred_taken = gshare_pred_taken;
                 slot0_sel_pred_pc    = pc_add_B;
             end
@@ -278,6 +265,10 @@ module bpu_controller #(
     logic [31:0] slot1_sel_pred_pc;
     always_comb begin
         unique case (1'b1)
+            slot1_is_btb_JALR: begin
+                slot1_sel_pred_taken = slot1_btb_hit;
+                slot1_sel_pred_pc    = slot1_btb_target_pc;
+            end
             slot1_ras_can_pop: begin
                 slot1_sel_pred_taken = 1'b1;
                 slot1_sel_pred_pc    = ras_pop_addr;
@@ -293,6 +284,11 @@ module bpu_controller #(
         endcase
     end
 
+    logic sel_pred_taken;
+    logic [31:0] sel_pred_pc;
+    assign sel_pred_taken = slot0_sel_pred_taken | slot1_sel_pred_taken;
+    assign sel_pred_pc = (slot0_sel_pred_taken) ? slot0_sel_pred_pc : slot1_sel_pred_pc;
+    
     always_ff @(posedge clk) begin
         if (!rst) begin
             pred_taken          <= 0;
@@ -301,6 +297,7 @@ module bpu_controller #(
             slot1_pred_taken    <= 0;
             slot0_pred_pc       <= 0;
             slot1_pred_pc       <= 0;
+            ras_snapshot        <= 0;
         end
         else if (pipe_hold) begin   // 当暂停时预测器的结果需要保存
             // ...
@@ -312,6 +309,7 @@ module bpu_controller #(
             slot1_pred_taken    <= 0;
             slot0_pred_pc       <= 0;
             slot1_pred_pc       <= 0;
+            ras_snapshot        <= 0;
         end
         else begin
             pred_taken          <= sel_pred_taken;
@@ -320,6 +318,7 @@ module bpu_controller #(
             slot1_pred_taken    <= slot1_sel_pred_taken;
             slot0_pred_pc       <= slot0_sel_pred_pc;
             slot1_pred_pc       <= slot1_sel_pred_pc;
+            ras_snapshot        <= ras_ptr;
         end
     end
 

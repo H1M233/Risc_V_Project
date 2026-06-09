@@ -7,23 +7,27 @@ module ras #(
     parameter DEPTH = 8,
     parameter PTR_WIDTH = $clog2(DEPTH)
 )(
-    input               clk,
-    input               rst,
+    input  logic        clk,
+    input  logic        rst,
 
-    // from gshare
-    input               push_en_i,      // 压栈使能
-    input               pop_en_i,       // 弹栈使能
-    input      [31:0]   push_addr_i,    // 压栈地址
+    // from bpu
+    input  logic        push_en_i,      // 压栈使能
+    input  logic        pop_en_i,       // 弹栈使能
+    input  logic [31:0] push_addr_i,    // 压栈地址
+    input  logic        update_ptr_en,
+    input  logic [3:0]  update_ptr,
 
-    // to gshare
-    output     [31:0]   pop_addr_o,     // 弹栈地址
-    output              isempty_o,      // 为空
-    output              isfull_o        // 为满
+    // to bpu
+    output logic [31:0] pop_addr_o,     // 弹栈地址
+    output logic        isempty_o,      // 为空
+    output logic        isfull_o,       // 为满
+    output logic [3:0]  ras_ptr         // RAS 指针
 );
 
     reg [31:0] stack_mem [DEPTH - 1:0];
     reg [PTR_WIDTH:0] ptr;
 
+    assign ras_ptr     = ptr;
     assign isempty_o   = (ptr == 0);
     assign isfull_o    = (ptr == DEPTH);
     assign pop_addr_o  = (ptr != 0) ? stack_mem[ptr - 1] : 32'b0;      // 始终输出栈顶
@@ -34,16 +38,19 @@ module ras #(
     end
 
     // 压栈
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (rst & push_en_i & ptr != DEPTH) begin
             stack_mem[ptr]  <= push_addr_i;
         end
     end
 
     // 指针控制
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (!rst) begin
             ptr <= 0;
+        end
+        else if (update_ptr_en) begin
+            ptr <= update_ptr_en;
         end
         else begin
             if (push_en_i && ptr != DEPTH) ptr <= ptr + 1'b1;    // 压栈

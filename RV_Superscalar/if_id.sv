@@ -5,10 +5,7 @@ module if_id(
     input               rst,
     input               pipe_hold,
     input               pipe_flush,
-
-    // from wb
-    input               ecall_flush,
-    input               mret_flush,
+    input               ecall_mret_flush,
 
     // from if
     input      [31:0]   slot0_pc_i,
@@ -49,29 +46,8 @@ module if_id(
     (* max_fanout = 30 *) output reg [4:0]    slot1_rs2_o
 
 );
-    wire if2_id_flush_en = (ecall_flush | mret_flush);
-
     always_ff @(posedge clk) begin
         if (!rst) begin
-            slot0_pc_o        <= 32'b0;
-            slot0_inst_o      <= `NOP;
-            slot0_opcode_o    <= 7'b0;
-            slot0_funct3_o    <= 3'b0;
-            slot0_funct7_o    <= 7'b0;
-            slot0_rd_o        <= 5'b0;
-            slot0_rs1_o       <= 5'b0;
-            slot0_rs2_o       <= 5'b0;
-
-            slot1_pc_o        <= 32'b0;
-            slot1_inst_o      <= `NOP;
-            slot1_opcode_o    <= 7'b0;
-            slot1_funct3_o    <= 3'b0;
-            slot1_funct7_o    <= 7'b0;
-            slot1_rd_o        <= 5'b0;
-            slot1_rs1_o       <= 5'b0;
-            slot1_rs2_o       <= 5'b0;
-        end
-        else if(if2_id_flush_en) begin
             slot0_pc_o        <= 32'b0;
             slot0_inst_o      <= `NOP;
             slot0_opcode_o    <= 7'b0;

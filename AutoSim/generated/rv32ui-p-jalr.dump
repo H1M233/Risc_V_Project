@@ -10,7 +10,7 @@ Disassembly of section .text.init:
 
 00000008 <test_2>:
    8:	00200193          	li	gp,2
-   c:	00000293          	li	t0,0
+   c:	00000293          	li	t0,0  
   10:	00000317          	auipc	t1,0x0
   14:	01030313          	addi	t1,t1,16 # 20 <target_2>
   18:	000302e7          	jalr	t0,t1

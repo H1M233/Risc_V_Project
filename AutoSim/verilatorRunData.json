@@ -1,47 +1,47 @@
 {
   "5_LEVEL_CPU_Cache": {
-    "INST TEST": "PASS √",
+    "INST TEST": "FAIL x",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.781311",
-        "REAL TIME": "10.3538",
+        "IPC": "0",
+        "REAL TIME": "8.89318",
         "RUN TIME": "143",
-        "BPU ACCURACY": "0.902758",
+        "BPU ACCURACY": "0",
         "LED": "PASS √"
       },
       "src0": {
-        "IPC": "0.686402",
-        "REAL TIME": "342.267",
+        "IPC": "0",
+        "REAL TIME": "354.025",
         "RUN TIME": "6894",
-        "BPU ACCURACY": "0.779465",
+        "BPU ACCURACY": "0",
         "LED": "PASS √"
       },
       "src1": {
-        "IPC": "0.602424",
-        "REAL TIME": "458.309",
-        "RUN TIME": "7223",
-        "BPU ACCURACY": "0.832964",
+        "IPC": "0",
+        "REAL TIME": "387.12",
+        "RUN TIME": "7144",
+        "BPU ACCURACY": "0",
         "LED": "PASS √"
       },
       "src2": {
-        "IPC": "0.708708",
-        "REAL TIME": "652.903",
-        "RUN TIME": "9387",
-        "BPU ACCURACY": "0.757197",
+        "IPC": "0",
+        "REAL TIME": "479.538",
+        "RUN TIME": "9381",
+        "BPU ACCURACY": "0",
         "LED": "PASS √"
       },
       "withMext": {
-        "IPC": "0.639467",
-        "REAL TIME": "110.902",
-        "RUN TIME": "6f6",
-        "BPU ACCURACY": "0.975406",
+        "IPC": "0",
+        "REAL TIME": "104.638",
+        "RUN TIME": "1815",
+        "BPU ACCURACY": "0",
         "LED": "FAIL x"
       },
       "withoutMext": {
-        "IPC": "0.700109",
-        "REAL TIME": "249.801",
-        "RUN TIME": "3821",
-        "BPU ACCURACY": "0.732028",
+        "IPC": "0",
+        "REAL TIME": "222.623",
+        "RUN TIME": "3758",
+        "BPU ACCURACY": "0",
         "LED": "PASS √"
       }
     }
@@ -50,10 +50,45 @@
     "INST TEST": "FAIL x",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.781424",
-        "REAL TIME": "7.14461",
-        "RUN TIME": "167",
-        "BPU ACCURACY": "0.902758",
+        "IPC": "1",
+        "REAL TIME": "10.0037",
+        "RUN TIME": "149",
+        "BPU ACCURACY": "0",
+        "LED": "PASS √"
+      },
+      "src0": {
+        "IPC": "0",
+        "REAL TIME": "484.355",
+        "RUN TIME": "7763",
+        "BPU ACCURACY": "0",
+        "LED": "PASS √"
+      },
+      "src1": {
+        "IPC": "0",
+        "REAL TIME": "546.231",
+        "RUN TIME": "8938",
+        "BPU ACCURACY": "0",
+        "LED": "PASS √"
+      },
+      "src2": {
+        "IPC": "1",
+        "REAL TIME": "643.782",
+        "RUN TIME": "10210",
+        "BPU ACCURACY": "0",
+        "LED": "PASS √"
+      },
+      "withMext": {
+        "IPC": "0",
+        "REAL TIME": "139.045",
+        "RUN TIME": "854",
+        "BPU ACCURACY": "0",
+        "LED": "FAIL x"
+      },
+      "withoutMext": {
+        "IPC": "0",
+        "REAL TIME": "271.898",
+        "RUN TIME": "4096",
+        "BPU ACCURACY": "0",
         "LED": "PASS √"
       }
     }

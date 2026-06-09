@@ -6,6 +6,7 @@ module ex(
     // from id_ex
     input data_t            data_packaged_i,
     input decode_t          inst_packaged_i,
+    input logic             regs_wen_i,
     input logic             valid_i,
 
     // forwarding
@@ -36,11 +37,12 @@ module ex(
     output              dcache_write_dram,
 
     // to ex_bpu
-    output              update_btb_en_o,
+    output              update_ras_o,
+    output     [3:0]    ras_snapshot_o,
     output              update_gshare_en_o,
-    output     [31:0]   update_pc_o,
-    output     [31:0]   update_target_o,
     output              actual_taken_o,
+    output              update_btb_en_o,
+    output     [31:0]   update_target_o,
     output              pred_flush_en,
     output     [31:0]   pred_flush_pc,
 
@@ -53,7 +55,6 @@ module ex(
     // 解码
     wire [31:0] pc_addr_i       = data_packaged_i.pc;
     wire [31:0] inst_i          = data_packaged_i.inst;
-    wire        regs_wen_i      = data_packaged_i.regs_wen;
     wire [31:0] value1_i        = data_packaged_i.value1;
     wire [31:0] value2_i        = data_packaged_i.value2;
     wire [31:0] jump1_i         = data_packaged_i.jump1;
@@ -65,10 +66,10 @@ module ex(
     wire        mret_i          = data_packaged_i.mret;
 
     // 主操作码独热
-    wire is_alu_i  = inst_packaged_i.is_alu_i;
-    wire is_alu_r  = inst_packaged_i.is_alu_r;
-    wire is_auipc  = inst_packaged_i.is_auipc;
-    wire is_lui    = inst_packaged_i.is_lui;
+    // wire is_alu_i  = inst_packaged_i.is_alu_i;
+    // wire is_alu_r  = inst_packaged_i.is_alu_r;
+    // wire is_auipc  = inst_packaged_i.is_auipc;
+    // wire is_lui    = inst_packaged_i.is_lui;
     wire is_jal    = inst_packaged_i.is_jal;
     wire is_jalr   = inst_packaged_i.is_jalr;
     wire is_branch = inst_packaged_i.is_branch;
@@ -113,8 +114,8 @@ module ex(
     wire sel_csrrwi = inst_packaged_i.sel_csrrwi;
     wire sel_csrrsi = inst_packaged_i.sel_csrrsi;
     wire sel_csrrci = inst_packaged_i.sel_csrrci;
-    wire sel_ecall  = inst_packaged_i.sel_ecall;
-    wire sel_mret   = inst_packaged_i.sel_mret;
+    // wire sel_ecall  = inst_packaged_i.sel_ecall;
+    // wire sel_mret   = inst_packaged_i.sel_mret;
 
     // 纯数值计算独热 - 已提前至 id 计算
     wire request_value_only = inst_packaged_i.request_value_only;
@@ -183,11 +184,13 @@ module ex(
     end
 
     // 预测错误判断
+    wire jal_pred_mispredict     = (is_jal && (pred_taken_i != 1'b1 || value2_i != 32'b0));
     wire jalr_pred_mispredict    = (is_jalr && rs1_data_fwd != jump2_i);            // rs1 == pred_pc - imm
     wire branch_pred_mispredict  = (is_branch && pred_taken_i != branch_taken);
     wire [31:0] branch_jump_addr = (~pred_taken_i) ? jump1_i : jump2_i;             // 提前到 id 计算
 
     // 地址计算
+    wire [31:0] jal_target        = jump1_i;
     wire [31:0] jalr_target       = rs1_data_fwd + value2_i;
     wire [31:0] mem_addr_calc     = rs1_data_fwd + value2_i;
 
@@ -219,16 +222,18 @@ module ex(
     end
 
     // 跳转
-    assign update_btb_en_o     = jalr_pred_mispredict;        // btb 更新使能
+    assign update_ras_o        = jalr_pred_mispredict && data_packaged_i.is_ret;// RAS 更新使能
+    assign ras_snapshot_o      = data_packaged_i.ras_snapshot;
     assign update_gshare_en_o  = branch_pred_mispredict;      // gshare 更新使能
-    assign update_pc_o         = pc_addr_i;
-    assign update_target_o     = jalr_target;
     assign actual_taken_o      = branch_taken;
+    assign update_btb_en_o     = jalr_pred_mispredict;        // btb 更新使能
+    assign update_target_o     = jalr_target;
 
     // 冲刷控制
-    assign pred_flush_en  = (branch_pred_mispredict | jalr_pred_mispredict);
+    assign pred_flush_en  = (branch_pred_mispredict | jalr_pred_mispredict | jal_pred_mispredict);
     assign pred_flush_pc  = (is_branch) ? branch_jump_addr :
-                            (is_jalr)   ? jalr_target : 32'b0;
+                            (is_jalr)   ? jalr_target : 
+                            (is_jal)    ? jal_target : 32'b0;
     
     // Dcache 控制
     assign dcache_req_load     = is_load & regs_wen_i;   // dcache 读使能

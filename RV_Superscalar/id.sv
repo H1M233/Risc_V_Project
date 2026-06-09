@@ -15,6 +15,8 @@ module id(
     // from bpu
     input               pred_taken_i,
     input      [31:0]   pred_pc_i,
+    input      [3:0]    ras_snapshot,
+    input               is_ret,
     
     // from regs
     input      [31:0]   rs1_data_i,         // 从寄存器堆读出的寄存rs1的数据
@@ -23,6 +25,10 @@ module id(
     // to id_ex
     output data_t       data_packaged_o,
     output decode_t     inst_packaged_o,
+    output logic        regs_wen_o,
+
+    // to hazard
+    output logic        using_rs_data_o,
 
     // from ex
     input               slot0_ex_regs_wen_i,
@@ -81,7 +87,7 @@ module id(
     wire forwarding_rs1_hit_wb = forwarding_rs1_slot0_wb | forwarding_rs1_slot1_wb;
 
     wire forwarding_rs2_hit_mem1 = forwarding_rs2_slot0_mem1 | forwarding_rs2_slot1_mem1;
-    wire forwarding_rs2_hit_mem2 = forwarding_rs2_slot0_mem2 | forwarding_rs2_slot1_mem2;
+    wire forwarding_rs2_hit_mem2 = forwarding_rs2_slot0_mem2 | forwarding_rs2_slot1_mem2;   
     wire forwarding_rs2_hit_wb = forwarding_rs2_slot0_wb | forwarding_rs2_slot1_wb;
 
     wire [31:0] forwarding_rs1_hit_mem1_data = (forwarding_rs1_slot1_mem1) ? slot1_mem1_rd_data_i : slot0_mem1_rd_data_i;
@@ -207,11 +213,16 @@ module id(
     // jump:    只用于传入跳转地址，建议在 id 内提前计算
     //          不够用可以借用
     // ==========================================================
-    wire [31:0] pc_add_4 = pc_addr_i + 32'd4;
+    wire [31:0] pc_add_4     = pc_addr_i + 32'd4;
+    wire [31:0] pc_addr_o    = pc_addr_i;
+    wire [31:0] inst_o       = inst_i;
+    wire        pred_taken_o = pred_taken_i;  
 
-    assign data_packaged_o.pc         = pc_addr_i;
-    assign data_packaged_o.inst       = inst_i;
-    assign data_packaged_o.pred_taken = pred_taken_i;     // 只对 slot0 预测
+    assign data_packaged_o.pc           = pc_addr_o;
+    assign data_packaged_o.inst         = inst_o;
+    assign data_packaged_o.pred_taken   = pred_taken_o;     // 只对 slot0 预测
+    assign data_packaged_o.ras_snapshot = ras_snapshot;
+    assign data_packaged_o.is_ret       = is_ret;
 
     assign data_packaged_o.fwd_rs1_data         = forwarding_rs1_data_hit;
     assign data_packaged_o.fwd_rs2_data         = (inst_packaged_o.is_alu_i) ? {{20{inst_i[31]}}, inst_i[31:20]} : forwarding_rs2_data_hit;    // 立即数时返回 imm
@@ -222,136 +233,150 @@ module id(
 
     // CSR
     assign data_packaged_o.csr_addr  = inst_packaged_o.is_zicsr ? inst_i[31:20] : 12'h520;
-    assign data_packaged_o.ecall     = inst_packaged_o.is_zicsr & inst_packaged_o.sel_ecall;
-    assign data_packaged_o.mret      = inst_packaged_o.is_zicsr & inst_packaged_o.sel_mret;
+    assign data_packaged_o.ecall     = inst_packaged_o.sel_ecall;
+    assign data_packaged_o.mret      = inst_packaged_o.sel_mret;
 
-    always_ff begin
+    always_comb begin
         unique case(1'b1)
             inst_packaged_o.is_lui: begin
-                data_packaged_o.regs_wen  = (rd_i != 5'b0);
+                regs_wen_o               = (rd_i != 5'b0);
                 data_packaged_o.value1   = {inst_i[31:12], 12'b0};
                 data_packaged_o.value2   = 32'b0;
                 data_packaged_o.jump1    = 32'b0;
                 data_packaged_o.jump2    = 32'b0;
                 data_packaged_o.rd_addr  = rd_i;
+                using_rs_data_o          = 1'b0;
             end
 
             inst_packaged_o.is_auipc: begin
-                data_packaged_o.regs_wen  = (rd_i != 5'b0);
+                regs_wen_o               = (rd_i != 5'b0);
                 data_packaged_o.value1   = pc_addr_i + {inst_i[31:12], 12'b0};
                 data_packaged_o.value2   = 32'b0;
                 data_packaged_o.jump1    = 32'b0;
                 data_packaged_o.jump2    = 32'b0;
                 data_packaged_o.rd_addr  = rd_i;
+                using_rs_data_o          = 1'b0;
             end
 
             inst_packaged_o.is_jal: begin
-                data_packaged_o.regs_wen  = (rd_i != 5'b0);
+                regs_wen_o               = (rd_i != 5'b0);
                 data_packaged_o.value1   = pc_add_4;
-                data_packaged_o.value2   = 32'b0;                  
-                data_packaged_o.jump1    = 32'b0;
+                data_packaged_o.value2   = pred_pc_i - {{12{inst_i[31]}}, inst_i[19:12], inst_i[20], inst_i[30:21], 1'b0} - pc_addr_i;
+                data_packaged_o.jump1    = pc_addr_i + {{12{inst_i[31]}}, inst_i[19:12], inst_i[20], inst_i[30:21], 1'b0};
                 data_packaged_o.jump2    = {{12{inst_i[31]}}, inst_i[19:12], inst_i[20], inst_i[30:21], 1'b0};
                 data_packaged_o.rd_addr  = rd_i;
+                using_rs_data_o          = 1'b0;
             end
 
             inst_packaged_o.is_jalr: begin
-                data_packaged_o.regs_wen  = (rd_i != 5'b0);
+                regs_wen_o               = (rd_i != 5'b0);
                 data_packaged_o.value1   = pc_add_4;
                 data_packaged_o.value2   = {{20{inst_i[31]}}, inst_i[31:20]};
                 data_packaged_o.jump1    = 32'b0;
                 data_packaged_o.jump2    = pred_pc_i - {{20{inst_i[31]}}, inst_i[31:20]};     // 提前计算 rs1 == pred_pc - imm
                 data_packaged_o.rd_addr  = rd_i;
+                using_rs_data_o          = 1'b1;
             end
 
             inst_packaged_o.is_branch: begin
-                data_packaged_o.regs_wen  = 1'b0;
+                regs_wen_o               = 1'b0;
                 data_packaged_o.value1   = 32'b0;
                 data_packaged_o.value2   = 32'b0;
                 data_packaged_o.jump1    = pc_addr_i + {{20{inst_i[31]}}, inst_i[7], inst_i[30:25], inst_i[11:8], 1'b0};
                 data_packaged_o.jump2    = pc_add_4;
                 data_packaged_o.rd_addr  = 5'b0;
+                using_rs_data_o          = 1'b1;
             end
 
             inst_packaged_o.is_load: begin
-                data_packaged_o.regs_wen  = (rd_i != 5'b0);
+                regs_wen_o               = (rd_i != 5'b0);
                 data_packaged_o.value1   = 32'b0;
                 data_packaged_o.value2   = {{20{inst_i[31]}}, inst_i[31:20]};
                 data_packaged_o.jump1    = 32'b0;
                 data_packaged_o.jump2    = 32'b0;
                 data_packaged_o.rd_addr  = rd_i;
+                using_rs_data_o          = 1'b1;
             end
 
             inst_packaged_o.is_store: begin
-                data_packaged_o.regs_wen  = 1'b0;
+                regs_wen_o               = 1'b0;
                 data_packaged_o.value1   = 32'b0;
                 data_packaged_o.value2   = {{20{inst_i[31]}}, inst_i[31:25], inst_i[11:7]};
                 data_packaged_o.jump1    = 32'b0;
                 data_packaged_o.jump2    = 32'b0;
                 data_packaged_o.rd_addr  = 5'b0;
+                using_rs_data_o          = 1'b1;
             end
 
             inst_packaged_o.is_alu_i: begin
-                data_packaged_o.regs_wen  = (rd_i != 5'b0);
+                regs_wen_o               = (rd_i != 5'b0);
                 data_packaged_o.value1   = 32'b0;
                 data_packaged_o.value2   = 32'b0;
                 data_packaged_o.jump1    = 32'b0;
                 data_packaged_o.jump2    = 32'b0;
                 data_packaged_o.rd_addr  = rd_i;
+                using_rs_data_o          = (rd_i != 5'b0);
             end
 
             inst_packaged_o.is_alu_r: begin
-                data_packaged_o.regs_wen  = (rd_i != 5'b0);
+                regs_wen_o               = (rd_i != 5'b0);
                 data_packaged_o.value1   = 32'b0;
                 data_packaged_o.value2   = 32'b0;
                 data_packaged_o.jump1    = 32'b0;
                 data_packaged_o.jump2    = 32'b0;
                 data_packaged_o.rd_addr  = rd_i;
+                using_rs_data_o          = (rd_i != 5'b0);
             end
 
             inst_packaged_o.is_zicsr: begin
                 case(funct3_i)
                     `CSRRW,`CSRRS,`CSRRC: begin
-                        data_packaged_o.regs_wen  = (rd_i != 5'b0);
+                        regs_wen_o               = (rd_i != 5'b0);
                         data_packaged_o.value1   = 32'b0;
                         data_packaged_o.value2   = 32'b0;
                         data_packaged_o.jump1    = 32'b0;
                         data_packaged_o.jump2    = 32'b0;
                         data_packaged_o.rd_addr  = rd_i;
+                        using_rs_data_o          = 1'b1;
                     end
                     `CSRRWI,`CSRRSI,`CSRRCI: begin
-                        data_packaged_o.regs_wen  = (rd_i != 5'b0);
+                        regs_wen_o               = (rd_i != 5'b0);
                         data_packaged_o.value1   = inst_i[19:15]; // zicsr立即数在rs1地址位
                         data_packaged_o.value2   = 32'b0;
                         data_packaged_o.jump1    = 32'b0;
                         data_packaged_o.jump2    = 32'b0;
                         data_packaged_o.rd_addr  = rd_i;
+                        using_rs_data_o          = 1'b1;
                     end
                     `ECALL_MRET: begin
-                        data_packaged_o.regs_wen  = 1'b0; // ecall和mret不写寄存器
+                        regs_wen_o               = 1'b0; // ecall和mret不写寄存器
                         data_packaged_o.value1   = 32'b0;
                         data_packaged_o.value2   = 32'b0;
                         data_packaged_o.jump1    = 32'b0;
                         data_packaged_o.jump2    = 32'b0;
                         data_packaged_o.rd_addr  = 5'b0;
+                        using_rs_data_o          = 1'b0;
                     end
                     default: begin
-                        data_packaged_o.regs_wen  = 1'b0;
+                        regs_wen_o               = 1'b0;
                         data_packaged_o.value1   = 32'b0;
                         data_packaged_o.value2   = 32'b0;
                         data_packaged_o.jump1    = 32'b0;
                         data_packaged_o.jump2    = 32'b0;
                         data_packaged_o.rd_addr  = 5'b0;
+                        using_rs_data_o          = 1'b0;
                     end
                 endcase
             end
 
             default: begin
-                data_packaged_o.regs_wen  = 1'b0;
+                regs_wen_o               = 1'b0;
                 data_packaged_o.value1   = 32'b0;
                 data_packaged_o.value2   = 32'b0;
                 data_packaged_o.jump1    = 32'b0;
                 data_packaged_o.jump2    = 32'b0;
                 data_packaged_o.rd_addr  = 5'b0;
+                using_rs_data_o          = 1'b0;
             end
         endcase
     end

@@ -44,7 +44,7 @@ module ex_mem(
     output  reg [3:0]   dcache_we_o,
     output  reg         dcache_write_dram_o
 );
-    always@(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (!rst) begin
             rd_addr_o           <= 5'b0;
             rd_data_o           <= 32'b0;
@@ -78,7 +78,7 @@ module ex_mem(
             load_addr_low_o     <= 2'b0;
             load_is_signed_o    <= 1'b0;
             ecall_inst_o        <= 32'b0;
-
+            
             dcache_req_load_o   <= 0;
             dcache_req_store_o  <= 0;
             dcache_addr_o       <= 0;

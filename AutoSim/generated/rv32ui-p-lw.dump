@@ -106,7 +106,7 @@ Disassembly of section .text.init:
  130:	00001097          	auipc	ra,0x1
  134:	ed408093          	addi	ra,ra,-300 # 1004 <tdat2>
  138:	0040af03          	lw	t5,4(ra)
- 13c:	000f0313          	mv	t1,t5
+ 13c:	000f0313          	mv	t1,t5 
  140:	0ff01eb7          	lui	t4,0xff01
  144:	ff0e8e93          	addi	t4,t4,-16 # ff00ff0 <_end+0xfefff68>
  148:	15d31663          	bne	t1,t4,294 <fail>

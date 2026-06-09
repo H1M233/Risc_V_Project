@@ -4,13 +4,12 @@ module pc(
     input               clk,
     input               rst,
 
-    // from hazard
-    input               hazard_en,
+    input               pipe_hold,
+    input               dual_stall,
 
     // from ex
     input               pred_flush,
     input      [31:0]   pred_flush_pc,
-    input               dcache_stall,
 
     // from wb
     input               wb_ecall,
@@ -28,11 +27,10 @@ module pc(
     input      [31:0]   pred_pc,
     input               pred_taken
 );
-    wire pc_hold_en = (hazard_en | dcache_stall);
-
     // 为冲刷 / 异常留的口
     // 发生冲刷 / 异常时: 重新回到取 s0
-    reg [31:0] pc_s0_sel, pc_s1_sel;
+    logic [31:0] pc_s0_sel, pc_s1_sel;
+    wire  pipe_flush = wb_ecall | wb_mret | pred_flush | pred_taken;
     always_comb begin
         if (wb_ecall | wb_mret) begin
             pc_s0_sel = ecall_mret_addr;
@@ -47,22 +45,26 @@ module pc(
             pc_s1_sel = pred_pc + 32'd4;
         end
         else begin
-            pc_s0_sel = slot0_pc_o + 32'd8;
-            pc_s1_sel = slot1_pc_o + 32'd8;
+            pc_s0_sel = 32'b0;
+            pc_s1_sel = 32'b0;
         end
     end
 
     always_ff @(posedge clk) begin
-        if(!rst) begin
+        if (!rst) begin
             slot0_pc_o <= 32'h8000_0000;
             slot1_pc_o <= 32'h8000_0004;
         end
-        else if (pc_hold_en) begin
+        else if (pipe_hold) begin
             // ...
         end
-        else begin
+        else if (pipe_flush) begin
             slot0_pc_o <= pc_s0_sel;
             slot1_pc_o <= pc_s1_sel;
+        end
+        else begin
+            slot0_pc_o <= slot0_pc_o + 32'd8;
+            slot1_pc_o <= slot1_pc_o + 32'd8;
         end
     end
 endmodule

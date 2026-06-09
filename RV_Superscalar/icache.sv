@@ -6,10 +6,10 @@ module icache #(
     parameter TAG_WIDTH     = 24,       // tag 宽度
     parameter WAYS          = 2         // 路数
 )(
-    input               clk,
-    input               rst,
-    input               pipe_hold,
-    input               pipe_flush,
+    input logic         clk,
+    input logic         rst,
+    input logic         pipe_hold,
+    input logic         pipe_flush,
 
     // CPU / IF side
     (* max_fanout = 30 *) input        [31:0]  slot0_cpu_pc,

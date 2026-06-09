@@ -69,13 +69,14 @@
     typedef struct packed {
         logic [31:0] pc;
         logic [31:0] inst;
-        logic        regs_wen;
         logic [31:0] value1;
         logic [31:0] value2;
         logic [31:0] jump1;
         logic [31:0] jump2;
         logic [4:0]  rd_addr;
         logic        pred_taken;
+        logic [3:0]  ras_snapshot;
+        logic        is_ret;
         logic [11:0] csr_addr;
         logic        ecall;
         logic        mret;

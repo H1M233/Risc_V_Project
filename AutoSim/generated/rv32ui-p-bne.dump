@@ -6,7 +6,7 @@ Disassembly of section .text.init:
 
 00000000 <_start>:
    0:	00000d13          	li	s10,0
-   4:	00000d93          	li	s11,0
+   4:	00000d93          	li	s11,0 
 
 00000008 <test_2>:
    8:	00200193          	li	gp,2

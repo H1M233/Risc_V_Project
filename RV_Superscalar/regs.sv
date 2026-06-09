@@ -43,8 +43,8 @@ module regs(
     end
 
     logic write_same_rd;
-    assign write_same_rd = slot0_rd_addr_i == slot1_rd_addr_i && slot0_regs_wen && slot1_regs_wen;
-    always @(posedge clk) begin
+    assign write_same_rd = (slot0_rd_addr_i == slot1_rd_addr_i) && slot0_regs_wen && slot1_regs_wen;
+    always_ff @(posedge clk) begin
         if (slot0_regs_wen && !write_same_rd)  begin
             regs_p1[slot0_rd_addr_i] <= slot0_rd_data_i;
             regs_p2[slot0_rd_addr_i] <= slot0_rd_data_i;

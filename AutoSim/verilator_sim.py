@@ -45,7 +45,7 @@ def compile(prj_dict, sim_type, macros):
                     f'-DPROJECT_{prj_folder.upper()}',      # 传递宏给.v
                     '-cc', '-exe', '-build',
                     '-j', '0',
-                    '-trace',
+                    '-trace-fst',
 
                     # Verilator 转换优化
                     '-O3',
@@ -192,13 +192,13 @@ def prj_mem_ch(prj_ch=None, mem_ch=None):
         if mem_name_ask == 'ESC':
             print("\033[2K\033[A\033[2K", end='')
             break
-        elif mem_name_ask == 'a':
+        elif mem_name_ask.lower() == 'a':
             mem_ret = json_file['mem_init']
             testInst = True
             testAll = True
             print("\033[96mALL\033[0m")
             break
-        elif mem_name_ask == 'i':
+        elif mem_name_ask.lower() == 'i':
             testInst = True
             print("\033[96mInst Test\033[0m")
             break
@@ -319,8 +319,7 @@ def instTest(prj_dict, testAll=False):
 
     # 遍历所有文件
     for file_bin in all_bin_files:
-        index = file_bin.index('rv')
-        print_name = file_bin[index:-4]
+        print_name = Path(file_bin).name[:-4]
 
         bin_to_mem(file_bin, 'inst_test')
 
@@ -371,7 +370,7 @@ def main():
             if testInst:
                 instTest(prj_dict, testAll=testAll)
             if mem_dict:
-                softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(0, 200))
+                softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(86, 87))
         except KeyboardInterrupt:
             print("\n\n仿真进程被Ctrl + C终止")
 

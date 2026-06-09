@@ -125,4 +125,14 @@ module tb_verilator_inst(
         assign x27 = tb_verilator_inst.Core_cpu.gen_ooo.CORE.REGS.regs[27];  // 0: fail, 1: pass
 
     `endif
+
+    reg [31:0] cycle_count;
+    always @(posedge clk_cpu) begin
+    if (x26 == 1'b1) begin
+        if (cycle_count >= 32'd100)  // 等待 100 个时钟周期
+            $finish();
+        else
+            cycle_count <= cycle_count + 1'd1;
+    end
+end
 endmodule

@@ -5,6 +5,8 @@ module mem(
     input               clk,
     input               rst,
 
+    input               forward_flush,
+
     // from dcache
     input               dcache_ack,
     input      [31:0]   dcache_rdata,
@@ -39,10 +41,12 @@ module mem(
     output reg          mret_o,
     output reg [31:0]   ecall_inst_o
 );  
-    reg        mem1_req_load_o;
-    reg [4:0]  mem1_rd_addr_oo;
-    reg [31:0] mem1_rd_data_oo;
-    reg        mem1_regs_wen_oo;
+    logic        mem1_mem2_req_load_i;
+    logic [4:0]  mem1_mem2_rd_addr_i;
+    logic [31:0] mem1_mem2_rd_data_i;
+    logic        mem1_mem2_regs_wen_i;
+    logic        mem1_mem2_ecall_i;
+    logic        mem1_mem2_mret_i;
 
     reg        mem2_req_load_i;
     reg [4:0]  mem2_rd_addr_i;
@@ -52,21 +56,23 @@ module mem(
     reg [1:0]  mem2_load_addr_low_i;
     reg        mem2_load_is_signed_i;
 
-    assign mem1_is_load_o   = mem1_req_load_o;
-    assign mem1_rd_addr_o   = mem1_rd_addr_oo;
-    assign mem1_rd_data_o   = mem1_rd_data_oo;
-    assign mem1_regs_wen_o  = mem1_regs_wen_oo;
+    assign mem1_is_load_o   = mem1_mem2_req_load_i;
+    assign mem1_rd_addr_o   = mem1_mem2_rd_addr_i;
+    assign mem1_rd_data_o   = mem1_mem2_rd_data_i;
+    assign mem1_regs_wen_o  = mem1_mem2_regs_wen_i;
 
     // mem1
-    always@(*) begin
-        mem1_req_load_o         = mem_req_load_i;
-        mem1_rd_addr_oo         = rd_addr_i;
-        mem1_rd_data_oo         = rd_data_i;
-        mem1_regs_wen_oo        = (mem_req_load_i) ? 1'b0 : regs_wen;
+    always_comb begin
+        mem1_mem2_req_load_i  = mem_req_load_i;
+        mem1_mem2_rd_addr_i   = rd_addr_i;
+        mem1_mem2_rd_data_i   = rd_data_i;
+        mem1_mem2_regs_wen_i  = (mem_req_load_i | forward_flush) ? 1'b0 : regs_wen;
+        mem1_mem2_ecall_i     = ecall_i & !forward_flush;
+        mem1_mem2_mret_i      = mret_i & !forward_flush;
     end
 
     // mem1_mem2
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (!rst) begin
             mem2_req_load_i         <= 0;
             mem2_rd_addr_i          <= 0;
@@ -83,25 +89,25 @@ module mem(
             // ...
         end
         else begin
-            mem2_req_load_i         <= mem1_req_load_o;
-            mem2_rd_addr_i          <= mem1_rd_addr_oo;
-            mem2_rd_data_i          <= mem1_rd_data_oo;
-            mem2_regs_wen_i         <= mem1_regs_wen_oo;
+            mem2_req_load_i         <= mem1_mem2_req_load_i;
+            mem2_rd_addr_i          <= mem1_mem2_rd_addr_i;
+            mem2_rd_data_i          <= mem1_mem2_rd_data_i;
+            mem2_regs_wen_i         <= mem1_mem2_regs_wen_i;
             mem2_load_mask_i        <= load_mask_i;
             mem2_load_addr_low_i    <= load_addr_low_i;
             mem2_load_is_signed_i   <= load_is_signed_i;
-            ecall_o                 <= ecall_i;
-            mret_o                  <= mret_i;
+            ecall_o                 <= mem1_mem2_ecall_i;
+            mret_o                  <= mem1_mem2_mret_i;
             ecall_inst_o            <= ecall_inst_i;
         end
     end
 
     // mem2
     wire [31:0] dcache_rdata_load_shift = load_shift(dcache_rdata, mem2_load_mask_i, mem2_load_addr_low_i, mem2_load_is_signed_i);
-    always@(*) begin
+    always_ff @(*) begin
         mem2_rd_addr_o   = mem2_rd_addr_i;
         mem2_rd_data_o   = (mem2_req_load_i) ? dcache_rdata_load_shift : mem2_rd_data_i;
-        mem2_regs_wen_o  = dcache_ack | mem2_regs_wen_i;
+        mem2_regs_wen_o  = (mem2_req_load_i & dcache_ack) | mem2_regs_wen_i;
         mem2_is_load_o   = mem2_req_load_i;
     end
 

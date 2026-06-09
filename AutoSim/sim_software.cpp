@@ -1,5 +1,5 @@
 #include <verilated.h>
-#include <verilated_vcd_c.h>
+#include <verilated_fst_c.h>
 #include "Vtb_verilator_software.h"
 #include <iostream>
 #include <iomanip>
@@ -30,6 +30,7 @@ int main(int argc, char** argv) {
     double next_clk_50MHz_edge = 0.0;
     double next_clk_CPU_edge = 0.0;
     int SEG_getTime = 0;
+    double waitTime = 0.0;
     const double PREV_TIME = std::stoi(std::getenv("PREV_TIME")) * NS2MS;
 
     // 初始化
@@ -46,22 +47,22 @@ int main(int argc, char** argv) {
     // 记录波形
     #ifdef ENABLE_TRACE
         Verilated::traceEverOn(true);
-        VerilatedVcdC* tfp = new VerilatedVcdC;
+        VerilatedFstC* tfp = new VerilatedFstC;
         top->trace(tfp, 99);                    // 追踪99层深度
         tfp->open("vcd/verilator_software.vcd");        // 打开波形文件
     #endif
 
     // 计算 IPC
-    double totalCycle = 0.0;
-    double commitCycle = 0.0;
+    uint64_t totalCycle = 0;
+    uint64_t commitCycle = 0;
 
     // 计算预测准确率
-    double predTotal = 0.0;
-    double predMiss = 0.0;
-    double predMissB = 0.0;
-    double predMissJr = 0.0;
-    double predTotalB = 0.0;
-    double predTotalJr = 0.0;
+    uint64_t predTotal = 0;
+    uint64_t predMiss = 0;
+    uint64_t predMissB = 0;
+    uint64_t predMissJr = 0;
+    uint64_t predTotalB = 0;
+    uint64_t predTotalJr = 0;
 
     // 剩余时间计算
     double lastRunTime = 0.0;
@@ -69,9 +70,22 @@ int main(int argc, char** argv) {
     double speed_ns = 0.0;
     int speedRef = 40;
     int validRef = 0;
-
+    
     // 进度条设置
     const double barWidth = 70.0;
+
+    // 打印更新频率 - 影响仿真性能
+    const double tf = 1;  // 1 = 每仿真 1ms 更新一次
+
+    // 跑飞分析
+    const int PC_RANGE_START = 0x8000'0000;
+    const int PC_RANGE_END = 0x8000'3FFF;
+    bool isPC0_OutOfRange = false;
+    double PC0_firstTime_OutOfRange = 0.0;
+    int PC0_OutOfRange = 0x0;
+    bool isPC1_OutOfRange = false;
+    double PC1_firstTime_OutOfRange = 0.0;
+    int PC1_OutOfRange = 0x0;
 
     // 记录函数
     auto step_and_advance = [&](double delta_time_ns) {
@@ -85,7 +99,7 @@ int main(int argc, char** argv) {
         }
     };
     
-    std::cout << "=================================== Simulation Started ===================================\n\n\n\n\n\n\n";
+    std::cout << "=================================== Simulation Started ===================================\n\n\n\n\n\n\n\n\n\n\n";
 
     // 计时器
     std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();;
@@ -114,6 +128,7 @@ int main(int argc, char** argv) {
     step_and_advance(rst_time - CLK_CPU_HALF_PERIOD);
 
     top->rst = 1;
+
     // 时钟主循环
     while (!contextp->gotFinish() && sim_time_ns < SIM_TIME && !SEG_getTime) {
         // 计算下一个时钟边沿的时间
@@ -124,34 +139,44 @@ int main(int argc, char** argv) {
         if (next_clk_CPU_edge <= sim_time_ns) {
             next_clk_CPU_edge = sim_time_ns + CLK_CPU_HALF_PERIOD;
             top->clk_cpu = !top->clk_cpu;  // 翻转 CPU 时钟
-            totalCycle += 0.5;
 
-            // 在上升沿统计
+            // 在 clk_cpu 上升沿统计
             if (top->clk_cpu) {
-                if (top->commit) commitCycle++;
-                if (top->pred_total) predTotal++;
-                if (top->pred_miss) predMiss++;
-                if (top->pred_total_b) predTotalB++;
-                if (top->pred_total_jr) predTotalJr++;
-                if (top->pred_miss_b) predMissB++;
-                if (top->pred_miss_jr) predMissJr++;
+                totalCycle++;
+                commitCycle += top->commit;
+                predTotal   += top->pred_total;
+                predMiss    += top->pred_miss;
+                predTotalB  += top->pred_total_b;
+                predTotalJr += top->pred_total_jr;
+                predMissB   += top->pred_miss_b;
+                predMissJr  += top->pred_miss_jr;
+                if (((top->pc0 < PC_RANGE_START || top->pc0 > PC_RANGE_END) && top->pc0 != 0) && !isPC0_OutOfRange) {
+                    isPC0_OutOfRange = true;
+                    PC0_firstTime_OutOfRange = sim_time_ns / NS2MS;
+                    PC0_OutOfRange = top->pc0;
+                }
+                if (((top->pc1 < PC_RANGE_START || top->pc1 > PC_RANGE_END) && top->pc1 != 0) && !isPC1_OutOfRange) {
+                    isPC1_OutOfRange = true;
+                    PC1_firstTime_OutOfRange = sim_time_ns / NS2MS;
+                    PC1_OutOfRange = top->pc1;
+                }
             }
         }
         
         // 找到下一个事件时间
-        double next_event_time = DBL_MAX;
-        next_event_time = std::min(next_clk_50MHz_edge, next_clk_CPU_edge);
+        double next_event_time = std::min(next_clk_50MHz_edge, next_clk_CPU_edge);
         
         // 执行到下一个事件
         step_and_advance(next_event_time - sim_time_ns);
         
         // 每仿真时 1 ms 打印一次
         static double last_print_sim_time = 0.0;
-        if (sim_time_ns - last_print_sim_time >= NS2MS) {
+        if (sim_time_ns - last_print_sim_time >= NS2MS / tf) {
             current_time = get_elapsed_ms();
             last_print_sim_time = sim_time_ns;
             if (top->seg != 0x3700'0000 && top->seg != 0x0000'0000) {
-                SEG_getTime = top->seg & 0x000F'FFFF;
+                waitTime++;
+                if (waitTime > 1) SEG_getTime = top->seg & 0x000F'FFFF;
             }
             
             // 计算剩余时间
@@ -161,10 +186,25 @@ int main(int argc, char** argv) {
             if (validRef <= speedRef) validRef++;
             lastSimTime = sim_time_ns;
             lastRunTime = current_time;
-            long long int ETATime_ms = (PREV_TIME - sim_time_ns) / speed_ns / 10;
+            int ETATime_s_total = (PREV_TIME - sim_time_ns) / speed_ns / 10;
+            int ETATime_s = ETATime_s_total % 60;
+            int ETATime_m = ETATime_s_total / 60; 
+
+            // 统计数据
+            double RUN_TIME = current_time / 1000.0;
+            double SIM_TIME = sim_time_ns / NS2MS;
+            int SEG = top->seg;
+            double IPC = commitCycle / static_cast<float>(totalCycle);
+            double BPU_ACCURACY = (predTotal - predMiss) / static_cast<float>(predTotal);
+            double BRANCH = (predTotalB - predMissB) / static_cast<float>(predTotalB);
+            double JALR = (predTotalJr - predMissJr) / static_cast<float>(predTotalJr);
+            int FUNC_BLOCK_PC0 = top->func_block_pc0;
+            int PC0 = top->pc0;
+            int FUNC_BLOCK_PC1 = top->func_block_pc1;
+            int PC1 = top->pc1;
 
             // 打印进度条
-            std::cout << "\r" << "\033[7A" << "\033[2K" << "\033[96m";
+            std::cout << "\r" << "\033[11A" << "\033[2K" << "\033[96m";
             double percentage = (PREV_TIME) ? sim_time_ns / PREV_TIME : 0.0;
             int filled = (int)(percentage * barWidth);
             for (int cnt = 0.0; cnt <= barWidth; ++cnt){
@@ -176,27 +216,40 @@ int main(int argc, char** argv) {
             std::cout << "\n\n";
 
             std::cout << "RUN TIME:"
-                      << std::right << std::setw(14) << std::fixed << std::setprecision(2) << current_time / 1000.0 << " s"
+                      << std::right << std::setw(14) << std::fixed << std::setprecision(2) << RUN_TIME << " s"
                       << std::setw(13) << "SIM TIME:"
-                      << std::right << std::setw(13) << std::fixed << std::setprecision(0) << sim_time_ns / NS2MS << " ms"
+                      << std::right << std::setw(13) << std::fixed << std::setprecision(0) << SIM_TIME << " ms"
                       << std::setw(8) << "SEG:"
-                      << std::right << std::setw(11) << std::hex << top->seg << std::dec
+                      << std::right << std::setw(11) << std::hex << SEG << std::dec
                       << std::endl << std::endl << "\033[2K"
 
                       << "IPC:" 
-                      << std::right << std::setw(21) << std::fixed << std::setprecision(4) << commitCycle / totalCycle
+                      << std::right << std::setw(21) << std::fixed << std::setprecision(4) << IPC
                       << std::setw(17) << "BPU ACCURACY:"
-                      << std::right << std::setw(12) << (predTotal - predMiss) / predTotal
-                      << std::setw(13) << "BRANCH:  " << (predTotal - predMissB) / predTotal
-                      << std::setw(10) << "JALR:  " << (predTotal - predMissJr) / predTotal
+                      << std::right << std::setw(12) << BPU_ACCURACY
+                      << std::setw(13) << "BRANCH:  " << BRANCH
+                      << std::setw(10) << "JALR:  " << JALR
                       << std::endl << std::endl << "\033[2K"
 
-                      << "PC:" 
-                      << std::right << std::setw(10) << std::hex << top->func_block_addr << " -> " 
-                      << std::right << std::setw(8) << top->pc << std::dec
-                      << std::setw(9) << "ETA: "
-                      << std::right << std::setw(13) << ETATime_ms / 60 << " m"
-                      << std::right << std::setw(3) << ETATime_ms % 60 << " s"
+                      << "PC0:" 
+                      << std::right << std::setw(10) << std::hex << FUNC_BLOCK_PC0 << " -> " 
+                      << std::right << std::setw(8) << PC0 << std::dec
+                      << std::setw(13) << "IN RANGE: "
+                      << ((isPC1_OutOfRange) ? "x | " : "√ | ") << PC0_firstTime_OutOfRange << " ms | " << PC0_OutOfRange
+                      << "  stuck: " << ((top->hold_signal) ? "√" : "x") << "    flush: " << ((top->flush_signal) ? "√" : "x")
+                      << std::endl << std::endl << "\033[2K"
+
+                      << "PC1:"
+                      << std::right << std::setw(10) << std::hex << FUNC_BLOCK_PC1 << " -> " 
+                      << std::right << std::setw(8) << PC1 << std::dec
+                      << std::setw(13) << "IN RANGE: "
+                      << ((isPC1_OutOfRange) ? "x | " : "√ | ") << PC1_firstTime_OutOfRange << " ms | " << PC1_OutOfRange
+                      << "  BRANCH_8000_0520: " << top->branch1 << " / " << std::hex << top->branch2 << std::dec
+                      << std::endl << std::endl << "\033[2K"
+
+                      << "ETA: "
+                      << std::right << std::setw(13) << ETATime_m << " m"
+                      << std::right << std::setw(3) << ETATime_s << " s"
 
                       << std::endl << std::flush;
         }
@@ -232,14 +285,12 @@ int main(int argc, char** argv) {
       << "LED=" << (isTick ? "PASS √" : "FAIL x");
     f.close();
 
-    #ifdef ENABLE_TRACE 
+    #ifdef ENABLE_TRACE
         tfp->close();
-    #endif
-
-    delete top;
-
-    #ifdef ENABLE_TRACE 
+        delete top;
         delete tfp;
+    #else
+        delete top;
     #endif
 
     delete contextp;

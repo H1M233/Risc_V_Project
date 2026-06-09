@@ -38,13 +38,19 @@ module bpu_top #(
     output logic        slot1_pred_taken,
     output logic [31:0] slot0_pred_pc,
     output logic [31:0] slot1_pred_pc,
+    output logic [3:0]  ras_snapshot,
+    output logic        slot0_is_ret,
+    output logic        slot1_is_ret,
 
-    // from ex
-    input               update_btb_en,      // ex阶段返回的BTB更新使能
-    input               update_gshare_en,   // ex阶段返回的PHT更新使能
-    input      [31:0]   update_pc,          // ex阶段返回更新的指令地址
-    input      [31:0]   update_target,      // ex阶段返回的实际跳转地址
-    input               actual_taken,       // ex阶段判断跳转为真
+    // from ex_bpu
+    input               update_ras_i,
+    input      [3:0]    ras_snapshot_i,
+    input               update_gshare_en,   // ex 阶段返回的PHT更新使能
+    input               actual_taken,       // ex 阶段判断跳转为真
+    input               update_btb_en,      // ex 阶段返回的BTB更新使能
+    input      [31:0]   update_target,      // ex 阶段返回的实际跳转地址
+    input      [31:0]   btb_update_pc,      // ex 阶段返回更新BTB的指令地址
+    input      [31:0]   gshare_update_pc,   // ex 阶段返回更新的指令地址
 
     (* max_fanout = 20 *)
     input               pipe_hold,
@@ -69,12 +75,17 @@ module bpu_top #(
     wire [31:0]             ras_pop_addr_o;
     wire                    ras_isempty_o;
     wire                    ras_isfull_o;
+    wire [3:0]              ras_ptr;
 
     // connect btb with bpu_controller
-    wire [BTB_INDEX_WIDTH - 1:0]        btb_query_index_i;
-    wire [31 - BTB_INDEX_WIDTH - 2:0]   btb_query_tag_i;
-    wire                                btb_hit_o;
-    wire [31:0]                         btb_target_pc_o;
+    wire [BTB_INDEX_WIDTH - 1:0]        slot0_btb_query_index_i;
+    wire [BTB_INDEX_WIDTH - 1:0]        slot1_btb_query_index_i;
+    wire [31 - BTB_INDEX_WIDTH - 2:0]   slot0_btb_query_tag_i;
+    wire [31 - BTB_INDEX_WIDTH - 2:0]   slot1_btb_query_tag_i;
+    wire                                slot0_btb_hit_o;
+    wire                                slot1_btb_hit_o;
+    wire [31:0]                         slot0_btb_target_pc_o;
+    wire [31:0]                         slot1_btb_target_pc_o;
 
     wire                                btb_update_en_i;
     wire [BTB_INDEX_WIDTH - 1:0]        btb_update_index_i;
@@ -109,13 +120,17 @@ module bpu_top #(
         .slot1_pred_taken           (slot1_pred_taken),
         .slot0_pred_pc              (slot0_pred_pc),
         .slot1_pred_pc              (slot1_pred_pc),
+        .ras_snapshot               (ras_snapshot),
+        .slot0_is_ret               (slot0_is_ret),
+        .slot1_is_ret               (slot1_is_ret),
 
         // from ex
-        .update_btb_en              (update_btb_en),
-        .update_gshare_en           (update_gshare_en),
-        .update_pc                  (update_pc),
-        .update_target              (update_target),
         .actual_taken               (actual_taken),
+        .update_gshare_en           (update_gshare_en),
+        .update_btb_en              (update_btb_en),
+        .update_target              (update_target),
+        .btb_update_pc              (btb_update_pc),
+        .gshare_update_pc           (gshare_update_pc),
 
         .pipe_hold                  (pipe_hold),
         .pipe_flush                 (pipe_flush),
@@ -132,21 +147,26 @@ module bpu_top #(
         .gshare_update_pht_index    (gshare_update_pht_index_i),
         .gshare_actual_taken        (gshare_actual_taken_i),
 
-        // ras - to bpu_controller
+        // ras - from bpu_controller
         .ras_push_en                (ras_push_en_i),
         .ras_pop_en                 (ras_pop_en_i),
         .ras_push_addr              (ras_push_addr_i),
 
-        // ras - from bpu_controller
+        // ras - to bpu_controller
         .ras_pop_addr               (ras_pop_addr_o),
         .ras_isempty                (ras_isempty_o),
         .ras_isfull                 (ras_isfull_o),
+        .ras_ptr                    (ras_ptr),
 
         // btb - 查询
-        .btb_query_index            (btb_query_index_i),
-        .btb_query_tag              (btb_query_tag_i),
-        .btb_hit                    (btb_hit_o),
-        .btb_target_pc              (btb_target_pc_o),
+        .slot0_btb_query_index      (slot0_btb_query_index_i),
+        .slot1_btb_query_index      (slot1_btb_query_index_i),
+        .slot0_btb_query_tag        (slot0_btb_query_tag_i),
+        .slot1_btb_query_tag        (slot1_btb_query_tag_i),
+        .slot0_btb_hit              (slot0_btb_hit_o),
+        .slot1_btb_hit              (slot1_btb_hit_o),
+        .slot0_btb_target_pc        (slot0_btb_target_pc_o),
+        .slot1_btb_target_pc        (slot1_btb_target_pc_o),
 
         // btb - 更新
         .btb_update_en              (btb_update_en_i),
@@ -186,11 +206,14 @@ module bpu_top #(
         .push_en_i                  (ras_push_en_i),
         .pop_en_i                   (ras_pop_en_i),
         .push_addr_i                (ras_push_addr_i),
+        .update_ptr_en              (update_ras_i),
+        .update_ptr                 (ras_snapshot_i),
 
         // to bpu_controller
         .pop_addr_o                 (ras_pop_addr_o),
         .isempty_o                  (ras_isempty_o),
-        .isfull_o                   (ras_isfull_o)
+        .isfull_o                   (ras_isfull_o),
+        .ras_ptr                    (ras_ptr)
     );
 
     btb #(
@@ -200,10 +223,14 @@ module bpu_top #(
         .rst                        (rst),
     
         // 查询
-        .query_index_i              (btb_query_index_i),
-        .query_tag_i                (btb_query_tag_i),
-        .hit_o                      (btb_hit_o),
-        .target_pc_o                (btb_target_pc_o),
+        .slot0_query_index_i        (slot0_btb_query_index_i),
+        .slot1_query_index_i        (slot1_btb_query_index_i),
+        .slot0_query_tag_i          (slot0_btb_query_tag_i),
+        .slot1_query_tag_i          (slot1_btb_query_tag_i),
+        .slot0_hit_o                (slot0_btb_hit_o),
+        .slot1_hit_o                (slot1_btb_hit_o),
+        .slot0_target_pc_o          (slot0_btb_target_pc_o),
+        .slot1_target_pc_o          (slot1_btb_target_pc_o),
     
         // 更新
         .update_en_i                (btb_update_en_i),

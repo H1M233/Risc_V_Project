@@ -1,5 +1,5 @@
 #include <verilated.h>
-#include <verilated_vcd_c.h>
+#include <verilated_fst_c.h>
 #include "Vtb_verilator_inst.h"
 #include <iostream>
 #include <iomanip>
@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
     // 记录波形
     #ifdef ENABLE_TRACE
         Verilated::traceEverOn(true);
-        VerilatedVcdC* tfp = new VerilatedVcdC;
+        VerilatedFstC* tfp = new VerilatedFstC;
         top->trace(tfp, 99);                    // 追踪99层深度
         std::string filename = "vcd/verilator_inst_" + INST_NAME + ".vcd";
         tfp->open(filename.c_str());   // 打开波形文件
@@ -79,12 +79,10 @@ int main(int argc, char** argv) {
 
     #ifdef ENABLE_TRACE
         tfp->close();
-    #endif
-
-    delete top;
-
-    #ifdef ENABLE_TRACE
+        delete top;
         delete tfp;
+    #else
+        delete top;
     #endif
 
     delete contextp;

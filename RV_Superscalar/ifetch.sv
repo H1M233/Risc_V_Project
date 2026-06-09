@@ -5,10 +5,7 @@ module ifetch(
     input               rst,
     input               pipe_hold,
     input               pipe_flush,
-
-    // from wb
-    input               ecall_flush,
-    input               mret_flush,
+    input               ecall_mret_flush,
 
     // from pc
     input      [31:0]   slot0_pc_i,
@@ -53,13 +50,8 @@ module ifetch(
     assign slot1_if1_pc_o = slot1_pc_i;
 
     // if1_if2
-    wire if1_if2_flush_en = (ecall_flush | mret_flush);
     always_ff @(posedge clk) begin
         if (!rst) begin
-            slot0_if1_if2_pc_o <= 32'b0;
-            slot1_if1_if2_pc_o <= 32'b0;
-        end
-        else if(if1_if2_flush_en) begin
             slot0_if1_if2_pc_o <= 32'b0;
             slot1_if1_if2_pc_o <= 32'b0;
         end
