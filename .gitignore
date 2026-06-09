@@ -30,5 +30,5 @@ AutoSim/vcd/*.vcd
 AutoSim/vcd/*.xlsx
 
 5_LEVEL_CPU_Cache/div.v
-5_LEVEL_CPU_Cache/divider.v
+
 

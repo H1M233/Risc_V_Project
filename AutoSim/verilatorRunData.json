@@ -39,7 +39,7 @@
       },
       "withoutMext": {
         "IPC": "0",
-        "REAL TIME": "222.623",
+        "REAL TIME": "245.12",
         "RUN TIME": "3758",
         "BPU ACCURACY": "0",
         "LED": "PASS √"
@@ -86,7 +86,7 @@
       },
       "withoutMext": {
         "IPC": "0",
-        "REAL TIME": "271.898",
+        "REAL TIME": "302.804",
         "RUN TIME": "4096",
         "BPU ACCURACY": "0",
         "LED": "PASS √"

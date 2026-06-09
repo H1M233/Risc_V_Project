@@ -3,9 +3,32 @@
 `include "switch.vh"
 
 module ex(
+<<<<<<< HEAD:5_LEVEL_CPU_Cache/ex.sv
     input  logic        clk,
     input  logic        rst,
     input  logic        pipe_flush,
+=======
+    input                       clk,
+    input                       rst,
+    // from id_ex
+    input      [31:0]           pc_addr_i,
+    input      [31:0]           inst_i,
+    input      [31:0]           jump1_i,
+    input      [31:0]           jump2_i,
+    input      [4:0]            rd_addr_i,
+    input                       regs_wen_i,
+    (* max_fanout = 30 *)
+    input      [31:0]           value1_i,
+    (* max_fanout = 30 *)
+    input      [31:0]           value2_i,
+    input                       pred_taken_i,
+    input      [`OP_INST_NUM - 1:0]  inst_packaged_i,
+    (* max_fanout = 30 *)
+    input                       valid_i,
+    input                       ecall_i,
+    input                       mret_i,
+    input      [11:0]           csr_addr_i,
+>>>>>>> a3ff03f426c323a73f62c1f2ca5113c889bf2adb:5_LEVEL_CPU_Cache/ex.v
 
     // from id_ex
     input  id_ex_data_t data_packaged_i,
@@ -55,8 +78,13 @@ module ex(
     output reg [31:0]   csr_wdata_o,
     output     [31:0]   ecall_inst,
 
+<<<<<<< HEAD:5_LEVEL_CPU_Cache/ex.sv
     // ctrl_stall
     output logic        ctrl_stall
+=======
+    //to if1_if2,if2_id
+    output              ctrl_stall
+>>>>>>> a3ff03f426c323a73f62c1f2ca5113c889bf2adb:5_LEVEL_CPU_Cache/ex.v
 );
     // 解码
     wire [31:0] pc_addr_i       = data_packaged_i.pc;
@@ -104,6 +132,26 @@ module ex(
     wire sel_divu  = inst_packaged_i.sel_divu;
     wire sel_rem   = inst_packaged_i.sel_rem;
     wire sel_remu  = inst_packaged_i.sel_remu;
+
+    // M-type
+    wire sel_mul   = inst_packaged_i[`INST_R_MUL];
+    wire sel_mulh  = inst_packaged_i[`INST_R_MULH];
+    wire sel_mulhu = inst_packaged_i[`INST_R_MULHU];
+    wire sel_mulhsu= inst_packaged_i[`INST_R_MULHSU];
+    wire sel_div   = inst_packaged_i[`INST_R_DIV];
+    wire sel_divu  = inst_packaged_i[`INST_R_DIVU];
+    wire sel_rem   = inst_packaged_i[`INST_R_REM];
+    wire sel_remu  = inst_packaged_i[`INST_R_REMU];
+
+    // M-type
+    wire sel_mul   = inst_packaged_i[`INST_R_MUL];
+    wire sel_mulh  = inst_packaged_i[`INST_R_MULH];
+    wire sel_mulhu = inst_packaged_i[`INST_R_MULHU];
+    wire sel_mulhsu= inst_packaged_i[`INST_R_MULHSU];
+    wire sel_div   = inst_packaged_i[`INST_R_DIV];
+    wire sel_divu  = inst_packaged_i[`INST_R_DIVU];
+    wire sel_rem   = inst_packaged_i[`INST_R_REM];
+    wire sel_remu  = inst_packaged_i[`INST_R_REMU];
 
     // Load & Store
     wire sel_lb    = inst_packaged_i.sel_lb;
@@ -171,11 +219,36 @@ module ex(
     wire        lts_res  = alu_cmp[0];
 
     // M扩展乘除法运算
+<<<<<<< HEAD:5_LEVEL_CPU_Cache/ex.sv
     wire [31:0] mul_res;
     wire mul_finished;
     wire sel_Mext_using_mul = inst_packaged_i.sel_Mext_using_mul;
     wire mul_ctrl = sel_Mext_using_mul & !mul_finished;
     
+=======
+    wire [31:0] div_res;
+    wire [31:0] mul_res;
+    wire div_ctrl_stall;
+    wire mul_ctrl_stall;
+    wire div_valid = valid_i && (sel_div | sel_divu | sel_rem | sel_remu);
+    
+    divider DIVIDER(
+        .clk          (clk),         
+        .rst          (rst),          
+        .valid_i      (div_valid),
+        .dividend_i   (value1_eff),
+        .divisor_i    (value2_eff),
+        .is_div_i     (sel_div),
+        .is_divu_i    (sel_divu),
+        .is_rem_i     (sel_rem),
+        .is_remu_i    (sel_remu),
+        .flush_i      (1'b0),
+        .valid_o      (div_ctrl_stall), 
+        .result_o     (div_res),
+        .busy_o       ()            
+    );
+
+>>>>>>> a3ff03f426c323a73f62c1f2ca5113c889bf2adb:5_LEVEL_CPU_Cache/ex.v
     mul MUL(
         .clk          (clk),
         .rst          (rst),
@@ -185,6 +258,7 @@ module ex(
         .is_mulh_i    (sel_mulh),
         .is_mulhu_i   (sel_mulhu),
         .is_mulhsu_i  (sel_mulhsu),
+<<<<<<< HEAD:5_LEVEL_CPU_Cache/ex.sv
         .flush_i      (pipe_flush),
         .finished_o   (mul_finished), 
         .mul_result_o (mul_res)
@@ -212,6 +286,14 @@ module ex(
 
 
     assign ctrl_stall = mul_ctrl | divider_ctrl; 
+=======
+        .flush_i      (1'b0),
+        .valid_o      (mul_ctrl_stall), 
+        .mul_result_o (mul_res)
+    );
+    
+    assign ctrl_stall = div_ctrl_stall | mul_ctrl_stall; 
+>>>>>>> a3ff03f426c323a73f62c1f2ca5113c889bf2adb:5_LEVEL_CPU_Cache/ex.v
 
     // csr 计算
     wire [31:0] csr_value1  = (inst_i[14]) ? value1_i : rs1_data_fwd;   // CSR 写数据选择
@@ -272,9 +354,21 @@ module ex(
             sel_or   : alu_result = or_res;
             sel_and  : alu_result = and_res;
             is_zicsr : alu_result = csr_rdata;
+            sel_div,
+            sel_divu,
+            sel_rem,
+            sel_remu : alu_result = div_res;
+            sel_mul,
+            sel_mulh,
+            sel_mulhu,
+            sel_mulhsu: alu_result = mul_res;
+
+<<<<<<< HEAD:5_LEVEL_CPU_Cache/ex.sv
 
             sel_Mext_using_divider: alu_result = div_res;
             sel_Mext_using_mul: alu_result = mul_res;
+=======
+>>>>>>> a3ff03f426c323a73f62c1f2ca5113c889bf2adb:5_LEVEL_CPU_Cache/ex.v
 
             request_value_only: alu_result = value1_i;
             default  : alu_result = 32'b0;
