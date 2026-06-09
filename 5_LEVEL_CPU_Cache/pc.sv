@@ -72,6 +72,9 @@ module pc(
         else if (div_stall) begin
             // ...
         end
+        else if (div_stall) begin
+            // ...
+        end
         else begin
             pc_addr_o <= pc_sel;
         end

@@ -368,6 +368,14 @@ module top_riscv(
         .pipe_hold          (pipe_hold_if1_if2),
         .pipe_flush         (pipe_flush_if1_if2),
 
+        .stall              (id_stall_o),
+        .ctrl_stall         (ex_ctrl_stall_o),
+
+<<<<<<< HEAD:5_LEVEL_CPU_Cache/top_riscv.sv
+=======
+        .stall              (id_stall_o),
+        .ctrl_stall         (ex_ctrl_stall_o),
+
 <<<<<<< HEAD:5_LEVEL_CPU_Cache/top_riscv.sv
 =======
         .stall              (id_stall_o),
@@ -414,6 +422,14 @@ module top_riscv(
         .rd_i               (if2_rd_o),
         .rs1_i              (if2_rs1_o),
         .rs2_i              (if2_rs2_o),
+
+        .stall              (id_stall_o),
+        .ctrl_stall         (ex_ctrl_stall_o),
+
+<<<<<<< HEAD:5_LEVEL_CPU_Cache/top_riscv.sv
+=======
+        .stall              (id_stall_o),
+        .ctrl_stall         (ex_ctrl_stall_o),
 
 <<<<<<< HEAD:5_LEVEL_CPU_Cache/top_riscv.sv
 =======
