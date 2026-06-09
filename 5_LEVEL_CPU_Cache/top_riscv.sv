@@ -75,36 +75,9 @@ module top_riscv(
     // ============================================================
     // id to id_ex
     // ============================================================
-<<<<<<< HEAD:5_LEVEL_CPU_Cache/top_riscv.sv
     id_ex_data_t    id_data_packaged_o;
     decode_t        id_inst_packaged_o;
     wire            id_regs_wen_o;
-=======
-    wire [31:0]     id_pc_addr_o;
-    wire [31:0]     id_inst_o;
-    wire [31:0]     id_value1_o;
-    wire [31:0]     id_value2_o;
-    wire [31:0]     id_jump1_o;
-    wire [31:0]     id_jump2_o;
-    wire            id_reg_wen;
-    (* max_fanout = 30 *)
-    wire [4:0]      id_rs1_addr_o;
-    (* max_fanout = 30 *)
-    wire [4:0]      id_rs2_addr_o;
-    wire [4:0]      id_rd_addr_o;
-    wire            id_pred_taken_o;
-    wire [`OP_INST_NUM - 1:0] id_inst_packaged_o;
-    wire            id_fwd_rs1_hit_ex_o;
-    wire            id_fwd_rs2_hit_ex_o;
-    wire [31:0]     id_fwd_rs1_data_o;
-    wire [31:0]     id_fwd_rs2_data_o;
-    wire [11:0]     id_csr_addr_o;
-    wire            id_ecall_o;
-    wire            id_mret_o;
-
-    // id to if1_if2 & if2_id
-    wire            id_stall_o;
->>>>>>> a3ff03f426c323a73f62c1f2ca5113c889bf2adb:5_LEVEL_CPU_Cache/top_riscv.v
 
     // ============================================================
     // ex to dcache
@@ -160,12 +133,7 @@ module top_riscv(
     wire [4:0]      ex_rd_addr_o;
     wire            ex_req_load_o;
 
-<<<<<<< HEAD:5_LEVEL_CPU_Cache/top_riscv.sv
     wire            ex_ctrl_stall;
-=======
-    // ex to if1_if2 & if2_id
-    wire            ex_ctrl_stall_o;
->>>>>>> a3ff03f426c323a73f62c1f2ca5113c889bf2adb:5_LEVEL_CPU_Cache/top_riscv.v
 
     // ============================================================
     // ex_mem to mem
@@ -285,9 +253,6 @@ module top_riscv(
         .pred_flush         (pred_flush_en),
         .pred_flush_pc      (pred_flush_pc),
 
-        .stall              (id_stall_o),
-        .ctrl_stall         (ex_ctrl_stall_o),
-
         .wb_ecall           (wb_ecall_o),
         .wb_mret            (wb_mret_o),
 
@@ -368,23 +333,6 @@ module top_riscv(
         .pipe_hold          (pipe_hold_if1_if2),
         .pipe_flush         (pipe_flush_if1_if2),
 
-        .stall              (id_stall_o),
-        .ctrl_stall         (ex_ctrl_stall_o),
-
-<<<<<<< HEAD:5_LEVEL_CPU_Cache/top_riscv.sv
-=======
-        .stall              (id_stall_o),
-        .ctrl_stall         (ex_ctrl_stall_o),
-
-<<<<<<< HEAD:5_LEVEL_CPU_Cache/top_riscv.sv
-=======
-        .stall              (id_stall_o),
-        .ctrl_stall         (ex_ctrl_stall_o),
-
-        .ecall_flush        (wb_ecall_flush),
-        .mret_flush         (wb_mret_flush),
-
->>>>>>> a3ff03f426c323a73f62c1f2ca5113c889bf2adb:5_LEVEL_CPU_Cache/top_riscv.v
         .pc_i               (if1_pc_o),
         .pc_o               (if2_pc_i)
     );
@@ -423,23 +371,6 @@ module top_riscv(
         .rs1_i              (if2_rs1_o),
         .rs2_i              (if2_rs2_o),
 
-        .stall              (id_stall_o),
-        .ctrl_stall         (ex_ctrl_stall_o),
-
-<<<<<<< HEAD:5_LEVEL_CPU_Cache/top_riscv.sv
-=======
-        .stall              (id_stall_o),
-        .ctrl_stall         (ex_ctrl_stall_o),
-
-<<<<<<< HEAD:5_LEVEL_CPU_Cache/top_riscv.sv
-=======
-        .stall              (id_stall_o),
-        .ctrl_stall         (ex_ctrl_stall_o),
-
-        .ecall_flush        (wb_ecall_flush),
-        .mret_flush         (wb_mret_flush),
-
->>>>>>> a3ff03f426c323a73f62c1f2ca5113c889bf2adb:5_LEVEL_CPU_Cache/top_riscv.v
         .inst_o             (id_inst_i),
         .pc_o               (id_pc_i),
         .opcode_o           (id_opcode_i),
@@ -491,22 +422,7 @@ module top_riscv(
         .wb_rd_addr_i       (wb_rd_addr_o),
         .wb_rd_data_i       (wb_rd_data_o),
 
-<<<<<<< HEAD:5_LEVEL_CPU_Cache/top_riscv.sv
         .hazard_en          (hazard_hazard_en)
-=======
-        .fwd_rs1_data_o     (id_fwd_rs1_data_o),
-        .fwd_rs2_data_o     (id_fwd_rs2_data_o),               
-        .fwd_rs1_hit_ex_o   (id_fwd_rs1_hit_ex_o),
-        .fwd_rs2_hit_ex_o   (id_fwd_rs2_hit_ex_o),
-
-        .hazard_en          (hazard_hazard_en),
-
-        .csr_addr_o         (id_csr_addr_o),
-        .ecall              (id_ecall_o),
-        .mret               (id_mret_o),
-
-        .stall              (id_stall_o)
->>>>>>> a3ff03f426c323a73f62c1f2ca5113c889bf2adb:5_LEVEL_CPU_Cache/top_riscv.v
     );
 
     // ============================================================
@@ -536,24 +452,6 @@ module top_riscv(
     ex EX(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
-<<<<<<< HEAD:5_LEVEL_CPU_Cache/top_riscv.sv
-=======
-        // from id_ex
-        .pc_addr_i          (ex_pc_addr_i),
-        .inst_i             (ex_inst_i),
-        .jump1_i            (ex_jump1_i),
-        .jump2_i            (ex_jump2_i),
-        .rd_addr_i          (ex_rd_addr_i),
-        .regs_wen_i         (ex_regs_wen_i),
-        .value1_i           (ex_value1_i),
-        .value2_i           (ex_value2_i),
-        .pred_taken_i       (ex_pred_taken_i),
-        .inst_packaged_i    (ex_inst_packaged_i),
-        .valid_i            (ex_valid_i),
-        .ecall_i            (ex_ecall_i),
-        .mret_i             (ex_mret_i),
-        .csr_addr_i         (ex_csr_addr_i),
->>>>>>> a3ff03f426c323a73f62c1f2ca5113c889bf2adb:5_LEVEL_CPU_Cache/top_riscv.v
 
         .pipe_flush         (pipe_flush_ex_mem),
 
@@ -602,12 +500,7 @@ module top_riscv(
         .csr_wdata_o        (ex_csr_wdata_o),
         .ecall_inst         (ex_ecall_inst),
 
-<<<<<<< HEAD:5_LEVEL_CPU_Cache/top_riscv.sv
         .ctrl_stall         (ex_ctrl_stall)
-=======
-        // to if1_if2,if2_id
-        .ctrl_stall         (ex_ctrl_stall_o)
->>>>>>> a3ff03f426c323a73f62c1f2ca5113c889bf2adb:5_LEVEL_CPU_Cache/top_riscv.v
     );
 
     // ============================================================
