@@ -85,10 +85,10 @@ module id(
     wire [31:0] forwarding_rs1_data_hit = (forwarding_rs1_hit_mem) ? forwarding_rs1_hit_mem_data : forwarding_rs1_hit_regs_data;
     wire [31:0] forwarding_rs2_data_hit = (forwarding_rs2_hit_mem) ? forwarding_rs2_hit_mem_data : forwarding_rs2_hit_regs_data;
 
-    assign inst_packaged_o = inst_packaged(inst_i, opcode_i, funct3_i, funct7_i);
+    assign inst_packaged_o = d(inst_i, opcode_i, funct3_i, funct7_i);
 
     // 打包指令
-    function automatic decode_t inst_packaged;
+    function automatic decode_t d;
         input [31:0] inst;
         input [6:0] opcode;
         input [2:0] funct3;
@@ -123,71 +123,71 @@ module id(
             logic f7_0000001 = (funct7 == 7'b0000001);
 
             // opcode
-            inst_packaged.is_alu_i   = is_alu_i;
-            inst_packaged.is_alu_r   = is_alu_r;
-            inst_packaged.is_auipc   = is_auipc;
-            inst_packaged.is_lui     = is_lui;
-            inst_packaged.is_jal     = is_jal;
-            inst_packaged.is_jalr    = is_jalr;
-            inst_packaged.is_branch  = is_branch;
-            inst_packaged.is_load    = is_load;
-            inst_packaged.is_store   = is_store;
-            inst_packaged.is_zicsr   = is_zicsr;
+            d.is_alu_i   = is_alu_i;
+            d.is_alu_r   = is_alu_r;
+            d.is_auipc   = is_auipc;
+            d.is_lui     = is_lui;
+            d.is_jal     = is_jal;
+            d.is_jalr    = is_jalr;
+            d.is_branch  = is_branch;
+            d.is_load    = is_load;
+            d.is_store   = is_store;
+            d.is_zicsr   = is_zicsr;
 
             // IR-type
-            inst_packaged.sel_add  = (is_alu_r & f3_000 & f7_0000000) | (is_alu_i & f3_000);
-            inst_packaged.sel_sub  = is_alu_r & f3_000 & f7_0100000;
-            inst_packaged.sel_xor  = (is_alu_r & f7_0000000 | is_alu_i) & f3_100;
-            inst_packaged.sel_or   = (is_alu_r & f7_0000000 | is_alu_i) & f3_110;
-            inst_packaged.sel_and  = (is_alu_r & f7_0000000 | is_alu_i) & f3_111;
-            inst_packaged.sel_sll  = (is_alu_r | is_alu_i) & f3_001 & f7_0000000;
-            inst_packaged.sel_srl  = (is_alu_r | is_alu_i) & f3_101 & f7_0000000;
-            inst_packaged.sel_sra  = (is_alu_r | is_alu_i) & f3_101 & f7_0100000;
-            inst_packaged.sel_slt  = (is_alu_r & f7_0000000 | is_alu_i) & f3_010;
-            inst_packaged.sel_sltu = (is_alu_r & f7_0000000 | is_alu_i) & f3_011;
+            d.sel_add  = (is_alu_r & f3_000 & f7_0000000) | (is_alu_i & f3_000);
+            d.sel_sub  = is_alu_r & f3_000 & f7_0100000;
+            d.sel_xor  = (is_alu_r & f7_0000000 | is_alu_i) & f3_100;
+            d.sel_or   = (is_alu_r & f7_0000000 | is_alu_i) & f3_110;
+            d.sel_and  = (is_alu_r & f7_0000000 | is_alu_i) & f3_111;
+            d.sel_sll  = (is_alu_r | is_alu_i) & f3_001 & f7_0000000;
+            d.sel_srl  = (is_alu_r | is_alu_i) & f3_101 & f7_0000000;
+            d.sel_sra  = (is_alu_r | is_alu_i) & f3_101 & f7_0100000;
+            d.sel_slt  = (is_alu_r & f7_0000000 | is_alu_i) & f3_010;
+            d.sel_sltu = (is_alu_r & f7_0000000 | is_alu_i) & f3_011;
 
             // M-type
-            inst_packaged.sel_Mext_using_mul    = is_alu_r & (f3_000 | f3_001 | f3_010 | f3_011) & f7_0000001;
-            inst_packaged.sel_Mext_using_divier = is_alu_r & (f3_100 | f3_101 | f3_110 | f3_111) & f7_0000001;
-            inst_packaged.sel_mul    = is_alu_r & f3_000 & f7_0000001;
-            inst_packaged.sel_mulh   = is_alu_r & f3_001 & f7_0000001;
-            inst_packaged.sel_mulhsu = is_alu_r & f3_010 & f7_0000001;
-            inst_packaged.sel_mulhu  = is_alu_r & f3_011 & f7_0000001;
-            inst_packaged.sel_div    = is_alu_r & f3_100 & f7_0000001;
-            inst_packaged.sel_divu   = is_alu_r & f3_101 & f7_0000001;
-            inst_packaged.sel_rem    = is_alu_r & f3_110 & f7_0000001;
-            inst_packaged.sel_remu   = is_alu_r & f3_111 & f7_0000001;
+            d.sel_Mext_using_mul    = is_alu_r & (f3_000 | f3_001 | f3_010 | f3_011) & f7_0000001;
+            d.sel_Mext_using_divider = is_alu_r & (f3_100 | f3_101 | f3_110 | f3_111) & f7_0000001;
+            d.sel_mul    = is_alu_r & f3_000 & f7_0000001;
+            d.sel_mulh   = is_alu_r & f3_001 & f7_0000001;
+            d.sel_mulhsu = is_alu_r & f3_010 & f7_0000001;
+            d.sel_mulhu  = is_alu_r & f3_011 & f7_0000001;
+            d.sel_div    = is_alu_r & f3_100 & f7_0000001;
+            d.sel_divu   = is_alu_r & f3_101 & f7_0000001;
+            d.sel_rem    = is_alu_r & f3_110 & f7_0000001;
+            d.sel_remu   = is_alu_r & f3_111 & f7_0000001;
 
             // Load & Store
-            inst_packaged.sel_lb   = is_load & f3_000;
-            inst_packaged.sel_lh   = is_load & f3_001;
-            inst_packaged.sel_lw   = is_load & f3_010;
-            inst_packaged.sel_lbu  = is_load & f3_100;
-            inst_packaged.sel_lhu  = is_load & f3_101;
-            inst_packaged.sel_sb   = is_store & f3_000;
-            inst_packaged.sel_sh   = is_store & f3_001;
-            inst_packaged.sel_sw   = is_store & f3_010;
+            d.sel_lb   = is_load & f3_000;
+            d.sel_lh   = is_load & f3_001;
+            d.sel_lw   = is_load & f3_010;
+            d.sel_lbu  = is_load & f3_100;
+            d.sel_lhu  = is_load & f3_101;
+            d.sel_sb   = is_store & f3_000;
+            d.sel_sh   = is_store & f3_001;
+            d.sel_sw   = is_store & f3_010;
 
             // Branch
-            inst_packaged.sel_beq   = is_branch & f3_000;
-            inst_packaged.sel_bne   = is_branch & f3_001;
-            inst_packaged.sel_blt   = is_branch & f3_100;
-            inst_packaged.sel_bge   = is_branch & f3_101;
-            inst_packaged.sel_bltu  = is_branch & f3_110;
-            inst_packaged.sel_bgeu  = is_branch & f3_111;
+            d.sel_beq   = is_branch & f3_000;
+            d.sel_bne   = is_branch & f3_001;
+            d.sel_blt   = is_branch & f3_100;
+            d.sel_bge   = is_branch & f3_101;
+            d.sel_bltu  = is_branch & f3_110;
+            d.sel_bgeu  = is_branch & f3_111;
 
             // CSR
-            inst_packaged.sel_csrrw   = is_zicsr & f3_001;
-            inst_packaged.sel_csrrs   = is_zicsr & f3_010;
-            inst_packaged.sel_csrrc   = is_zicsr & f3_011;
-            inst_packaged.sel_csrrwi  = is_zicsr & f3_101;
-            inst_packaged.sel_csrrsi  = is_zicsr & f3_110;
-            inst_packaged.sel_csrrci  = is_zicsr & f3_111;
-            inst_packaged.sel_ecall   = is_zicsr & f3_000 & is_ecall;
-            inst_packaged.sel_mret    = is_zicsr & f3_000 & is_mret;
+            d.sel_csrrw   = is_zicsr & f3_001;
+            d.sel_csrrs   = is_zicsr & f3_010;
+            d.sel_csrrc   = is_zicsr & f3_011;
+            d.sel_csrrwi  = is_zicsr & f3_101;
+            d.sel_csrrsi  = is_zicsr & f3_110;
+            d.sel_csrrci  = is_zicsr & f3_111;
+            d.sel_ecall   = is_zicsr & f3_000 & is_ecall;
+            d.sel_mret    = is_zicsr & f3_000 & is_mret;
 
             // 纯数值计算独热
-            inst_packaged.request_value_only = is_auipc | is_lui | is_jal | is_jalr;
+            d.request_value_only = is_auipc | is_lui | is_jal | is_jalr;
         end
     endfunction
 

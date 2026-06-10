@@ -29,12 +29,12 @@ module regs(
 
     integer i;
     always_ff @(posedge clk) begin
-	     if (!rst) begin
-		      for (i = 0; i < 32; i = i + 1) begin
-				    regs_p1[i] <= 32'b0;
+        if (!rst) begin
+            for (i = 0; i < 32; i = i + 1) begin
+				regs_p1[i] <= 32'b0;
                 regs_p2[i] <= 32'b0;
-				end
-		  end
+            end
+		end
         else if (regs_wen)  begin
             regs_p1[rd_addr_i] <= rd_data_i;
             regs_p2[rd_addr_i] <= rd_data_i;

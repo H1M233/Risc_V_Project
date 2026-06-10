@@ -37,11 +37,11 @@ module btb #(
     
     integer i;
     always_ff @(posedge clk) begin
-	     if (!rst) begin
-				for (i = 0; i < LINE_NUM; i = i + 1) begin
-					tagv[i] <= 0;
-				end
-		  end
+        if (!rst) begin
+            for (i = 0; i < LINE_NUM; i = i + 1) begin
+                tagv[i] <= 0;
+            end
+		end
         else if (update_en_i) begin
             // 更新目标地址
             tagv[update_index_i]      <= {1'b1, update_tag_i};

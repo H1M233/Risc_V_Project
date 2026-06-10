@@ -25,21 +25,21 @@
       },
       "src2": {
         "IPC": "0",
-        "REAL TIME": "479.538",
+        "REAL TIME": "849.249",
         "RUN TIME": "9381",
         "BPU ACCURACY": "0",
         "LED": "PASS √"
       },
       "withMext": {
         "IPC": "0",
-        "REAL TIME": "158.087",
+        "REAL TIME": "178.171",
         "RUN TIME": "1815",
         "BPU ACCURACY": "0",
         "LED": "FAIL x"
       },
       "withoutMext": {
         "IPC": "0",
-        "REAL TIME": "221.925",
+        "REAL TIME": "351.267",
         "RUN TIME": "3758",
         "BPU ACCURACY": "0",
         "LED": "PASS √"

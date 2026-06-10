@@ -32,9 +32,9 @@ module ras #(
 
     // 压栈
     always_ff @(posedge clk) begin
-	     if (!rst) begin
-				for(i = 0; i < DEPTH; i = i + 1) stack_mem[i] <= 32'b0;
-		  end
+        if (!rst) begin
+			for(i = 0; i < DEPTH; i = i + 1) stack_mem[i] <= 32'b0;
+		end
         else if (push_en_i & ptr != DEPTH) begin
             stack_mem[ptr]  <= push_addr_i;
         end

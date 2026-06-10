@@ -55,7 +55,7 @@
 
         // M-type
         logic sel_Mext_using_mul;
-        logic sel_Mext_using_divier;
+        logic sel_Mext_using_divider;
         logic sel_mul;
         logic sel_mulh;
         logic sel_mulhsu;

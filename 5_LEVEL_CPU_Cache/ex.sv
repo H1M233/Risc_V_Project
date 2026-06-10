@@ -192,7 +192,7 @@ module ex(
 
     wire [31:0] div_res;
     wire divider_finished;
-    wire sel_Mext_using_divider = inst_packaged_i.sel_Mext_using_divier;
+    wire sel_Mext_using_divider = inst_packaged_i.sel_Mext_using_divider;
     wire divider_ctrl = sel_Mext_using_divider & !divider_finished;
 
     divider DIVIDER(
