@@ -51,6 +51,8 @@ module dcache(
     reg miss_ready;
     reg tagv_wait, miss_wait;
     reg miss_way;
+	 reg [INDEX_WIDTH - 1:0] miss_index;
+    reg [TAG_WIDTH - 1:0] miss_tag;
     reg [INDEX_WIDTH - 1:0] query_index_r;
     reg [TAG_WIDTH - 1:0] query_tag_r;
     reg [3:0] cpu_we_r;
@@ -72,17 +74,7 @@ module dcache(
             cpu_req_store_r <= cpu_req_store;
         end
     end
-
-    // 初始化
-    integer i;
-    initial begin
-        for (i = 0; i < LINE_NUM; i = i + 1)  begin
-            tagv_w0[i] = 0;
-            tagv_w1[i] = 0;
-            replace_way[i] = 0;
-        end
-    end
-
+    
     // 判断命中 & replace_way & D-cache 读寄存器
     wire [TAG_WIDTH:0] hit_tagv_w0 = tagv_w0[query_index_tagv];
     wire [TAG_WIDTH:0] hit_tagv_w1 = tagv_w1[query_index_tagv];
@@ -104,6 +96,7 @@ module dcache(
     // Store Buffer 状态传递
     wire store_buffer_en = dcache_hit & cpu_req_store_r;
     reg store_buffer_hit;
+    reg [31:0] store_buffer_data_merge;
     reg [31:0] store_buffer_hit_data;
     always_ff @(posedge clk) begin
         if (!rst) begin
@@ -117,7 +110,6 @@ module dcache(
     end
 
     // Store Buffer 更新数据
-    reg [31:0] store_buffer_data_merge;
     always_comb begin
         store_buffer_data_merge = (hit_way_r) ? data_rdata_w1 : data_rdata_w0;
         if (cpu_we_r[3]) store_buffer_data_merge[31:24] = cpu_wdata_r[31:24];
@@ -147,16 +139,26 @@ module dcache(
     end
 
     // tagv 更新
+	 integer i;
     always_ff @(posedge clk) begin
-        if (miss_ready) begin
-            replace_way[miss_index] <= ~miss_way;    // FIFO 替换指针更新
-        end
-        if (miss_ready && miss_way == 1'b0) begin
-            tagv_w0[miss_index] <= {1'b1, miss_tag};
-        end
-        if (miss_ready && miss_way == 1'b1) begin
-            tagv_w1[miss_index] <= {1'b1, miss_tag};
-        end
+	     if (!rst) begin
+		      for (i = 0; i < LINE_NUM; i = i + 1)  begin
+					tagv_w0[i] <= 0;
+					tagv_w1[i] <= 0;
+					replace_way[i] <= 0;
+            end
+		  end
+		  else begin
+				if (miss_ready) begin
+					replace_way[miss_index] <= ~miss_way;    // FIFO 替换指针更新
+				end
+				if (miss_ready && miss_way == 1'b0) begin
+					tagv_w0[miss_index] <= {1'b1, miss_tag};
+				end
+				if (miss_ready && miss_way == 1'b1) begin
+					tagv_w1[miss_index] <= {1'b1, miss_tag};
+				end
+		  end
     end
 
     // 命中数据
@@ -164,8 +166,6 @@ module dcache(
                             (hit_way_r) ? data_rdata_w1 : data_rdata_w0;
 
     // 未命中状态转换
-    reg [INDEX_WIDTH - 1:0] miss_index;
-    reg [TAG_WIDTH - 1:0] miss_tag;
     always_ff @(posedge clk) begin
         if (!rst) begin
             tagv_wait       <= 0;

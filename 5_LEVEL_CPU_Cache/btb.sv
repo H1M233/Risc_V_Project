@@ -36,14 +36,13 @@ module btb #(
     assign target_pc_o = (hit_o) ? target[query_index_i] : 32'b0;
     
     integer i;
-    initial begin
-        // 复位所有状态
-        for (i = 0; i < LINE_NUM; i = i + 1) begin
-            tagv[i]  = 0;
-        end
-    end
     always_ff @(posedge clk) begin
-        if (update_en_i) begin
+	     if (!rst) begin
+				for (i = 0; i < LINE_NUM; i = i + 1) begin
+					tagv[i] <= 0;
+				end
+		  end
+        else if (update_en_i) begin
             // 更新目标地址
             tagv[update_index_i]      <= {1'b1, update_tag_i};
             target[update_index_i]    <= update_target_i;

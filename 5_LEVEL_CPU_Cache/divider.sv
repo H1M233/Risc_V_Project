@@ -18,6 +18,29 @@ module divider(
     output             valid_o,          // 结果有效，解除暂停
     output     [31:0]  result_o          // 商或余数
 );
+    // 寄存输入
+    wire InProgress = ~state_is_idle;
+    logic [31:0] dividend_r, divisor_r;
+    always_ff @(posedge clk) begin
+        if (!rst) begin
+            dividend_r  <= 32'b0;
+            divisor_r   <= 32'b0;
+        end
+        else if (flush_i) begin
+            dividend_r  <= 32'b0;
+            divisor_r   <= 32'b0;
+        end
+        else if (InProgress) begin
+            // 输入寄存
+        end
+        else if (valid_i) begin
+            dividend_r  <= dividend_i;
+            divisor_r   <= divisor_i;
+        end
+    end
+
+    wire [31:0] dividend_true = (InProgress) ? dividend_r : dividend_i;
+    wire [31:0] divisor_true = (InProgress) ? divisor_r : divisor_i;
 
     // =========================================================================
     //  指令译码
@@ -30,14 +53,14 @@ module divider(
     // =========================================================================
     //  特殊值检测
     // =========================================================================
-    wire div_by_0 = ~(|divisor_i);                                                    // 除数为 0
-    wire div_ovf  = is_signed & divisor_i[31] & (&divisor_i[30:0])                    // 除数 = -1
-                  & dividend_i[31] & (~(|dividend_i[30:0]));                          // 被除数 = MIN_INT
+    wire div_by_0 = ~(|divisor_true);                                                    // 除数为 0
+    wire div_ovf  = is_signed & divisor_true[31] & (&divisor_true[30:0])                    // 除数 = -1
+                  & dividend_true[31] & (~(|dividend_true[30:0]));                           // 被除数 = MIN_INT
     wire special_case = is_op_div & (div_by_0 | div_ovf);
 
     // 特殊值结果
     wire [31:0] div_by_0_quot = 32'hFFFFFFFF;
-    wire [31:0] div_by_0_remd = dividend_i;
+    wire [31:0] div_by_0_remd = dividend_true;
     wire [31:0] div_ovf_quot  = 32'h80000000;
     wire [31:0] div_ovf_remd  = 32'h0;
     wire [31:0] special_result = div_by_0 ? (want_quot ? div_by_0_quot : div_by_0_remd)
@@ -46,8 +69,6 @@ module divider(
     // =========================================================================
     //  状态机
     // =========================================================================
-    // typedef enum {IDLE, EXEC, CHECK, QUOT_CORR, REMD_CORR} state_t;
-    // state_t divider_state;
     localparam S_IDLE      = 3'd0;
     localparam S_EXEC      = 3'd1;
     localparam S_CHECK     = 3'd2;
@@ -73,11 +94,11 @@ module divider(
     // =========================================================================
     //  操作数符号扩展
     // =========================================================================
-    wire div_rs1_sign = is_signed & dividend_i[31];
-    wire div_rs2_sign = is_signed & divisor_i[31];
+    wire div_rs1_sign = is_signed & dividend_true[31];
+    wire div_rs2_sign = is_signed & divisor_true[31];
 
-    wire [65:0] dividend_ext = {{33{div_rs1_sign}}, div_rs1_sign, dividend_i};   // 66 bit
-    wire [33:0] divisor_ext  = {div_rs2_sign, div_rs2_sign, divisor_i};          // 34 bit
+    wire [65:0] dividend_ext = {{33{div_rs1_sign}}, div_rs1_sign, dividend_true};   // 66 bit
+    wire [33:0] divisor_ext  = {div_rs2_sign, div_rs2_sign, divisor_true};          // 34 bit
 
     // =========================================================================
     //  不恢复余数除法核心
@@ -88,8 +109,7 @@ module divider(
     reg        part_remd_sft1_r;    // 余数高位暂存 (adder MSB)
 
     // --- 第 0 周期: 初始商位 ---
-    // wire quot_0cycl = ~(dividend_ext[65] ^ divisor_ext[33]);   // 同号则 1，异号则 0 
-    wire quot_0cycl = 1'b1;
+    wire quot_0cycl = ~(dividend_ext[65] ^ divisor_ext[33]);   // 同号则 1，异号则 0
     wire [66:0] dividend_lsft1 = {dividend_ext[65:0], quot_0cycl};
 
     // --- 上一轮商位 ---
@@ -165,7 +185,7 @@ module divider(
     // =========================================================================
     wire start = state_is_idle & valid_i & is_op_div & ~flush_i & ~special_case;
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (~rst | flush_i) begin
             state_r <= S_IDLE;
         end else begin
@@ -200,7 +220,7 @@ module divider(
     // =========================================================================
     //  计数器
     // =========================================================================
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (~rst | flush_i) begin
             exec_cnt_r <= 6'd0;
         end else if (start) begin
@@ -231,7 +251,7 @@ module divider(
                            (state_is_exec & exec_last_cycle) ? div_quot :
                            part_remd_lsft1[32:0];
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (~rst | flush_i) begin
             part_remd_r     <= 33'd0;
             part_remd_sft1_r <= 1'b0;
@@ -241,7 +261,7 @@ module divider(
         end
     end
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (~rst | flush_i) begin
             part_quot_r <= 33'd0;
         end else if (update_quot) begin

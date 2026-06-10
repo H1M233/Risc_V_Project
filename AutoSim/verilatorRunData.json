@@ -1,24 +1,24 @@
 {
   "5_LEVEL_CPU_Cache": {
-    "INST TEST": "FAIL x",
+    "INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
         "IPC": "0",
-        "REAL TIME": "8.46464",
+        "REAL TIME": "13.3928",
         "RUN TIME": "143",
         "BPU ACCURACY": "0",
         "LED": "PASS √"
       },
       "src0": {
         "IPC": "0",
-        "REAL TIME": "354.025",
+        "REAL TIME": "618.194",
         "RUN TIME": "6894",
         "BPU ACCURACY": "0",
         "LED": "PASS √"
       },
       "src1": {
         "IPC": "0",
-        "REAL TIME": "387.12",
+        "REAL TIME": "628.296",
         "RUN TIME": "7144",
         "BPU ACCURACY": "0",
         "LED": "PASS √"
@@ -32,14 +32,14 @@
       },
       "withMext": {
         "IPC": "0",
-        "REAL TIME": "104.638",
+        "REAL TIME": "158.087",
         "RUN TIME": "1815",
         "BPU ACCURACY": "0",
         "LED": "FAIL x"
       },
       "withoutMext": {
         "IPC": "0",
-        "REAL TIME": "245.12",
+        "REAL TIME": "221.925",
         "RUN TIME": "3758",
         "BPU ACCURACY": "0",
         "LED": "PASS √"

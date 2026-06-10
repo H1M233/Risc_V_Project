@@ -1,5 +1,3 @@
-`include "switch.vh"
-
 module dram_BRAM(
     input               clk,
 

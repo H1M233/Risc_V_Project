@@ -60,7 +60,7 @@ module mul(
         dsp_result_uu   <= sent_value1 * sent_value2;
 
         // MULHSU: signed × unsigned
-        dsp_result_su   <= $signed(sent_value1) * $unsigned(sent_value2);
+        dsp_result_su   <= $signed(sent_value1) * $signed({1'b0, sent_value2});
     end
 
     always_comb begin

@@ -140,7 +140,7 @@ module id(
             inst_packaged.sel_xor  = (is_alu_r & f7_0000000 | is_alu_i) & f3_100;
             inst_packaged.sel_or   = (is_alu_r & f7_0000000 | is_alu_i) & f3_110;
             inst_packaged.sel_and  = (is_alu_r & f7_0000000 | is_alu_i) & f3_111;
-            inst_packaged.sel_sll  = (is_alu_r & f7_0000000 | is_alu_i) & f3_001;
+            inst_packaged.sel_sll  = (is_alu_r | is_alu_i) & f3_001 & f7_0000000;
             inst_packaged.sel_srl  = (is_alu_r | is_alu_i) & f3_101 & f7_0000000;
             inst_packaged.sel_sra  = (is_alu_r | is_alu_i) & f3_101 & f7_0100000;
             inst_packaged.sel_slt  = (is_alu_r & f7_0000000 | is_alu_i) & f3_010;

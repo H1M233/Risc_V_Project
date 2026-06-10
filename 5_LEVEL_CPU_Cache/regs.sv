@@ -28,14 +28,14 @@ module regs(
     assign rs2_data_o = regs_p2[rs2_addr_i];
 
     integer i;
-    initial begin
-        for (i = 0; i < 32; i = i + 1) begin
-            regs_p1[i] = 32'b0;
-            regs_p2[i] = 32'b0;
-        end
-    end
     always_ff @(posedge clk) begin
-        if (regs_wen)  begin
+	     if (!rst) begin
+		      for (i = 0; i < 32; i = i + 1) begin
+				    regs_p1[i] <= 32'b0;
+                regs_p2[i] <= 32'b0;
+				end
+		  end
+        else if (regs_wen)  begin
             regs_p1[rd_addr_i] <= rd_data_i;
             regs_p2[rd_addr_i] <= rd_data_i;
         end

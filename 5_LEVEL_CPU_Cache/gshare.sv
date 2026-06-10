@@ -42,18 +42,18 @@ module gshare #(
 
     // Block RAM
     integer i;
-    initial begin
-        for (i = 0; i < PHT_SIZE; i = i + 1) begin
-            pht[i] = 2'b01;
-        end
-    end
     always_ff @(posedge clk) begin
         // �?
         pht_reg         <= pht[pht_index_i];
         pht_update_old  <= pht[update_pht_index_i];
 
         // �?
-        if (pht_update_en_r) begin
+		  if (!rst) begin
+				for (i = 0; i < PHT_SIZE; i = i + 1) begin
+					pht[i] <= 2'b01;
+				end
+		  end
+        else if (pht_update_en_r) begin
             pht[pht_index_update_r] <= pht_update_new;
         end
     end
