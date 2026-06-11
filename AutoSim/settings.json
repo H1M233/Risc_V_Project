@@ -1,7 +1,7 @@
 {
   "Project": {
-    "5_LEVEL_CPU_Cache": {
-      "folder": "5_LEVEL_CPU_Cache",
+    "RV_Baseline": {
+      "folder": "RV_Baseline",
       "clockFreq": 350
     },
     "RV_Superscalar": {

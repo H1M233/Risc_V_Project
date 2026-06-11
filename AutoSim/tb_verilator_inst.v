@@ -40,7 +40,8 @@ module tb_verilator_inst(
         assign x3  = tb_verilator_inst.Core_cpu.REGS.regs_p1[3];   // 进行的test序号
         assign x26 = tb_verilator_inst.Core_cpu.REGS.regs_p1[26];  // 测试结束信号
         assign x27 = tb_verilator_inst.Core_cpu.REGS.regs_p1[27];  // 0: fail, 1: pass
-    `elsif PROJECT_5_LEVEL_CPU_CACHE
+
+    `elsif PROJECT_RV_BASELINE
         wire [31:0] pc, instruction;
         wire [31:0] perip_addr, perip_wdata, perip_rdata;
         wire [3:0] perip_we;
@@ -67,63 +68,7 @@ module tb_verilator_inst(
         assign x3  = tb_verilator_inst.Core_cpu.REGS.regs_p1[3];   // 进行的test序号
         assign x26 = tb_verilator_inst.Core_cpu.REGS.regs_p1[26];  // 测试结束信号
         assign x27 = tb_verilator_inst.Core_cpu.REGS.regs_p1[27];  // 0: fail, 1: pass
-
-    `elsif PROJECT_5_LEVEL_CPU_IMPROVED
-        wire [31:0] pc, instruction;
-        wire [31:0] perip_addr, perip_wdata, perip_rdata;
-        wire [1:0] perip_mask;
-        wire perip_wen;
-        top_riscv Core_cpu (
-            .cpu_rst            (rst),
-            .cpu_clk            (clk_cpu),
-            .irom_addr          (pc),             
-            .irom_data          (instruction),   
-            .perip_addr         (perip_addr),
-            .perip_wen          (perip_wen),
-            .perip_mask         (perip_mask),
-            .perip_wdata        (perip_wdata),    
-            .perip_rdata        (perip_rdata)     
-        );
-
-        IROM Mem_IROM (.a(pc[13:2]), .spo(instruction));
-        dram_driver dram_driver_inst (.clk(clk_cpu), .dram_addr(perip_addr[17:0]), .perip_wdata(perip_wdata), .perip_mask(perip_mask), .dram_wen(perip_wen), .perip_rdata(perip_rdata));
         
-        initial begin
-            $readmemh("./mem_init/inst_test.txt", tb_verilator_inst.Mem_IROM.rom_mem);
-            $readmemh("./mem_init/inst_test.txt", tb_verilator_inst.dram_driver_inst.Mem_DRAM.dram_inst.ram_mem);
-        end
-
-        assign x3  = tb_verilator_inst.Core_cpu.REGS.regs[3];   // 进行的test序号
-        assign x26 = tb_verilator_inst.Core_cpu.REGS.regs[26];  // 测试结束信号
-        assign x27 = tb_verilator_inst.Core_cpu.REGS.regs[27];  // 0: fail, 1: pass
-
-    `elsif PROJECT_5_LEVEL_CPU_OOO
-        wire [31:0] pc, instruction;
-        wire [31:0] perip_addr, perip_wdata, perip_rdata;
-        wire [3:0] perip_we;
-        top_riscv Core_cpu (
-            .cpu_rst            (rst),
-            .cpu_clk            (clk_cpu),
-            .irom_addr          (pc),             
-            .irom_data          (instruction),   
-            .perip_addr         (perip_addr),     
-            .perip_we           (perip_we),
-            .perip_wen          (),
-            .perip_wdata        (perip_wdata),    
-            .perip_rdata        (perip_rdata)     
-        );
-
-        IROM Mem_IROM (.a(pc[13:2]), .spo(instruction));
-        dram_driver dram_driver_inst (.clk(clk_cpu), .dram_addr(perip_addr[17:0]), .perip_wdata(perip_wdata), .perip_we(perip_we), .perip_rdata(perip_rdata));
-        initial begin
-            $readmemh("./mem_init/inst_test.txt", tb_verilator_inst.Mem_IROM.rom_mem);
-            $readmemh("./mem_init/inst_test.txt", tb_verilator_inst.dram_driver_inst.Mem_DRAM.dram_inst.ram_mem);
-        end
-
-        assign x3  = tb_verilator_inst.Core_cpu.gen_ooo.CORE.REGS.regs[3];   // 进行的test序号
-        assign x26 = tb_verilator_inst.Core_cpu.gen_ooo.CORE.REGS.regs[26];  // 测试结束信号
-        assign x27 = tb_verilator_inst.Core_cpu.gen_ooo.CORE.REGS.regs[27];  // 0: fail, 1: pass
-
     `endif
 
     reg [31:0] cycle_count;

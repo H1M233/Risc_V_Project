@@ -104,7 +104,7 @@ module tb_verilator_software(
                 func_block_pc1 <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX_SLOT1.branch_jump_addr;
         end
 
-    `elsif PROJECT_5_LEVEL_CPU_CACHE
+    `elsif PROJECT_RV_BASELINE
         initial begin
             $readmemh("./mem_init/irom.txt", tb_verilator_software.uut.student_top_inst.Mem_IROM.rom_mem);
             $readmemh("./mem_init/dram.txt", tb_verilator_software.uut.student_top_inst.bridge_inst.dram_driver_inst.Mem_DRAM.dram_inst.ram_mem);
@@ -137,36 +137,6 @@ module tb_verilator_software(
                 func_block_pc0 <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.jalr_target;
             else if (ex_is_branch & tb_verilator_software.uut.student_top_inst.Core_cpu.EX.branch_taken == 1'b1)
                 func_block_pc0 <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.branch_jump_addr;
-        end
-
-    `elsif PROJECT_5_LEVEL_CPU_IMPROVED
-        initial begin
-            $readmemh("./mem_init/irom.txt", tb_verilator_software.uut.student_top_inst.Mem_IROM.rom_mem);
-            $readmemh("./mem_init/dram.txt", tb_verilator_software.uut.student_top_inst.bridge_inst.dram_driver_inst.Mem_DRAM.dram_inst.ram_mem);
-        end
-        assign seg = tb_verilator_software.uut.student_top_inst.bridge_inst.seg_driver.s;
-        assign pc0 = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.pc_addr_i;
-        assign pc1 = 0;
-
-        always @(posedge clk_cpu) begin
-            if (tb_verilator_software.uut.student_top_inst.Core_cpu.EX.jump_en)
-                func_block_pc0 <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.jump_addr_o;
-        end
-
-    `elsif PROJECT_5_LEVEL_CPU_OOO
-        initial begin
-            $readmemh("./mem_init/irom.txt", tb_verilator_software.uut.student_top_inst.Mem_IROM.rom_mem);
-            $readmemh("./mem_init/dram.txt", tb_verilator_software.uut.student_top_inst.bridge_inst.dram_driver_inst.Mem_DRAM.dram_inst.ram_mem);
-        end
-        assign seg = tb_verilator_software.uut.student_top_inst.bridge_inst.seg_driver.s;
-        assign pc0 = tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.ALU0.pc;
-        assign pc1 = 0;
-
-        always @(posedge clk_cpu) begin
-            if (tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.ALU0.need_redirect)
-                func_block_pc0 <= tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.ALU0.redirect_pc;
-            else if (tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.ALU0.pred_taken)
-                func_block_pc1 <= tb_verilator_software.uut.student_top_inst.Core_cpu.gen_ooo.CORE.ALU0.actual_next_pc;
         end
 
     `endif

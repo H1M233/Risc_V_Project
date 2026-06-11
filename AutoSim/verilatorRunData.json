@@ -1,93 +1,11 @@
 {
-  "5_LEVEL_CPU_Cache": {
+  "RV_Baseline": {
     "INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
         "IPC": "0",
-        "REAL TIME": "13.3928",
+        "REAL TIME": "9.99634",
         "RUN TIME": "143",
-        "BPU ACCURACY": "0",
-        "LED": "PASS √"
-      },
-      "src0": {
-        "IPC": "0",
-        "REAL TIME": "618.194",
-        "RUN TIME": "6894",
-        "BPU ACCURACY": "0",
-        "LED": "PASS √"
-      },
-      "src1": {
-        "IPC": "0",
-        "REAL TIME": "628.296",
-        "RUN TIME": "7144",
-        "BPU ACCURACY": "0",
-        "LED": "PASS √"
-      },
-      "src2": {
-        "IPC": "0",
-        "REAL TIME": "849.249",
-        "RUN TIME": "9381",
-        "BPU ACCURACY": "0",
-        "LED": "PASS √"
-      },
-      "withMext": {
-        "IPC": "0",
-        "REAL TIME": "104.987",
-        "RUN TIME": "1815",
-        "BPU ACCURACY": "0",
-        "LED": "PASS √"
-      },
-      "withoutMext": {
-        "IPC": "0",
-        "REAL TIME": "351.267",
-        "RUN TIME": "3758",
-        "BPU ACCURACY": "0",
-        "LED": "PASS √"
-      }
-    }
-  },
-  "RV_Superscalar": {
-    "INST TEST": "FAIL x",
-    "SOFTWARE TEST": {
-      "init": {
-        "IPC": "1",
-        "REAL TIME": "10.0037",
-        "RUN TIME": "149",
-        "BPU ACCURACY": "0",
-        "LED": "PASS √"
-      },
-      "src0": {
-        "IPC": "0",
-        "REAL TIME": "484.355",
-        "RUN TIME": "7763",
-        "BPU ACCURACY": "0",
-        "LED": "PASS √"
-      },
-      "src1": {
-        "IPC": "0",
-        "REAL TIME": "546.231",
-        "RUN TIME": "8938",
-        "BPU ACCURACY": "0",
-        "LED": "PASS √"
-      },
-      "src2": {
-        "IPC": "1",
-        "REAL TIME": "643.782",
-        "RUN TIME": "10210",
-        "BPU ACCURACY": "0",
-        "LED": "PASS √"
-      },
-      "withMext": {
-        "IPC": "0",
-        "REAL TIME": "149.163",
-        "RUN TIME": "854",
-        "BPU ACCURACY": "0",
-        "LED": "FAIL x"
-      },
-      "withoutMext": {
-        "IPC": "0",
-        "REAL TIME": "302.804",
-        "RUN TIME": "4096",
         "BPU ACCURACY": "0",
         "LED": "PASS √"
       }
