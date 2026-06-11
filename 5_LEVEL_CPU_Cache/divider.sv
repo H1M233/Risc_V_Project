@@ -19,7 +19,20 @@ module divider(
     output     [31:0]  result_o          // 商或余数
 );
     // 寄存输入
-    wire InProgress = ~state_is_idle;
+    logic valid_r;
+    wire valid_pluse = valid_i & ~valid_r;
+    always_ff @(posedge clk) begin
+        if (!rst) begin
+            valid_r <= 1'b0;
+        end
+        else if (flush_i) begin
+            valid_r <= 1'b0;
+        end
+        else begin
+            valid_r <= valid_i;
+        end
+    end
+
     logic [31:0] dividend_r, divisor_r;
     always_ff @(posedge clk) begin
         if (!rst) begin
@@ -30,7 +43,7 @@ module divider(
             dividend_r  <= 32'b0;
             divisor_r   <= 32'b0;
         end
-        else if (InProgress) begin
+        else if (valid_r) begin
             // 输入寄存
         end
         else if (valid_i) begin
@@ -39,8 +52,8 @@ module divider(
         end
     end
 
-    wire [31:0] dividend_true = (InProgress) ? dividend_r : dividend_i;
-    wire [31:0] divisor_true = (InProgress) ? divisor_r : divisor_i;
+    wire [31:0] dividend_true = (valid_r) ? dividend_r : dividend_i;
+    wire [31:0] divisor_true = (valid_r) ? divisor_r : divisor_i;
 
     // =========================================================================
     //  指令译码
@@ -53,9 +66,10 @@ module divider(
     // =========================================================================
     //  特殊值检测
     // =========================================================================
-    wire div_by_0 = ~(|divisor_true);                                                    // 除数为 0
-    wire div_ovf  = is_signed & divisor_true[31] & (&divisor_true[30:0])                    // 除数 = -1
-                  & dividend_true[31] & (~(|dividend_true[30:0]));                           // 被除数 = MIN_INT
+    wire div_by_0 = ~(|divisor_true);                                                                           // 除数为 0
+    wire div_ovf  = is_signed 
+                  & (divisor_true[31] & (&divisor_true[30:0]) | (~(|divisor_true[31:1]) & divisor_true[0]))     // 除数 = -1 或 1
+                  & dividend_true[31] & (~(|dividend_true[30:0]));                                              // 被除数 = MIN_INT
     wire special_case = is_op_div & (div_by_0 | div_ovf);
 
     // 特殊值结果
@@ -173,17 +187,17 @@ module divider(
     // =========================================================================
     wire normal_done = (state_is_exec & exec_last_cycle & ~is_op_div)       // 非除法（不走这里，但保留安全）
                      | (state_is_check & ~div_need_corrct)
-                     | state_is_remd_corr;
+                     | (state_is_quot_corr & want_quot)
+                     | (state_is_remd_corr & want_remd);
 
-    assign valid_o = (state_is_idle & valid_i & special_case)               // 特殊值直接出
-                   | (state_is_idle & valid_i & ~special_case & ~is_op_div) // 安全保护
+    assign valid_o = (state_is_idle & valid_pluse & special_case)               // 特殊值直接出
                    | normal_done;
     assign result_o = special_case ? special_result : div_result;
 
     // =========================================================================
     //  状态机转移
     // =========================================================================
-    wire start = state_is_idle & valid_i & is_op_div & ~flush_i & ~special_case;
+    wire start = state_is_idle & valid_pluse & is_op_div & ~flush_i & ~special_case;
 
     always_ff @(posedge clk) begin
         if (~rst | flush_i) begin

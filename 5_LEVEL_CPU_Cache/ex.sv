@@ -210,8 +210,7 @@ module ex(
         .result_o     (div_res)
     );
 
-
-    assign ctrl_stall = mul_ctrl | divider_ctrl; 
+    assign ctrl_stall = (mul_ctrl | divider_ctrl) & !pipe_flush; 
 
     // csr 计算
     wire [31:0] csr_value1  = (inst_i[14]) ? value1_i : rs1_data_fwd;   // CSR 写数据选择
@@ -230,8 +229,7 @@ module ex(
     // Branch 计算
     reg branch_taken;
     always_comb begin
-        (* parallel_case *)
-        case (1'b1)
+        unique case (1'b1)
             sel_beq  : branch_taken = branch_eq_res;
             sel_bne  : branch_taken = ~branch_eq_res;
             sel_blt  : branch_taken = branch_lts_res;
@@ -272,15 +270,6 @@ module ex(
             sel_or   : alu_result = or_res;
             sel_and  : alu_result = and_res;
             is_zicsr : alu_result = csr_rdata;
-            sel_div,
-            sel_divu,
-            sel_rem,
-            sel_remu : alu_result = div_res;
-            sel_mul,
-            sel_mulh,
-            sel_mulhu,
-            sel_mulhsu: alu_result = mul_res;
-
 
             sel_Mext_using_divider: alu_result = div_res;
             sel_Mext_using_mul: alu_result = mul_res;

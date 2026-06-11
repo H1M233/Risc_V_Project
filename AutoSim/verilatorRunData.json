@@ -1,6 +1,6 @@
 {
   "5_LEVEL_CPU_Cache": {
-    "INST TEST": "PASS √",
+    "INST TEST": "FAIL x",
     "SOFTWARE TEST": {
       "init": {
         "IPC": "0",
@@ -32,10 +32,10 @@
       },
       "withMext": {
         "IPC": "0",
-        "REAL TIME": "178.171",
+        "REAL TIME": "104.987",
         "RUN TIME": "1815",
         "BPU ACCURACY": "0",
-        "LED": "FAIL x"
+        "LED": "PASS √"
       },
       "withoutMext": {
         "IPC": "0",
@@ -79,7 +79,7 @@
       },
       "withMext": {
         "IPC": "0",
-        "REAL TIME": "139.045",
+        "REAL TIME": "149.163",
         "RUN TIME": "854",
         "BPU ACCURACY": "0",
         "LED": "FAIL x"
