@@ -1,6 +1,6 @@
 {
   "5_LEVEL_CPU_Cache": {
-    "INST TEST": "FAIL x",
+    "INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
         "IPC": "0",
