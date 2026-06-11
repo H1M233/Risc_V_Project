@@ -77,6 +77,13 @@ int main(int argc, char** argv) {
     // 打印更新频率 - 影响仿真性能
     const double tf = 1;  // 1 = 每仿真 1ms 更新一次
 
+    // 统计数据
+    double REAL_TIME, RUN_TIME;
+    int SEG;
+    double IPC, BPU_ACCURACY, BRANCH, JALR;
+    int PC0, PC1;
+    int FUNC_BLOCK_PC0, FUNC_BLOCK_PC1;
+
     // 跑飞分析
     const int PC_RANGE_START = 0x8000'0000;
     const int PC_RANGE_END = 0x8000'3FFF;
@@ -186,22 +193,22 @@ int main(int argc, char** argv) {
             if (validRef <= speedRef) validRef++;
             lastSimTime = sim_time_ns;
             lastRunTime = current_time;
-            int ETATime_s_total = (PREV_TIME - sim_time_ns) / speed_ns / 10;
+            int ETATime_s_total = (PREV_TIME) ? (PREV_TIME - sim_time_ns) / speed_ns / 10 : -1;
             int ETATime_s = ETATime_s_total % 60;
             int ETATime_m = ETATime_s_total / 60; 
 
             // 统计数据
-            double RUN_TIME = current_time / 1000.0;
-            double SIM_TIME = sim_time_ns / NS2MS;
-            int SEG = top->seg;
-            double IPC = commitCycle / static_cast<float>(totalCycle);
-            double BPU_ACCURACY = (predTotal - predMiss) / static_cast<float>(predTotal);
-            double BRANCH = (predTotalB - predMissB) / static_cast<float>(predTotalB);
-            double JALR = (predTotalJr - predMissJr) / static_cast<float>(predTotalJr);
-            int FUNC_BLOCK_PC0 = top->func_block_pc0;
-            int PC0 = top->pc0;
-            int FUNC_BLOCK_PC1 = top->func_block_pc1;
-            int PC1 = top->pc1;
+            REAL_TIME = current_time / 1000.0;
+            RUN_TIME = sim_time_ns / NS2MS;
+            SEG = top->seg;
+            IPC = commitCycle / static_cast<float>(totalCycle);
+            BPU_ACCURACY = (predTotal - predMiss) / static_cast<float>(predTotal);
+            BRANCH = (predTotalB - predMissB) / static_cast<float>(predTotalB);
+            JALR = (predTotalJr - predMissJr) / static_cast<float>(predTotalJr);
+            FUNC_BLOCK_PC0 = top->func_block_pc0;
+            PC0 = top->pc0;
+            FUNC_BLOCK_PC1 = top->func_block_pc1;
+            PC1 = top->pc1;
 
             // 打印进度条
             std::cout << "\r" << "\033[11A" << "\033[2K" << "\033[96m";
@@ -215,10 +222,10 @@ int main(int argc, char** argv) {
             if (!SEG_getTime) std::cout << "\033[0m";
             std::cout << "\n\n";
 
-            std::cout << "RUN TIME:"
-                      << std::right << std::setw(14) << std::fixed << std::setprecision(2) << RUN_TIME << " s"
-                      << std::setw(13) << "SIM TIME:"
-                      << std::right << std::setw(13) << std::fixed << std::setprecision(0) << SIM_TIME << " ms"
+            std::cout << "REAL TIME:"
+                      << std::right << std::setw(14) << std::fixed << std::setprecision(2) << REAL_TIME << " s"
+                      << std::setw(12) << "RUN TIME:"
+                      << std::right << std::setw(13) << std::fixed << std::setprecision(0) << RUN_TIME << " ms"
                       << std::setw(8) << "SEG:"
                       << std::right << std::setw(11) << std::hex << SEG << std::dec
                       << std::endl << std::endl << "\033[2K"
@@ -244,7 +251,7 @@ int main(int argc, char** argv) {
                       << std::right << std::setw(8) << PC1 << std::dec
                       << std::setw(13) << "IN RANGE: "
                       << ((isPC1_OutOfRange) ? "x | " : "√ | ") << PC1_firstTime_OutOfRange << " ms | " << PC1_OutOfRange
-                      << "  BRANCH_8000_0520: " << top->branch1 << " / " << std::hex << top->branch2 << std::dec
+                      << "  QUERY_VALUE: " << top->branch1 << " / " << std::hex << top->branch2 << std::dec
                       << std::endl << std::endl << "\033[2K"
 
                       << "ETA: "
@@ -278,10 +285,11 @@ int main(int argc, char** argv) {
 
     // 写回文件 传输给python
     std::ofstream f("software_results.txt");
-    f << "IPC=" << commitCycle / totalCycle << std::endl
-      << "REAL TIME=" << current_time / 1000.0 << std::endl
-      << "RUN TIME=" << std::hex << SEG_getTime << std::dec << std::endl
-      << "BPU ACCURACY=" << (predTotal - predMiss) / predTotal << std::endl
+    f << "IPC=" << IPC << std::endl
+      << "REAL TIME=" << REAL_TIME << std::endl
+      << "RUN TIME=" << RUN_TIME << std::endl
+      << "SEG TIME=" << std::hex << SEG_getTime << std::dec << std::endl
+      << "BPU ACCURACY=" << BPU_ACCURACY << std::endl
       << "LED=" << (isTick ? "PASS √" : "FAIL x");
     f.close();
 

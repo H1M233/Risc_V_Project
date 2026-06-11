@@ -17,8 +17,7 @@
         logic [31:0] jump2;
         logic [4:0]  rd_addr;
         logic        pred_taken;
-        logic [3:0]  ras_snapshot;
-        logic        is_ret;
+        logic [3:0]  ras_ptr;
         logic [11:0] csr_addr;
         logic        ecall;
         logic        mret;

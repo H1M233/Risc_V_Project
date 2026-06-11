@@ -31,6 +31,7 @@ module bpu_top #(
     // to pc & id
     output     [31:0]   pred_pc,            // 向if输出预测的地址
     output              pred_taken,         // 从PHT中读取的计数器高位值
+    output     [3:0]    ptr_o,
 
     // from ex
     input               update_btb_en,      // ex阶段返回的BTB更新使能
@@ -38,6 +39,8 @@ module bpu_top #(
     input      [31:0]   update_pc,          // ex阶段返回更新的指令地址
     input      [31:0]   update_target,      // ex阶段返回的实际跳转地址
     input               actual_taken,       // ex阶段判断跳转为真
+    input               rollback_ras_ptr_en_i,
+    input      [3:0]    rollback_ras_ptr_i,
 
     (* max_fanout = 20 *)
     input               pipe_hold,
@@ -170,11 +173,14 @@ module bpu_top #(
         .push_en_i                  (ras_push_en_i),
         .pop_en_i                   (ras_pop_en_i),
         .push_addr_i                (ras_push_addr_i),
+        .rollback_en_i              (rollback_ras_ptr_en_i),
+        .rollback_ptr_i             (rollback_ras_ptr_i),
 
         // to bpu_controller
         .pop_addr_o                 (ras_pop_addr_o),
         .isempty_o                  (ras_isempty_o),
-        .isfull_o                   (ras_isfull_o)
+        .isfull_o                   (ras_isfull_o),
+        .ptr_o                      (ptr_o)
     );
 
     btb #(

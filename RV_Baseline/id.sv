@@ -16,7 +16,7 @@ module id(
     // from bpu
     input               pred_taken_i,
     input      [31:0]   pred_pc_i,
-    
+    input      [3:0]    ras_ptr_i,
     // from regs
     input      [31:0]   rs1_data_i,         // 从寄存器堆读出的寄存rs1的数据
     input      [31:0]   rs2_data_i,         // 从寄存器堆读出的寄存rs2的数据
@@ -209,6 +209,7 @@ module id(
     assign data_packaged_o.pc           = pc_addr_o;
     assign data_packaged_o.inst         = inst_o;
     assign data_packaged_o.pred_taken   = pred_taken_o;
+    assign data_packaged_o.ras_ptr      = ras_ptr_i;
 
     // 前推
     assign data_packaged_o.fwd_rs1_data = forwarding_rs1_data_hit;

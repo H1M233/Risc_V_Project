@@ -102,6 +102,7 @@ module top_riscv(
     // ============================================================
     wire            ex_pred_flush_en_o;
     wire [31:0]     ex_pred_flush_pc_o;
+    wire [3:0]      ex_rollback_ras_ptr_o;
     wire            pred_flush_en;
     wire [31:0]     pred_flush_pc;
 
@@ -206,6 +207,7 @@ module top_riscv(
     // ============================================================
     wire [31:0]     bpu_pred_pc;
     wire            bpu_pred_taken;
+    wire [3:0]      bpu_ras_ptr_o;
 
     // ��ˮ����ͣ����
     (* max_fanout = 30 *) wire pipe_hold_pc = dcache_stall | hazard_hazard_en | ex_ctrl_stall;
@@ -239,6 +241,7 @@ module top_riscv(
     wire [31:0]     bpu_update_pc_i;
     wire [31:0]     bpu_update_target_i;
     wire            bpu_actual_taken_i;
+    wire [3:0]      bpu_rollback_ras_ptr_i;
 
     // ============================================================
     // PC
@@ -396,6 +399,7 @@ module top_riscv(
 
         .pred_taken_i       (bpu_pred_taken),
         .pred_pc_i          (bpu_pred_pc),
+        .ras_ptr_i          (bpu_ras_ptr_o),
 
         .rs1_data_i         (reg_rs1_data_o),
         .rs2_data_i         (reg_rs2_data_o),
@@ -492,6 +496,7 @@ module top_riscv(
         .actual_taken_o     (ex_actual_taken_o),
         .pred_flush_en      (ex_pred_flush_en_o),
         .pred_flush_pc      (ex_pred_flush_pc_o),
+        .rollback_ras_ptr_o (ex_rollback_ras_ptr_o),
 
         // to csr_regs
         .csr_addr_o         (ex_csr_addr_o),
@@ -669,6 +674,7 @@ module top_riscv(
         .update_pc_i        (ex_update_pc_o),
         .update_target_i    (ex_update_target_o),
         .actual_taken_i     (ex_actual_taken_o),
+        .rollback_ras_ptr_i (ex_rollback_ras_ptr_o),
 
         .pred_flush_en_i    (ex_pred_flush_en_o),
         .pred_flush_pc_i    (ex_pred_flush_pc_o),
@@ -678,6 +684,7 @@ module top_riscv(
         .update_pc_o        (bpu_update_pc_i),
         .update_target_o    (bpu_update_target_i),
         .actual_taken_o     (bpu_actual_taken_i),
+        .rollback_ras_ptr_o (bpu_rollback_ras_ptr_i),
 
         .pred_flush_en_o    (pred_flush_en),
         .pred_flush_pc_o    (pred_flush_pc)
@@ -698,12 +705,15 @@ module top_riscv(
 
         .pred_pc            (bpu_pred_pc),
         .pred_taken         (bpu_pred_taken),
+        .ptr_o              (bpu_ras_ptr_o),
 
         .update_btb_en      (bpu_update_btb_en_i),
         .update_gshare_en   (bpu_update_gshare_en_i),
         .update_pc          (bpu_update_pc_i),
         .update_target      (bpu_update_target_i),
         .actual_taken       (bpu_actual_taken_i),
+        .rollback_ras_ptr_en_i(pred_flush_en),
+        .rollback_ras_ptr_i (bpu_rollback_ras_ptr_i),
 
         .pipe_hold          (pipe_hold_bpu),
         .pipe_flush         (pipe_flush_bpu)

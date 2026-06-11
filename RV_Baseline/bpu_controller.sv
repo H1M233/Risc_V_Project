@@ -159,12 +159,13 @@ module bpu_controller #(
             gshare_prev_b   <= 0;
         end
         else if (pipe_hold) begin
-            // ..
+            // ...
         end
         else if (pipe_flush) begin
             // RAS
             ras_pop_en      <= 0;
             ras_push_en     <= 0;
+
             // GSHARE
             gshare_prev_b   <= 0;
         end

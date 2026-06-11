@@ -48,6 +48,7 @@ module ex(
     output              actual_taken_o,
     output              pred_flush_en,
     output     [31:0]   pred_flush_pc,
+    output     [3:0]    rollback_ras_ptr_o,
 
     // to csr_regs
     output              csr_wen_o,
@@ -285,6 +286,7 @@ module ex(
     assign update_pc_o         = pc_addr_i;
     assign update_target_o     = jalr_target;
     assign actual_taken_o      = branch_taken;
+    assign rollback_ras_ptr_o  = data_packaged_i.ras_ptr;
 
     // 冲刷控制
     assign pred_flush_en  = (branch_pred_mispredict | jalr_pred_mispredict);

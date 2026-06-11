@@ -10,6 +10,7 @@ module ex_bpu(
     input      [31:0]   update_pc_i,
     input      [31:0]   update_target_i,
     input               actual_taken_i,
+    input      [3:0]    rollback_ras_ptr_i,
 
     input               pred_flush_en_i,
     input      [31:0]   pred_flush_pc_i,
@@ -19,6 +20,7 @@ module ex_bpu(
     output reg [31:0]   update_pc_o,
     output reg [31:0]   update_target_o,
     output reg          actual_taken_o,
+    output     [3:0]    rollback_ras_ptr_o,
 
     output reg          pred_flush_en_o,
     output reg [31:0]   pred_flush_pc_o
@@ -30,6 +32,7 @@ module ex_bpu(
             update_pc_o         <= 0;
             update_target_o     <= 0;
             actual_taken_o      <= 0;
+            rollback_ras_ptr_o  <= 0;
 
             pred_flush_en_o     <= 0;
             pred_flush_pc_o     <= 0;
@@ -41,6 +44,7 @@ module ex_bpu(
             update_pc_o         <= 0;
             update_target_o     <= 0;
             actual_taken_o      <= 0;
+            rollback_ras_ptr_o  <= 0;
 
             pred_flush_en_o     <= 0;
             pred_flush_pc_o     <= 0;
@@ -51,6 +55,7 @@ module ex_bpu(
             update_pc_o         <= update_pc_i;
             update_target_o     <= update_target_i;
             actual_taken_o      <= actual_taken_i;
+            rollback_ras_ptr_o  <= rollback_ras_ptr_i;
 
             pred_flush_en_o     <= pred_flush_en_i;
             pred_flush_pc_o     <= pred_flush_pc_i;
