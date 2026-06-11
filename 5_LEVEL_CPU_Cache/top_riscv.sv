@@ -88,6 +88,12 @@ module top_riscv(
     wire [31:0]     dcache_wdata_i;
     wire [3:0]      dcache_we_i;
     wire            dcache_write_dram_i;
+    wire [31:0]     ex_dcache_addr_o;
+    wire            ex_dcache_req_load_o;
+    wire            ex_dcache_req_store_o;
+    wire [31:0]     ex_dcache_wdata_o;
+    wire [3:0]      ex_dcache_we_o;
+    wire            ex_dcache_write_dram_o;
 
     // ============================================================
     // id_ex to ex
@@ -106,7 +112,62 @@ module top_riscv(
     wire [31:0]     pred_flush_pc;
 
     // ============================================================
-    // ex to ex_mem
+    // ex1 to ex_ex2
+    // ============================================================
+    wire [1:0]      ex1_load_addr_low_o;
+    wire [1:0]      ex1_load_mask_o;
+    wire            ex1_load_is_signed_o;
+    wire            ex1_regs_wen_o;
+    wire            ex1_ecall_o;
+    wire            ex1_mret_o;
+    wire [31:0]     ex1_ecall_inst;
+    wire [31:0]     ex1_rd_data_o;
+    wire [4:0]      ex1_rd_addr_o;
+    wire            ex1_req_load_o;
+    wire            ex1_dcache_req_load_o;
+    wire            ex1_dcache_req_store_o;
+    wire [31:0]     ex1_dcache_addr_o;
+    wire [31:0]     ex1_dcache_wdata_o;
+    wire [3:0]      ex1_dcache_we_o;
+    wire            ex1_dcache_write_dram_o;
+    wire [`OP_INST_NUM - 1:0] ex1_inst_packaged_o;
+    wire [31:0]     ex1_mdu_rs1_o;
+    wire [31:0]     ex1_mdu_rs2_o;
+    wire signed [33:0] ex1_div_remainder_o;
+    wire [31:0]     ex1_div_quotient_o;
+    wire [31:0]     ex1_div_divisor_abs_o;
+
+    // ex to csr_regs
+    wire            ex_csr_wen_o;
+    wire [31:0]     ex_csr_wdata_o;
+    wire [11:0]     ex_csr_addr_o;
+
+    // ex_ex2 to ex2
+    // ============================================================
+    wire [1:0]      ex2_load_addr_low_i;
+    wire [1:0]      ex2_load_mask_i;
+    wire            ex2_load_is_signed_i;
+    wire            ex2_regs_wen_i;
+    wire            ex2_ecall_i;
+    wire            ex2_mret_i;
+    wire [31:0]     ex2_ecall_inst_i;
+    wire [31:0]     ex2_rd_data_i;
+    wire [4:0]      ex2_rd_addr_i;
+    wire            ex2_req_load_i;
+    wire            ex2_dcache_req_load_i;
+    wire            ex2_dcache_req_store_i;
+    wire [31:0]     ex2_dcache_addr_i;
+    wire [31:0]     ex2_dcache_wdata_i;
+    wire [3:0]      ex2_dcache_we_i;
+    wire            ex2_dcache_write_dram_i;
+    wire [`OP_INST_NUM - 1:0] ex2_inst_packaged_i;
+    wire [31:0]     ex2_mdu_rs1_i;
+    wire [31:0]     ex2_mdu_rs2_i;
+    wire signed [33:0] ex2_div_remainder_i;
+    wire [31:0]     ex2_div_quotient_i;
+    wire [31:0]     ex2_div_divisor_abs_i;
+
+    // ex2 to ex_mem & hazard
     // ============================================================
     wire [1:0]      ex_load_addr_low_o;
     wire [1:0]      ex_load_mask_o;
@@ -129,6 +190,8 @@ module top_riscv(
     wire [11:0]     ex_csr_addr_o;
 
     // ex to ex_mem & hazard
+=======
+>>>>>>> 9949f6b048c4bc471514e2989b8b1a332441e541
     wire [31:0]     ex_rd_data_o;
     wire [4:0]      ex_rd_addr_o;
     wire            ex_req_load_o;
@@ -506,7 +569,7 @@ module top_riscv(
     // ============================================================
     // EX/MEM
     // ============================================================
-    ex_mem EX_MEM(
+    ex1_ex2 EX1_EX2(
         .clk                (cpu_clk),
         .rst                (cpu_rst),
         .pipe_hold          (pipe_hold_ex_mem),
