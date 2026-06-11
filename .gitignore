@@ -1,4 +1,6 @@
 .history/
+.settings/
+.vscode/
 
 \[文档\]/
 
@@ -21,7 +23,6 @@ AutoSim/wave_verilator.vcd
 
 twin/
 
-.settings/
 
 .library_mapping.xml
 .project
