@@ -17,3 +17,20 @@
     `define DRAM_ADDR_START  32'h8010_0000
     `define DRAM_ADDR_END    32'h8013_FFFF
 `endif
+
+// 扩展
+// `define ENABLE_M
+
+// `define ENABLE_B
+`ifdef ENABLE_B
+    `define ENABLE_B_ZBA
+    `define ENABLE_B_ZBB
+    `define ENABLE_B_ZBC
+    `define ENABLE_B_ZBS
+    `define ENABLE_B_ZBKB
+    `define ENABLE_B_ZBKX
+`endif
+
+// `define ENABLE_Zicond
+
+`define ENABLE_A

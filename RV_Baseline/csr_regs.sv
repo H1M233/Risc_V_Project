@@ -4,9 +4,8 @@
 module csr_regs(
     input clk,
     input rst,
-    input [11:0] csr_addr,        
-    input [31:0] csr_wdata,        //from ex
-    input csr_wen,
+    input logic [11:0] csr_addr,
+    input ex_csr_data_t data_packaged_i,
 
     output reg [31:0] csr_rdata,
     //ecall
@@ -15,6 +14,10 @@ module csr_regs(
     input [31:0] ecall_inst,        //from wb
     output reg [31:0] ecall_mret_addr
 );
+    // 解码
+    wire [31:0] csr_wdata = data_packaged_i.wdata;
+    wire        csr_wen   = data_packaged_i.wen;
+
     // 定义CSR寄存器
     reg [31:0] mstatus;   // 机器状态寄存器
     reg [31:0] mepc;      // 机器异常程序计数器

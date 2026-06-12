@@ -55,6 +55,8 @@
 `define CSRRSI   3'b110
 `define CSRRCI   3'b111
 
+`define TYPE_AMO 7'b0101111
+
 `define ECALL_MRET    3'b000
 
 `define NOP      32'h0000_0013      

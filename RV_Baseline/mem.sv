@@ -2,109 +2,61 @@
 `include "alu.vh"
 
 module mem(
-    input               clk,
-    input               rst,
+    input  logic clk,
+    input  logic rst,
 
     // from dcache
-    input               dcache_ack,
-    input      [31:0]   dcache_rdata,
-    input               dcache_stall,
+    input  logic         dcache_ack,
+    input  logic [31:0]  dcache_rdata,
+    input  logic         dcache_stall,
 
     // from ex_mem
-    input      [4:0]    rd_addr_i,
-    input      [31:0]   rd_data_i,
-    input               regs_wen,
-    input               mem_req_load_i,
-    input               ecall_i,
-    input               mret_i,
-    input      [1:0]    load_mask_i,
-    input      [1:0]    load_addr_low_i,
-    input               load_is_signed_i,
-    input      [31:0]   ecall_inst_i,
+    input ex_mem_data_t  data_packaged_i,
     
     // to hazard & wb
-    output              mem1_is_load_o,
-    output reg          mem2_is_load_o,
-
-    // to forwarding
-    output     [4:0]    mem1_rd_addr_o,
-    output     [31:0]   mem1_rd_data_o,
-    output              mem1_regs_wen_o,
+    output logic         mem2_is_load_o,
 
     // to mem_wb & forwarding
-    (* max_fanout = 20 *) output reg [4:0]    mem2_rd_addr_o,
-    (* max_fanout = 20 *) output reg [31:0]   mem2_rd_data_o,
-    (* max_fanout = 20 *) output reg          mem2_regs_wen_o,
-    output reg          ecall_o,
-    output reg          mret_o,
-    output reg [31:0]   ecall_inst_o
+    output mem_wb_data_t data_packaged_o
 );  
-    reg        mem1_req_load_o;
-    reg [4:0]  mem1_rd_addr_oo;
-    reg [31:0] mem1_rd_data_oo;
-    reg        mem1_regs_wen_oo;
-
-    reg        mem2_req_load_i;
-    reg [4:0]  mem2_rd_addr_i;
-    reg [31:0] mem2_rd_data_i;
-    reg        mem2_regs_wen_i;
-    reg [1:0]  mem2_load_mask_i;
-    reg [1:0]  mem2_load_addr_low_i;
-    reg        mem2_load_is_signed_i;
-
-    assign mem1_is_load_o   = mem1_req_load_o;
-    assign mem1_rd_addr_o   = mem1_rd_addr_oo;
-    assign mem1_rd_data_o   = mem1_rd_data_oo;
-    assign mem1_regs_wen_o  = mem1_regs_wen_oo;
+    ex_mem_data_t mpkg_i;
+    ex_mem_data_t mpkg_o;
 
     // mem1
     always_comb begin
-        mem1_req_load_o         = mem_req_load_i;
-        mem1_rd_addr_oo         = rd_addr_i;
-        mem1_rd_data_oo         = rd_data_i;
-        mem1_regs_wen_oo        = (mem_req_load_i) ? 1'b0 : regs_wen;
+        mpkg_i          = data_packaged_i;
+        mpkg_i.regs_wen = (data_packaged_i.req_load) ? 1'b0 : data_packaged_i.regs_wen;
     end
 
     // mem1_mem2
     always_ff @(posedge clk) begin
         if (!rst) begin
-            mem2_req_load_i         <= 0;
-            mem2_rd_addr_i          <= 0;
-            mem2_rd_data_i          <= 0;
-            mem2_regs_wen_i         <= 0;
-            mem2_load_mask_i        <= 0;
-            mem2_load_addr_low_i    <= 0;
-            mem2_load_is_signed_i   <= 0;
-            ecall_o                 <= 0;
-            mret_o                  <= 0;
-            ecall_inst_o            <= 0;
+            mpkg_o <= 0;
         end
         else if (dcache_stall) begin
             // ...
         end
         else begin
-            mem2_req_load_i         <= mem1_req_load_o;
-            mem2_rd_addr_i          <= mem1_rd_addr_oo;
-            mem2_rd_data_i          <= mem1_rd_data_oo;
-            mem2_regs_wen_i         <= mem1_regs_wen_oo;
-            mem2_load_mask_i        <= load_mask_i;
-            mem2_load_addr_low_i    <= load_addr_low_i;
-            mem2_load_is_signed_i   <= load_is_signed_i;
-            ecall_o                 <= ecall_i;
-            mret_o                  <= mret_i;
-            ecall_inst_o            <= ecall_inst_i;
+            mpkg_o <= mpkg_i;
         end
     end
 
     // mem2
-    wire [31:0] dcache_rdata_load_shift = load_shift(dcache_rdata, mem2_load_mask_i, mem2_load_addr_low_i, mem2_load_is_signed_i);
+    wire [31:0] dcache_rdata_load_shift = 
+        load_shift(
+            dcache_rdata,
+            mpkg_o.load_mask,
+            mpkg_o.load_addr_low,
+            mpkg_o.load_is_signed
+        );
     always_comb begin
-        mem2_rd_addr_o   = mem2_rd_addr_i;
-        mem2_rd_data_o   = (mem2_req_load_i) ? dcache_rdata_load_shift : mem2_rd_data_i;
-        mem2_regs_wen_o  = dcache_ack | mem2_regs_wen_i;
-        mem2_is_load_o   = mem2_req_load_i;
+        data_packaged_o          = mpkg_o;
+        data_packaged_o.rd_addr  = mpkg_o.rd_addr;
+        data_packaged_o.rd_data  = (mpkg_o.req_load) ? dcache_rdata_load_shift : mpkg_o.rd_data;
+        data_packaged_o.regs_wen = dcache_ack | mpkg_o.regs_wen;
     end
-
+    assign mem2_is_load_o = mpkg_o.req_load;
+        
     // 函数：
     function [31:0] load_shift;
         input [31:0] word;

@@ -1,57 +1,41 @@
 `include "rv32I.vh"
 
 module mem_wb(
-    input               clk,
-    input               rst,
+    input  logic clk,
+    input  logic rst,
+    input  logic pipe_flush,
 
     // from mem
-    input      [4:0]    rd_addr_i,
-    input      [31:0]   rd_data_i,
-    input               regs_wen_i,
-    input               is_load_i,
-    input               ecall_i,
-    input               mret_i,
-    input      [31:0]   ecall_inst_i,
-
-    // from wb
-    input               mret_ecall_flush,
+    input  mem_wb_data_t data_packaged_i,
 
     // to wb
-    output reg [4:0]    rd_addr_o,
-    output reg [31:0]   rd_data_o,
-    output reg          regs_wen_o,
-    output reg          is_load_o,
-    output reg          ecall_o,
-    output reg          mret_o,
-    output reg [31:0]   ecall_inst_o
+    output logic [4:0]   rd_addr_o,
+    output logic [31:0]  rd_data_o,
+    output logic         regs_wen_o,
+    output logic         ecall_o,
+    output logic         mret_o
 );
     always_ff @(posedge clk) begin
         if (!rst) begin
             rd_data_o       <= 32'b0;
             rd_addr_o       <= 5'b0;
             regs_wen_o      <= 1'b0;
-            is_load_o       <= 1'b0;
             ecall_o         <= 1'b0;
             mret_o          <= 1'b0;
-            ecall_inst_o    <= 32'b0;
         end
-        else if (mret_ecall_flush) begin
+        else if (pipe_flush) begin
             rd_data_o       <= 32'b0;
             rd_addr_o       <= 5'b0;
             regs_wen_o      <= 1'b0;
-            is_load_o       <= 1'b0;
             ecall_o         <= 1'b0;    // ecall_flush 信号来自 wb，当发生 ecall 时，清空 mem_wb 寄存器，防止错误执行
             mret_o          <= 1'b0;    // mret_flush 信号来自 wb，当发生 mret 时，清空 mem_wb 寄存器，防止错误执行
-            ecall_inst_o    <= 32'b0;   // 同上
         end
         else begin
-            rd_data_o       <= rd_data_i;
-            rd_addr_o       <= rd_addr_i;
-            regs_wen_o      <= regs_wen_i;
-            is_load_o       <= is_load_i;
-            ecall_o         <= ecall_i;
-            mret_o          <= mret_i;
-            ecall_inst_o    <= ecall_inst_i;
+            rd_data_o       <= data_packaged_i.rd_data;
+            rd_addr_o       <= data_packaged_i.rd_addr;
+            regs_wen_o      <= data_packaged_i.regs_wen;
+            ecall_o         <= data_packaged_i.ecall;
+            mret_o          <= data_packaged_i.mret;
         end
     end
 endmodule

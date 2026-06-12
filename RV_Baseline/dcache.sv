@@ -2,34 +2,32 @@
 `include "switch.vh"
 
 module dcache(
-    input               clk,
-    input               rst,
+    input  logic clk,
+    input  logic rst,
 
     // CPU/MEM side
-    input               cpu_req_load,
-    input               cpu_req_store,
-    input      [31:0]   cpu_addr,
-    (* max_fanout = 20 *)
-    input      [31:0]   cpu_wdata,
-    input      [3:0]    cpu_we,
-    output     [31:0]   cpu_rdata,
-    input               cpu_write_dram,
+    input  ex_lsu_data_t    data_packaged_i,
 
-    (* max_fanout = 20 *)
-    output              stall,
+    output logic [31:0]     mem_rdata,
+    output logic            load_ready,
+    output logic            store_ready,
+
+    output logic            stall,
 
     // external DROM side
-    output     [31:0]   mem_addr,
-    output     [3:0]    mem_we,
-    output              mem_wen,
-    output     [31:0]   mem_wdata,
-    input      [31:0]   mem_rdata,
-
-    output              mem_ack
+    output logic [31:0]     perip_addr,
+    output logic [3:0]      perip_we,
+    output logic            perip_wen,
+    output logic [31:0]     perip_wdata,
+    input  logic [31:0]     perip_rdata
 );
     localparam INDEX_WIDTH = `DCACHE_INDEX_WIDTH;
     localparam TAG_WIDTH = 30 - INDEX_WIDTH;
     localparam LINE_NUM = 2 ** INDEX_WIDTH;
+
+    // 解码
+    ex_lsu_data_t dpkg;
+    assign dpkg = data_packaged_i;
 
     // 两路 D-cache
     (* ram_style = "distributed" *) reg [31:0] data_w0 [0:LINE_NUM - 1];
@@ -41,20 +39,17 @@ module dcache(
     reg replace_way [0:LINE_NUM - 1];
 
     // 地址解码
-    (* max_fanout = 20 *) wire [INDEX_WIDTH - 1:0] query_index = cpu_addr[INDEX_WIDTH + 1:2];
-    (* max_fanout = 20 *) wire [TAG_WIDTH - 1:0]   query_tag   = cpu_addr[31:INDEX_WIDTH + 2];
-    wire [INDEX_WIDTH - 1:0] query_index_data = cpu_addr[INDEX_WIDTH + 1:2];    // D-cache 读专用
-    (* max_fanout = 20 *) wire [INDEX_WIDTH - 1:0] query_index_tagv = cpu_addr[INDEX_WIDTH + 1:2];    // tagv 读专用
-    wire [TAG_WIDTH - 1:0]   query_tag_tagv   = cpu_addr[31:INDEX_WIDTH + 2];   // tagv 判断专用
+    (* max_fanout = 20 *) wire [INDEX_WIDTH - 1:0] query_index = dpkg.addr[INDEX_WIDTH + 1:2];
+    (* max_fanout = 20 *) wire [TAG_WIDTH - 1:0]   query_tag   = dpkg.addr[31:INDEX_WIDTH + 2];
+    wire [INDEX_WIDTH - 1:0] query_index_data = dpkg.addr[INDEX_WIDTH + 1:2];    // D-cache 读专用
+    (* max_fanout = 20 *) wire [INDEX_WIDTH - 1:0] query_index_tagv = dpkg.addr[INDEX_WIDTH + 1:2];    // tagv 读专用
+    wire [TAG_WIDTH - 1:0]   query_tag_tagv   = dpkg.addr[31:INDEX_WIDTH + 2];   // tagv 判断专用
 
     // 状态寄存
-    reg miss_ready;
-    reg tagv_wait, miss_wait;
+    reg tagv_wait, miss_wait, miss_ready;
     reg miss_way;
-	 reg [INDEX_WIDTH - 1:0] miss_index;
-    reg [TAG_WIDTH - 1:0] miss_tag;
-    reg [INDEX_WIDTH - 1:0] query_index_r;
-    reg [TAG_WIDTH - 1:0] query_tag_r;
+    reg [INDEX_WIDTH - 1:0] query_index_r, miss_index;
+    reg [TAG_WIDTH - 1:0] query_tag_r, miss_tag;
     reg [3:0] cpu_we_r;
     reg [31:0] cpu_wdata_r;
     reg cpu_req_store_r;
@@ -69,9 +64,9 @@ module dcache(
         else begin
             query_index_r   <= query_index;
             query_tag_r     <= query_tag;
-            cpu_we_r        <= cpu_we;
-            cpu_wdata_r     <= cpu_wdata;
-            cpu_req_store_r <= cpu_req_store;
+            cpu_we_r        <= dpkg.we;
+            cpu_wdata_r     <= dpkg.wdata;
+            cpu_req_store_r <= dpkg.req_store;
         end
     end
     
@@ -139,26 +134,26 @@ module dcache(
     end
 
     // tagv 更新
-	 integer i;
+	integer i;
     always_ff @(posedge clk) begin
-	     if (!rst) begin
-		      for (i = 0; i < LINE_NUM; i = i + 1)  begin
-					tagv_w0[i] <= 0;
-					tagv_w1[i] <= 0;
-					replace_way[i] <= 0;
+        if (!rst) begin
+            for (i = 0; i < LINE_NUM; i = i + 1)  begin
+                tagv_w0[i] <= 0;
+                tagv_w1[i] <= 0;
+                replace_way[i] <= 0;
             end
-		  end
-		  else begin
-				if (miss_ready) begin
-					replace_way[miss_index] <= ~miss_way;    // FIFO 替换指针更新
-				end
-				if (miss_ready && miss_way == 1'b0) begin
-					tagv_w0[miss_index] <= {1'b1, miss_tag};
-				end
-				if (miss_ready && miss_way == 1'b1) begin
-					tagv_w1[miss_index] <= {1'b1, miss_tag};
-				end
-		  end
+		end
+		else begin
+            if (miss_ready) begin
+                replace_way[miss_index] <= ~miss_way;    // FIFO 替换指针更新
+            end
+            if (miss_ready && miss_way == 1'b0) begin
+                tagv_w0[miss_index] <= {1'b1, miss_tag};
+            end
+            if (miss_ready && miss_way == 1'b1) begin
+                tagv_w1[miss_index] <= {1'b1, miss_tag};
+            end
+		end
     end
 
     // 命中数据
@@ -186,7 +181,7 @@ module dcache(
                 miss_wait   <= 1'b0;
             end
             else begin
-                tagv_wait <= cpu_req_load;
+                tagv_wait <= dpkg.req_load;
             end
         end
     end
@@ -202,15 +197,18 @@ module dcache(
     end
 
     // 传输至 DRAM
-    assign mem_addr   = cpu_addr;
-    assign mem_we     = (cpu_write_dram) ? cpu_we : 4'b0;
-    assign mem_wen    = cpu_req_store;
-    assign mem_wdata  = cpu_wdata;
+    assign perip_addr   = dpkg.addr;
+    assign perip_we     = (dpkg.write_dram) ? dpkg.we : 4'b0;
+    assign perip_wen    = dpkg.req_store;
+    assign perip_wdata  = dpkg.wdata;
 
     // 暂停
     assign stall = (tagv_wait && dcache_miss) | miss_wait;
 
     // 读数据
-    assign cpu_rdata  = (miss_ready) ? mem_rdata : hit_data;
-    assign mem_ack    = dcache_hit | miss_ready;
+    assign mem_rdata   = (miss_ready) ? perip_rdata : hit_data;
+    assign load_ready  = dcache_hit | miss_ready;
+    always_ff @(posedge clk) begin
+        store_ready <= store_buffer_en;
+    end
 endmodule

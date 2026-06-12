@@ -120,15 +120,15 @@ module tb_verilator_software(
         assign hold_signal = tb_verilator_software.uut.student_top_inst.Core_cpu.pipe_hold_pc;
         assign flush_signal = tb_verilator_software.uut.student_top_inst.Core_cpu.pipe_flush_icache;
 
-        wire ex_is_jal = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.is_jal;
-        wire ex_is_jalr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.is_jalr;
-        wire ex_is_branch = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.is_branch;
-        assign pred_miss = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.update_gshare_en_o | tb_verilator_software.uut.student_top_inst.Core_cpu.EX.update_btb_en_o;
-        assign pred_total = (ex_is_jalr | ex_is_branch) & ex_valid;
-        assign pred_total_b = ex_is_branch & ex_valid;
-        assign pred_total_jr = ex_is_jalr & ex_valid;
-        assign pred_miss_b = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.update_gshare_en_o;
-        assign pred_miss_jr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.update_btb_en_o;
+        wire ex_is_jal = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.inst_packaged_i.is_jal & ex_valid;
+        wire ex_is_jalr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.inst_packaged_i.is_jalr & ex_valid;
+        wire ex_is_branch = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.inst_packaged_i.is_branch & ex_valid;
+        assign pred_total = (ex_is_jalr | ex_is_branch);
+        assign pred_total_b = ex_is_branch;
+        assign pred_total_jr = ex_is_jalr;
+        assign pred_miss_b = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.bpu_data_packaged_o.update_gshare_en;
+        assign pred_miss_jr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.bpu_data_packaged_o.update_btb_en;
+        assign pred_miss = pred_miss_b | pred_miss_jr;
 
         always @(posedge clk_cpu) begin
             if (ex_is_jal)
