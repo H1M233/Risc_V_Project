@@ -21,7 +21,7 @@ module csr_regs(
     output logic [31:0]  trap_pc
 );
     // 解码
-    wire [31:0] csr_waddr = data_packaged_i.waddr;
+    wire [11:0] csr_waddr = data_packaged_i.waddr;
     wire [31:0] csr_wdata = data_packaged_i.wdata;
     wire        csr_wen   = data_packaged_i.wen;
     wire [5:0]  fflags    = data_packaged_i.fflags;
@@ -43,7 +43,9 @@ module csr_regs(
     localparam MCAUSE_ADDR   = 12'h342;
     localparam MTVEC_ADDR    = 12'h305;
     localparam MSCRATCH_ADDR = 12'h340;
-    localparam FCSR_ADDR     = 12'h001;
+    localparam FCSR_ADDR     = 12'h003;
+    localparam FFLAGS_ADDR   = 32'h001;
+    localparam FRM_ADDR      = 32'h002;
 
     // CSR 写
     always_ff @(posedge clk) begin
@@ -78,7 +80,9 @@ module csr_regs(
                     MTVEC_ADDR    : mtvec    <= csr_wdata;
                     MSCRATCH_ADDR : mscratch <= csr_wdata;
 
-                    FCSR_ADDR     : fcsr     <= csr_wdata;
+                    FCSR_ADDR     : fcsr       <= csr_wdata[7:0];
+                    FFLAGS_ADDR   : fcsr.flags <= csr_wdata[4:0];
+                    FRM_ADDR      : fcsr.frm   <= rm_t'(csr_wdata[2:0]);
                     default       : ; // 无效地址，保持不变
                 endcase
             end
@@ -97,7 +101,9 @@ module csr_regs(
             MTVEC_ADDR    : csr_rdata = mtvec;
             MSCRATCH_ADDR : csr_rdata = mscratch;
 
-            FCSR_ADDR     : csr_rdata = fcsr; 
+            FCSR_ADDR     : csr_rdata = fcsr;
+            FFLAGS_ADDR   : csr_rdata = {26'b0, fcsr.flags};
+            FRM_ADDR      : csr_rdata = {29'b0, fcsr.frm};
             default       : csr_rdata = 32'b0; // 无效地址，返回0
         endcase
     end

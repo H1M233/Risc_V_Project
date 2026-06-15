@@ -83,7 +83,9 @@ module id(
     // 前推
     wire using_frs1 = (ipkg.is_FP & ~ipkg.sel_fmv_w_x);
     wire using_frs2 = ipkg.is_load_FP | ipkg.is_store_FP | ipkg.is_FP;
-    wire using_frd  = ipkg.is_load_FP | ipkg.is_store_FP | (ipkg.is_FP & ~ipkg.sel_fmv_x_w );
+    wire using_frd  = ipkg.is_load_FP | ipkg.is_store_FP | 
+                      (ipkg.sel_fmv_w_x | ipkg.sel_fadd_s | ipkg.sel_fsub_s | ipkg.sel_fmin_s | ipkg.sel_fmax_s |
+                       ipkg.sel_fsgnj_s | ipkg.sel_fsgnjn_s | ipkg.sel_fsgnjx_s);
 
     assign rs1_addr_o = {using_frs1, rs1_i};
     assign rs2_addr_o = {using_frs2, rs2_i};
@@ -388,7 +390,7 @@ module id(
     always_comb begin
         unique case (1'b1)
             ipkg.is_zicsr : csr_addr_o = inst_i[31:20];
-            ipkg.is_FP    : csr_addr_o = 12'h001;       // fflags
+            ipkg.is_FP    : csr_addr_o = 12'h003;       // fcsr
             default       : csr_addr_o = 12'h0;
         endcase
     end

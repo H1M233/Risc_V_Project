@@ -5,6 +5,7 @@ module alu_Bext(
     input  logic        rst,
     input  logic        flush,
 
+    input  logic        valid,
     input  logic [31:0] value1,
     input  logic [31:0] value2,
     input  decode_t     ipkg,
@@ -12,28 +13,57 @@ module alu_Bext(
     output logic        ctrl,
     output logic [31:0] result
 );
+    // 输入寄存
+    logic [31:0] value1_r, value2_r;
+    logic        valid_r, finished;
+    always_ff @(posedge clk) begin
+        if (~rst) begin
+            valid_r  <= 1'b0;
+
+            value1_r <= 32'b0;
+            value2_r <= 32'b0;
+        end
+        else if (flush | finished) begin
+            valid_r  <= 1'b0;
+
+            value1_r <= 32'b0;
+            value2_r <= 32'b0;
+        end
+        else if (valid & ~valid_r) begin
+            valid_r  <= 1'b1;
+
+            value1_r <= value1;
+            value2_r <= value2;
+        end
+    end
+
     // Zba
     logic [31:0] zba_res;
+    logic        zba_finished;
     `ifdef ENABLE_B_ZBA
-    wire [31:0] sh1add_res = (value1 << 1) + value2;
-    wire [31:0] sh2add_res = (value1 << 2) + value2;
-    wire [31:0] sh3add_res = (value1 << 3) + value2;
+    wire [31:0] sh1add_res = (value1_r << 1) + value2_r;
+    wire [31:0] sh2add_res = (value1_r << 2) + value2_r;
+    wire [31:0] sh3add_res = (value1_r << 3) + value2_r;
     
     always_comb begin
         unique case (1'b1)
             ipkg.sel_sh1add : zba_res = sh1add_res;
             ipkg.sel_sh2add : zba_res = sh2add_res;
             ipkg.sel_sh3add : zba_res = sh3add_res;
-            default : zba_res = 32'b0;
+            default         : zba_res = 32'b0;
         endcase
     end
+
+    assign zba_finished = ipkg.is_Bext_zba & valid_r;
+    `else
+    assign zba_res      = 32'b0;
+    assign zba_finished = 1'b0;
     `endif
     
     // Zbb
     logic [31:0] zbb_res;
+    logic        zbb_finished;
     `ifdef ENABLE_B_ZBB
-    wire        value1_is_zero = ~(|value1);
-    wire  [4:0] shamt_zbb      = value2[4:0];
     logic [7:0] value1_byte [0:3];
     always_comb begin
         for (int i = 0; i < 4; i++) value1_byte[i] = value1[8*i +: 8];
@@ -43,46 +73,23 @@ module alu_Bext(
     wire [31:0] orn_res  = value1 | ~value2;
     wire [31:0] xnor_res = ~(value1 ^ value2);
     
-    wire [31:0] clz_res = {26'b0, value1_is_zero, clz_result};
-    function automatic logic [3:0] clz8(input logic [7:0] data);
-        for (int i = 7; i >= 0; i--) begin
-            if (data[i]) return {1'b1, 3'(7 - i)};
+    wire [31:0] clz_res = {26'b0, clz(value1_r)};
+    function automatic logic [5:0] clz(input logic [31:0] data);
+        for (int i = 31; i >= 0; i--) begin
+            if (data[i]) return 6'(31 - i);
         end
-        return {1'b0, 3'b0};
+        return 6'd32;
     endfunction
-    logic [4:0] clz_result;
-    always_comb begin
-        clz_result = 5'b0;
-        for (int i = 3; i >= 0; i--) begin
-            logic [3:0] clz_byte = clz8(value1_byte[i]);
-            if (clz_byte[3]) begin
-                clz_result = (8 * 5'(3 - i)) + clz_byte[2:0];
-                break;
-            end
+    
+    wire [31:0] ctz_res = {26'b0, ctz(value1_r)};
+    function automatic logic [5:0] ctz(input logic [31:0] data);
+        for (int i = 0; i < 32; i++) begin
+            if (data[i]) return 6'(i);
         end
-    end
-
-    wire [31:0] ctz_res = {26'b0, value1_is_zero, ctz_result};
-    function automatic logic [3:0] ctz8(input logic [7:0] data);
-        for (int i = 0; i < 8; i++) begin
-            if (data[i]) return {1'b1, 3'(i)};
-        end
-        return {1'b0, 3'b0};
+        return 6'd32;
     endfunction
-    logic [4:0] ctz_result;
-    always_comb begin
-        ctz_result = 5'b0;
-        for (int i = 0; i < 4; i++) begin
-            logic [3:0] ctz_byte = ctz8(value1_byte[i]);
-
-            if (ctz_byte[3]) begin
-                ctz_result = 5'(8 * i) + ctz_byte[2:0];
-                break;
-            end
-        end
-    end
-
-    wire [31:0] cpop_res = cpop32(value1);
+    
+    wire [31:0] cpop_res = cpop32(value1_r);
     function automatic logic [5:0] cpop32(input logic [31:0] data); // 加法数
         logic [1:0] stage0 [15:0];
         logic [2:0] stage1 [7:0];
@@ -94,10 +101,10 @@ module alu_Bext(
         for (int i = 0; i < 8; i++)  stage1[i] = stage0[2*i] + stage0[2*i+1];
         for (int i = 0; i < 4; i++)  stage2[i] = stage1[2*i] + stage1[2*i+1];
         for (int i = 0; i < 2; i++)  stage3[i] = stage2[2*i] + stage2[2*i+1];
-
+        
         return stage3[0] + stage3[1];
     endfunction
-
+    
     cmp_result_t cmp; 
     assign cmp = fast_compare(value1, value2);
     wire [31:0] max_res  = (cmp.lts) ? value2 : value1;
@@ -108,9 +115,10 @@ module alu_Bext(
     wire [31:0] sext_b_res = {{24{value1[7]}}, value1[7:0]};
     wire [31:0] sext_h_res = {{16{value1[15]}}, value1[15:0]};
     wire [31:0] zext_h_res = {16'b0, value1[15:0]};
-
-    wire [31:0] rol_res = (value1 << shamt_zbb) | (value1 >> (32 - shamt_zbb));
-    wire [31:0] ror_res = (value1 >> shamt_zbb) | (value1 << (32 - shamt_zbb)); // same to rori
+    
+    wire  [4:0] shamt_zbb = value2[4:0];
+    wire [31:0] rol_res   = (value1 << shamt_zbb) | (value1 >> (32 - shamt_zbb));
+    wire [31:0] ror_res   = (value1 >> shamt_zbb) | (value1 << (32 - shamt_zbb)); // same to rori
 
     wire [31:0] orc_b_res = {{8{|value1_byte[3]}}, {8{|value1_byte[2]}}, {8{|value1_byte[1]}}, {8{|value1_byte[0]}}};
 
@@ -138,14 +146,22 @@ module alu_Bext(
             default : zbb_res = 32'b0;
         endcase
     end
+
+    wire need_ctrl = ipkg.sel_clz | ipkg.sel_ctz | ipkg.sel_cpop;
+
+    assign zbb_finished = (need_ctrl) ? valid_r : ipkg.is_Bext_zbb;
+    `else
+    assign zbb_res      = 32'b0;
+    assign zbb_finished = 1'b0;
     `endif
 
     // Zbc
     logic [31:0] zbc_res;
+    logic        zbc_finished;
     `ifdef ENABLE_B_ZBC
-    wire [31:0] clmul_res  = clmul_tree(value1, value2)[31:0];
-    wire [31:0] clmulh_res = clmul_tree(value1, value2)[63:32];
-    wire [31:0] clmulr_res = rev_bits(clmul_tree(rev_bits(value1), rev_bits(value2)));
+    wire [31:0] clmul_res  = clmul_tree(value1_r, value2_r)[31:0];
+    wire [31:0] clmulh_res = clmul_tree(value1_r, value2_r)[63:32];
+    wire [31:0] clmulr_res = rev_bits(clmul_tree(rev_bits(value1_r), rev_bits(value2_r)));
     function automatic logic [31:0] rev_bits(input logic [31:0] data);
         for (int i = 0; i < 32; i++) begin
             rev_bits[i] = data[31 - i];
@@ -175,13 +191,19 @@ module alu_Bext(
             ipkg.sel_clmul  : zbc_res = clmul_res;
             ipkg.sel_clmulh : zbc_res = clmulh_res;
             ipkg.sel_clmulr : zbc_res = clmulr_res;
-            default : zbc_res = 32'b0;
+            default         : zbc_res = 32'b0;
         endcase
     end
+
+    assign zbc_finished = ipkg.is_Bext_zbc & valid_r;
+    `else
+    assign zbc_res     = 32'b0;
+    assign zbc_finised = 1'b0;
     `endif
     
     // Zbs
     logic [31:0] zbs_res;
+    logic        zbs_finished;
     `ifdef ENABLE_B_ZBS
     wire [4:0]  shamt_zbs = value2[4:0];
     wire [31:0] bclr_res = value1 & ~(1 << shamt_zbs);  // same to bclri
@@ -195,13 +217,19 @@ module alu_Bext(
             ipkg.sel_bext : zbs_res = bext_res;
             ipkg.sel_binv : zbs_res = binv_res;
             ipkg.sel_bset : zbs_res = bset_res;
-            default : zbs_res = 32'b0;
+            default       : zbs_res = 32'b0;
         endcase
     end
+
+    assign zbs_finished = ipkg.is_Bext_zbs;
+    `else
+    assign zbs_res      = 32'b0;
+    assign zbs_finished = 1'b0;
     `endif
 
     // Zbkb
     logic [31:0] zbkb_res;
+    logic        zbkb_finished;
     `ifdef ENABLE_B_ZBKB
     wire [31:0] pack_res  = {value2[15:0], value1[15:0]};
     wire [31:0] packh_res = {16'b0, value2[7:0], value1[7:0]};
@@ -238,15 +266,21 @@ module alu_Bext(
             ipkg.sel_brev8 : zbkb_res = brev8_res;
             ipkg.sel_zip   : zbkb_res = zip_res;
             ipkg.sel_unzip : zbkb_res = unzip_res;
-            default : zbkb_res = 32'b0;
+            default        : zbkb_res = 32'b0;
         endcase
     end
+
+    assign zbkb_finished = ipkg.is_Bext_zbkb;
+    `else
+    assign zbkb_res      = 32'b0;
+    assign zbkb_finished = 1'b0;
     `endif
 
     // Zbkx
     logic [31:0] zbkx_res;
+    logic        zbkx_finished;
     `ifdef ENABLE_B_ZBKX
-    wire [31:0] xperm4_res = xperm4(value1, value2);
+    wire [31:0] xperm4_res = xperm4(value1_r, value2_r);
     function automatic logic [31:0] xperm4(input logic [31:0] a, b);
         for (int i = 0; i < 8; i++) begin
             logic [3:0] idx = b[i*4 +: 4];
@@ -256,7 +290,7 @@ module alu_Bext(
         end
     endfunction
 
-    wire [31:0] xperm8_res = xperm8(value1, value2);
+    wire [31:0] xperm8_res = xperm8(value1_r, value2_r);
     function automatic logic [31:0] xperm8(input logic [31:0] a, b);
         for (int i = 0; i < 4; i++) begin
             logic [7:0] idx = b[i*8 +: 8];
@@ -270,13 +304,19 @@ module alu_Bext(
         unique case (1'b1)
             ipkg.sel_xperm4 : zbkx_res = xperm4_res;
             ipkg.sel_xperm8 : zbkx_res = xperm8_res;
-            default : zbkx_res = 32'b0;
+            default         : zbkx_res = 32'b0;
         endcase
     end
+    
+    assign zbkx_finished = ipkg.is_Bext_zbkx & valid_r;
+    `else
+    assign zbkx_res      = 32'b0;
+    assign zbkx_finished = 1'b0;
     `endif
 
     // 暂停控制
-    assign ctrl = 1'b0;
+    assign finished = zba_finished | zbb_finished | zbc_finished | zbs_finished | zbkb_finished | zbkx_finished;
+    assign ctrl = valid & ~finished;
 
     // 选择输出
     always_comb begin

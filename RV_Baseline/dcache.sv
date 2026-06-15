@@ -91,12 +91,22 @@ module dcache(
     reg replace_way_r;
     reg [31:0] data_rdata_w0, data_rdata_w1;
     always_ff @(posedge clk) begin
-        hit_way_r       <= hit_way1;
-        dcache_hit      <= (hit_way0 | hit_way1);
-        dcache_miss     <= ~(hit_way0 | hit_way1);
-        replace_way_r   <= replace_way[query_index];
-        data_rdata_w0   <= data_w0[query_index_data];
-        data_rdata_w1   <= data_w1[query_index_data];
+        if (!rst) begin
+            hit_way_r       <= 0;
+            dcache_hit      <= 0;
+            dcache_miss     <= 0;
+            replace_way_r   <= 0;
+            data_rdata_w0   <= 0;
+            data_rdata_w1   <= 0;
+        end
+        else begin
+            hit_way_r       <= hit_way1;
+            dcache_hit      <= (hit_way0 | hit_way1);
+            dcache_miss     <= ~(hit_way0 | hit_way1);
+            replace_way_r   <= replace_way[query_index];
+            data_rdata_w0   <= data_w0[query_index_data];
+            data_rdata_w1   <= data_w1[query_index_data];
+        end
     end
 
     // Store Buffer 状态传递
@@ -110,7 +120,7 @@ module dcache(
             store_buffer_hit_data   <= 0;
         end
         else begin
-            store_buffer_hit        <= (store_buffer_en && query_index == query_index_r && query_tag == query_tag_r);
+            store_buffer_hit        <= store_buffer_en && (query_index == query_index_r) && (query_tag == query_tag_r);
             store_buffer_hit_data   <= store_buffer_data_merge;
         end
     end
@@ -131,7 +141,7 @@ module dcache(
     wire dcache_wway;
 
     // Dcache 写使能
-    assign dcache_wen   = (store_buffer_en | miss_ready);
+    assign dcache_wen   = store_buffer_en | miss_ready;
     assign dcache_waddr = (miss_ready) ? miss_index : query_index_r;
     assign dcache_wdata = (miss_ready) ? mem_rdata : store_buffer_data_merge;
     assign dcache_wway  = (miss_ready) ? miss_way : hit_way_r;

@@ -14,7 +14,9 @@ module alu_Fext(
     output logic        ctrl,
     output logic [31:0] result
 );
-    localparam offest_const = 7'd127;
+    wire [7:0]  OFFEST_CONST = 8'd127;
+    wire [31:0] NORMAL_QNAN  = 32'h7fc00000;
+    
     
     // F 数据解码
     fval_t fval1, fval2;
@@ -24,19 +26,68 @@ module alu_Fext(
     rm_t rm;
     assign rm = rm_t'((dpkg.imm[2:0] == 3'b111) ? dpkg.csr_rdata[7:5] : dpkg.imm[2:0]); // 3'b111 动态舍入模式
 
+    // 特殊值识别
     wire value1_is_fval = ipkg.is_FP & ~ipkg.sel_fmv_w_x;
     wire value2_is_fval = ipkg.is_FP;
+    
+    wire fval1_is_nan = (fval1.exp == 8'd255) & (fval1.mant != 0) & value1_is_fval;
+    wire fval2_is_nan = (fval2.exp == 8'd255) & (fval2.mant != 0) & value2_is_fval;
 
-    wire fval1_is_nan = (fval1.exp == 255) & (fval1.mant != 0) & value1_is_fval;
-    wire fval2_is_nan = (fval2.exp == 255) & (fval2.mant != 0) & value2_is_fval;
+    wire fval1_is_snan = fval1_is_nan & ~fval1.mant[22];
+    wire fval2_is_snan = fval2_is_nan & ~fval2.mant[22];
 
-    wire fval1_is_inf = (fval1.exp == 255) & (fval1.mant == 0) & value1_is_fval;
-    wire fval2_is_inf = (fval2.exp == 255) & (fval2.mant == 0) & value2_is_fval;
+    wire fval1_is_qnan = fval1_is_nan & fval1.mant[22];
+    wire fval2_is_qnan = fval2_is_nan & fval2.mant[22];
+    
+    wire fval1_is_inf = (fval1.exp == 8'd255) & (fval1.mant == 0) & value1_is_fval;
+    wire fval2_is_inf = (fval2.exp == 8'd255) & (fval2.mant == 0) & value2_is_fval;
+    
+    wire fval1_is_subnormal = (fval1.exp == 8'd0) & (fval1.mant != 0) & value1_is_fval;
+    wire fval2_is_subnormal = (fval2.exp == 8'd0) & (fval2.mant != 0) & value2_is_fval;
+    
+    wire fval1_is_zero = (fval1.exp == 8'd0) & (fval1.mant == 0) & value1_is_fval;
+    wire fval2_is_zero = (fval2.exp == 8'd0) & (fval2.mant == 0) & value2_is_fval;
+    
+    // -------------------------------------
+    // fclass
+    // -------------------------------------
+    wire fval1_is_pinf = fval1_is_inf & ~fval1.sign;
+    wire fval1_is_ninf = fval1_is_inf & fval1.sign;
+
+    wire fval1_is_psubnormal = fval1_is_subnormal & ~fval1.sign;
+    wire fval1_is_nsubnormal = fval1_is_subnormal & fval1.sign;
+
+    wire fval1_is_pzero = fval1_is_zero & ~fval1.sign;
+    wire fval1_is_nzero = fval1_is_zero & fval1.sign;
+
+    logic [31:0] fclass_res;
+    always_comb begin
+        fclass_res = 32'b0;
+        unique case (1'b1)
+            fval1_is_snan       : fclass_res[8] = 1'b1;
+            fval1_is_qnan       : fclass_res[9] = 1'b1;
+            fval1_is_pinf       : fclass_res[7] = 1'b1;
+            fval1_is_ninf       : fclass_res[0] = 1'b1;
+            fval1_is_psubnormal : fclass_res[5] = 1'b1;
+            fval1_is_nsubnormal : fclass_res[2] = 1'b1;
+            fval1_is_pzero      : fclass_res[4] = 1'b1;
+            fval1_is_nzero      : fclass_res[3] = 1'b1;
+            default : begin // 规格化数
+                if (fval1.sign) begin
+                    fclass_res[1] = 1'b1;
+                end
+                else begin
+                    fclass_res[6] = 1'b1;
+                end
+            end
+        endcase
+    end
 
     // -------------------------------------
     // fadd.s, fsub.s:
     // -------------------------------------
 
+    wire sum_fval_nv  = (fval1_is_nan | fval2_is_nan) && (ipkg.sel_fadd_s | ipkg.sel_fsub_s);
     wire sum_diff_inf = fval1_is_inf & fval2_is_inf & ((ipkg.sel_fadd_s & (fval1.sign != fval2.sign)) || (ipkg.sel_fsub_s & (fval1.sign == fval2.sign)));
 
     // 1. 指数比较
@@ -167,7 +218,7 @@ module alu_Fext(
     wire  sum_S   = sum_collect_S_shift | sum_collect_S_norm | sum_mant_norm[0];
     logic sum_roundup;
     logic sum_roundup_inexact;
-    assign sum_roundup_inexact = (sum_G | sum_R | sum_S);
+    assign sum_roundup_inexact = (ipkg.sel_fadd_s | ipkg.sel_fsub_s) & (sum_G | sum_R | sum_S);
 
     // 根据 GRS 计算进位
     always_comb begin
@@ -216,9 +267,60 @@ module alu_Fext(
 
     wire [31:0] sum_res = sum_final;
 
+    // -------------------------------------
+    // fcmp (feq.s, fle.s, flt.s):
+    // -------------------------------------
+    wire [31:0] fval1_unsigned = (fval1.sign) ? ~fval1 : {1'b1, fval1.exp, fval1.mant};
+    wire [31:0] fval2_unsigned = (fval2.sign) ? ~fval2 : {1'b1, fval2.exp, fval2.mant};
+
+    wire normal_eq = (fval1_unsigned == fval2_unsigned);
+    wire normal_lt = (fval1_unsigned < fval2_unsigned);
+
+    wire normal_eq_ignore_zero = normal_eq | (fval1_is_zero & fval2_is_zero);
+    wire normal_lt_ignore_zero = normal_lt & ~(fval1_is_zero & fval2_is_zero);
+
+    wire feq_s_res = (fval1_is_nan | fval2_is_nan) ? 0 : normal_eq_ignore_zero;
+    wire flt_s_res = (fval1_is_nan | fval2_is_nan) ? 0 : normal_lt_ignore_zero;
+    wire fle_s_res = feq_s_res | flt_s_res;
+
+    wire fcmp_fval_nv = ((fval1_is_snan | fval2_is_snan) & ipkg.sel_feq_s) | ((fval1_is_nan | fval2_is_nan) & (ipkg.sel_flt_s | ipkg.sel_fle_s));
+
+    // -------------------------------------
+    // fmax, fmin:
+    // -------------------------------------
+    wire fmaxmin_fval_nv = (fval1_is_snan | fval2_is_snan) && (ipkg.sel_fmax_s | ipkg.sel_fmin_s);
+
+    logic [31:0] fmax_s_res, fmin_s_res;
+    always_comb begin
+        if (fval1_is_nan & fval2_is_nan) begin
+            fmax_s_res = NORMAL_QNAN;
+            fmin_s_res = NORMAL_QNAN;
+        end
+        else if (fval1_is_nan) begin
+            fmax_s_res = fval2;
+            fmin_s_res = fval2;
+        end
+        else if (fval2_is_nan) begin
+            fmax_s_res = fval1;
+            fmin_s_res = fval1;
+        end
+        else begin
+            fmax_s_res = (normal_lt) ? fval2 : fval1;
+            fmin_s_res = (normal_lt) ? fval1 : fval2;
+        end
+    end
+
+    // -------------------------------------
+    // fsgnj.s, fsgnjn.s, fsgnjx.s:
+    // -------------------------------------
+    wire [31:0] fsgnj_s_res  = (fval1_is_nan) ? NORMAL_QNAN : {fval2.sign, fval1.exp, fval1.mant};
+    wire [31:0] fsgnjn_s_res = (fval1_is_nan) ? NORMAL_QNAN : {~fval2.sign, fval1.exp, fval1.mant};
+    wire [31:0] fsgnjx_s_res = (fval1_is_nan) ? NORMAL_QNAN : {fval1.sign ^ fval2.sign, fval1.exp, fval1.mant};
+
+
     // fflags 写入
     fflags_t flags;
-    assign flags.NV = fval1_is_nan | fval2_is_nan | sum_diff_inf;
+    assign flags.NV = sum_fval_nv | sum_diff_inf | fcmp_fval_nv | fmaxmin_fval_nv;
     assign flags.OF = sum_norm_overflow | sum_roundup_overflow;
     assign flags.UF = sum_norm_underflow;
     assign flags.NX = sum_roundup_inexact;
@@ -226,19 +328,25 @@ module alu_Fext(
     assign fflags = (ipkg.is_FP) ? flags : 0;
 
 
-
-    // fclass
-    // fcmp
-    // fmax, min
-    // fmv, fcvt
-    // fsgnj
+    // fcvt
     // fmul, fdiv
 
     always_comb begin
         unique case (1'b1)
-            ipkg.sel_fadd_s, ipkg.sel_fsub_s   : result = sum_res;
-            ipkg.sel_fmv_w_x, ipkg.sel_fmv_x_w : result = value1;
-            default                            : result = 32'b0;
+            ipkg.sel_fclass_s : result = fclass_res;
+            ipkg.sel_fadd_s   : result = sum_res;
+            ipkg.sel_fsub_s   : result = sum_res;
+            ipkg.sel_fmv_w_x  : result = value1;
+            ipkg.sel_fmv_x_w  : result = value1;
+            ipkg.sel_feq_s    : result = {31'b0, feq_s_res};
+            ipkg.sel_fle_s    : result = {31'b0, fle_s_res};
+            ipkg.sel_flt_s    : result = {31'b0, flt_s_res};
+            ipkg.sel_fmax_s   : result = fmax_s_res;
+            ipkg.sel_fmin_s   : result = fmin_s_res;
+            ipkg.sel_fsgnj_s  : result = fsgnj_s_res;
+            ipkg.sel_fsgnjn_s : result = fsgnjn_s_res;
+            ipkg.sel_fsgnjx_s : result = fsgnjx_s_res;
+            default           : result = 32'b0;
         endcase
     end
     

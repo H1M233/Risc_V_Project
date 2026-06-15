@@ -1,18 +1,18 @@
 module divider(
-    input              clk,
-    input              rst,
-    // 输入
-    input              valid_i,          // 启动除法
-    input      [31:0]  dividend_i,       // 被除数
-    input      [31:0]  divisor_i,        // 除数
-    input              is_div_i,         // DIV  有符号除法
-    input              is_divu_i,        // DIVU 无符号除法
-    input              is_rem_i,         // REM  有符号取余
-    input              is_remu_i,        // REMU 无符号取余
-    input              flush_i,          // 流水线冲刷
-    // 输出
-    output             valid_o,          // 结果有效，解除暂停
-    output     [31:0]  result_o          // 商或余数
+    input  logic        clk,
+    input  logic        rst,
+
+    input  logic        valid_i,          // 启动除法
+    input  logic [31:0] dividend_i,       // 被除数
+    input  logic [31:0] divisor_i,        // 除数
+    input  logic        is_div_i,         // DIV  有符号除法
+    input  logic        is_divu_i,        // DIVU 无符号除法
+    input  logic        is_rem_i,         // REM  有符号取余
+    input  logic        is_remu_i,        // REMU 无符号取余
+    input  logic        flush_i,
+
+    output logic        valid_o,          // 结果有效
+    output logic [31:0] result_o
 );
     // =========================================================================
     //  指令译码
@@ -24,41 +24,32 @@ module divider(
     // =========================================================================
     //  输入寄存
     // =========================================================================
-    logic valid_r;
-    always_ff @(posedge clk) begin
-        if (!rst) begin
-            valid_r <= 1'b0;
-        end
-        else if (flush_i) begin
-            valid_r <= 1'b0;
-        end
-        else begin
-            valid_r <= valid_i;
-        end
-    end
-
+    logic        valid_r;
     logic [65:0] dividend_ext;
     logic [33:0] divisor_ext;
-    logic div_by_0, div_ovf;    // 除 0 & 溢出判断
+    logic        div_by_0, div_ovf;    // 除 0 & 溢出判断
     always_ff @(posedge clk) begin
         if (!rst) begin
-            dividend_ext  <= 66'b0;
-            divisor_ext   <= 34'b0;
+            valid_r      <= 1'b0;
 
-            div_by_0     <= 1'b0;
-            div_ovf      <= 1'b0;
-        end
-        else if (flush_i) begin
             dividend_ext <= 66'b0;
             divisor_ext  <= 34'b0;
 
             div_by_0     <= 1'b0;
             div_ovf      <= 1'b0;
         end
-        else if (valid_r) begin
-            // 输入寄存
+        else if (flush_i | valid_o) begin
+            valid_r      <= 1'b0;
+
+            dividend_ext <= 66'b0;
+            divisor_ext  <= 34'b0;
+
+            div_by_0     <= 1'b0;
+            div_ovf      <= 1'b0;
         end
-        else if (valid_i) begin
+        else if (valid_i & ~valid_r) begin
+            valid_r      <= 1'b1;
+
             dividend_ext <= {{34{is_signed & dividend_i[31]}}, dividend_i};
             divisor_ext  <= {{2{is_signed & divisor_i[31]}}, divisor_i};
 
@@ -181,13 +172,21 @@ module divider(
                      | (state_is_quot_corr & want_quot)
                      | (state_is_remd_corr & want_remd);
 
-    assign valid_o  = (state_is_idle & valid_r & special_case) | normal_done;
-    assign result_o = (special_case) ? special_result : div_result;
+    always_ff @(posedge clk) begin
+        if (~rst) begin
+            valid_o     <= 1'b0;
+            result_o    <= 32'b0;
+        end
+        else begin
+            valid_o     <= (state_is_idle & valid_r & special_case) | normal_done;
+            result_o    <= (special_case) ? special_result : div_result;
+        end
+    end
 
     // =========================================================================
     //  状态机转移
     // =========================================================================
-    wire start = state_is_idle & valid_r & valid_i & ~special_case;     // 双 valid 保证计算结束后不能在非除法 start
+    wire start = state_is_idle & valid_r & ~valid_o & ~special_case;
 
     always_ff @(posedge clk) begin
         if (~rst) begin

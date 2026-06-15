@@ -4,7 +4,6 @@ import sys
 import json
 import os
 
-
 '''全局变量'''
 AutoSim_dir = Path.cwd()    # 当前文件夹
 
@@ -258,7 +257,6 @@ def getPrevTimeJson(prj_name, mem_name):
         return float(json_file[prj_name]['SOFTWARE TEST'][mem_name]['RUN TIME'])
     except:
         return 0
-    
 
 
 def softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(-1, -1)):
@@ -297,21 +295,28 @@ def softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(-1, -1)):
 
 
 def instTest(prj_dict, testAll=False):
-    inst_name = ' '
+    inst_name = ''
     enableTrace = False
+
     while True:
         if not testAll:
-            print('\r\033[2KINST Name (Press Enter or ALL): ', end='')
+            print('\r\033[2KINST Name (Press Enter for ALL, \'/\' for Folder): ', end='')
+            print('\033[96m', end='')
             inst_name = input().lower()
+            print('\033[0m', end='')
 
         # 获取路径下所有bin文件
         if inst_name == 'all' or inst_name == '' or testAll:
-            all_bin_files = [str(p) for p in Path(AutoSim_dir / 'generated').rglob('*.bin')]
+            sel_bin_files = [str(p) for p in Path(AutoSim_dir / 'generated').rglob(f'*.bin')]
             break
         elif inst_name:
-            all_bin_files = [str(p) for p in Path(AutoSim_dir / 'generated').rglob(f'*{inst_name}.bin')]
-            if all_bin_files:
-                enableTrace = True
+            if inst_name[0] == '/':
+                sel_bin_files = [str(p) for p in Path(AutoSim_dir / 'generated' / inst_name[1:]).rglob(f'*.bin')]
+            else:
+                sel_bin_files = [str(p) for p in Path(AutoSim_dir / 'generated').rglob(f'*{inst_name}.bin')]
+            
+            if sel_bin_files:
+                enableTrace = True if len(sel_bin_files) == 1 else False
                 break
 
     print("\n编译中...", end='\r', flush=True)
@@ -320,7 +325,7 @@ def instTest(prj_dict, testAll=False):
     passCnt, failCnt = 0, 0
 
     # 遍历所有文件
-    for file_bin in all_bin_files:
+    for file_bin in sel_bin_files:
         print_name = Path(file_bin).name[:-4]
 
         bin_to_mem(file_bin, 'inst_test')
@@ -342,9 +347,9 @@ def instTest(prj_dict, testAll=False):
 
             # 进度条
             width = 50
-            percent = (passCnt + failCnt) / len(all_bin_files)
+            percent = (passCnt + failCnt) / len(sel_bin_files)
             filled = int(width * percent)
-            bar = '█' * filled + '░' * (width - filled) + f'  {passCnt + failCnt} / {len(all_bin_files)}'
+            bar = '█' * filled + '░' * (width - filled) + f'  {passCnt + failCnt} / {len(sel_bin_files)}'
             
             if findFail:
                 print('\033[2K指令  ' + print_name.ljust(20, ' ') + '!!!FAIL!!!', flush=True)
@@ -362,7 +367,7 @@ def instTest(prj_dict, testAll=False):
             print(error_msg)
             print('=' * 40)
     
-    updateJson(prj_dict['prj_name'], 'Inst Test', inst_result=(passCnt == len(all_bin_files) and failCnt == 0))
+    updateJson(prj_dict['prj_name'], 'Inst Test', inst_result=(passCnt == len(sel_bin_files) and failCnt == 0))
     print(f"\033[2K指令集测试共 \033[92m{passCnt}个成功 \033[91m{failCnt}个失败\033[0m", end='\n\033[2K')
 
 def main():

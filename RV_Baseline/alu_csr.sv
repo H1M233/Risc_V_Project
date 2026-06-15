@@ -27,12 +27,15 @@ module alu_csr (
 
     always_comb begin: ALU_CSR_CTRL
         unique case (1'b1)
-            ipkg.sel_csrrw, ipkg.sel_csrrwi : cpkg.wdata = rw_res;
-            ipkg.sel_csrrs, ipkg.sel_csrrsi : cpkg.wdata = rs_res;
-            ipkg.sel_csrrc, ipkg.sel_csrrci : cpkg.wdata = rc_res;
+            ipkg.sel_csrrw  : cpkg.wdata = rw_res;
+            ipkg.sel_csrrwi : cpkg.wdata = rw_res;
+            ipkg.sel_csrrs  : cpkg.wdata = rs_res;
+            ipkg.sel_csrrsi : cpkg.wdata = rs_res;
+            ipkg.sel_csrrc  : cpkg.wdata = rc_res;
+            ipkg.sel_csrrci : cpkg.wdata = rc_res;
 
-            ipkg.is_FP                      : cpkg.wdata = fflags_res;
-            default                         : cpkg.wdata = 32'b0;
+            ipkg.is_FP      : cpkg.wdata = fflags_res;
+            default         : cpkg.wdata = 32'b0;
         endcase
     end 
 endmodule

@@ -94,7 +94,7 @@ module ex(
     assign mpkg.rd_data         = alu_result;
     assign mpkg.regs_wen        = regs_wen_i & ~ctrl_stall; // regs 写使能
     assign mpkg.req_load        = dcache_data_packaged_o.req_load;
-    assign mpkg.load_is_signed  = (ipkg.sel_lb | ipkg.sel_lh | ipkg.sel_lw);
+    assign mpkg.load_is_signed  = ipkg.sel_lb | ipkg.sel_lh | ipkg.sel_lw;
     assign mpkg.load_addr_low   = mem_addr_calc_low;
     assign valid_o              = valid_i; // 未使用
     
@@ -190,6 +190,7 @@ module ex(
         .rst        (rst),
         .flush      (pipe_flush),
 
+        .valid      (is_Bext),
         .value1     (rs1_data_fwd),
         .value2     (rs2_data_fwd),
         .ipkg       (ipkg),

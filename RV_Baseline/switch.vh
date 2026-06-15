@@ -7,7 +7,7 @@
 // L2: 256 KB
 
 // D-CACHE
-`define DCACHE_INDEX_WIDTH 10 // 2 * 1024 * 4 = 8 KB
+`define DCACHE_INDEX_WIDTH 8 // 2 * 256 * 4 = 2 KB
 
 // Perip Range
 `ifdef VERILATOR_INST_TEST
@@ -19,7 +19,7 @@
 `endif
 
 // 扩展
-`define ENABLE_M
+// `define ENABLE_M
 // `define ENABLE_B
 `ifdef ENABLE_B
     `define ENABLE_B_ZBA
@@ -32,4 +32,4 @@
 
 // `define ENABLE_Zicond
 // `define ENABLE_A
-// `define ENABLE_F
+`define ENABLE_F
