@@ -162,8 +162,9 @@ def prj_mem_ch(prj_ch=None, mem_ch=None):
         else:
             try:
                 key_num = int(prj_name_ask)
-                prj_ch = prj_dict[key_num] if key_num in prj_dict else ''
-                break
+                if key_num in prj_dict:
+                    prj_ch = prj_dict[key_num]
+                    break
             except ValueError:
                 pass
 
@@ -205,8 +206,9 @@ def prj_mem_ch(prj_ch=None, mem_ch=None):
         else:
             try:
                 key_num = int(mem_name_ask)
-                mem_ch.append(mem_dict[key_num] if key_num in mem_dict else '')
-                break
+                if key_num in mem_dict:
+                    mem_ch.append(mem_dict[key_num])
+                    break
             except ValueError:
                 pass
 

@@ -57,6 +57,10 @@
 
 `define TYPE_AMO 7'b0101111
 
+`define TYPE_FP       7'b1010011
+`define TYPE_LOAD_FP  7'b0000111
+`define TYPE_STORE_FP 7'b0100111
+
 `define ECALL_MRET    3'b000
 
 `define NOP      32'h0000_0013      

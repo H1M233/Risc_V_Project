@@ -1,77 +1,114 @@
 `include "rv32I.vh"
-`include "alu.vh"
+`include "alu_def.svh"
+`include "csr_def.svh"
 
 module csr_regs(
-    input clk,
-    input rst,
-    input logic [11:0] csr_addr,
-    input ex_csr_data_t data_packaged_i,
+    input  logic clk,
+    input  logic rst,
 
-    output reg [31:0] csr_rdata,
-    //ecall
-    input ecall,                    //from wb
-    input mret,                     //from wb
-    input [31:0] ecall_inst,        //from wb
-    output reg [31:0] ecall_mret_addr
+    // from id
+    input  logic [11:0]  csr_addr,
+    output logic [31:0]  csr_rdata,
+
+    // from wb
+    input  ex_csr_data_t data_packaged_i,
+    
+    // trap
+    input  logic         ecall,          // from wb
+    input  logic         mret,           // from wb
+    input  logic [31:0]  ecall_inst,     // from wb
+    output logic         trap_en,
+    output logic [31:0]  trap_pc
 );
     // 解码
+    wire [31:0] csr_waddr = data_packaged_i.waddr;
     wire [31:0] csr_wdata = data_packaged_i.wdata;
     wire        csr_wen   = data_packaged_i.wen;
+    wire [5:0]  fflags    = data_packaged_i.fflags;
+
+    // 特权级寄存器
+    pm_t current_privilege;
 
     // 定义CSR寄存器
-    reg [31:0] mstatus;   // 机器状态寄存器
-    reg [31:0] mepc;      // 机器异常程序计数器
-    reg [31:0] mcause;    // 机器异常原因寄存器
-    reg [31:0] mtvec;     // 机器异常向量基地址寄存器
-    reg [31:0] mscratch;   // 机器临时寄存器
+    mstatus_t   mstatus;     // 机器状态寄存器
+    mepc_t      mepc;        // 机器异常程序计数器
+    mcause_t    mcause;      // 机器异常原因寄存器
+    mtvec_t     mtvec;       // 机器异常向量基地址寄存器
+    mscratch_t  mscratch;    // 机器临时寄存器
+    fcsr_t      fcsr;        // F 扩展浮点控制和状态异常寄存器
 
     // CSR地址映射
-    localparam MSTATUS_ADDR = 12'h300;
-    localparam MEPC_ADDR    = 12'h341;
-    localparam MCAUSE_ADDR  = 12'h342;
-    localparam MTVEC_ADDR   = 12'h305;
-    localparam MSCATCH_ADDR = 12'h340;
-    // CSR写入逻辑
+    localparam MSTATUS_ADDR  = 12'h300;
+    localparam MEPC_ADDR     = 12'h341;
+    localparam MCAUSE_ADDR   = 12'h342;
+    localparam MTVEC_ADDR    = 12'h305;
+    localparam MSCRATCH_ADDR = 12'h340;
+    localparam FCSR_ADDR     = 12'h001;
+
+    // CSR 写
     always_ff @(posedge clk) begin
         if (!rst) begin
-            mstatus <= 32'b0;
-            mepc <= 32'b0;
-            mcause <= 32'b0;
-            mtvec <= 32'b0;
-            mscratch <= 32'b0;
-            ecall_mret_addr <= 32'b0;
+            current_privilege   <= M;
+            mstatus             <= 32'b0;
+            mepc                <= 32'b0;
+            mcause              <= 32'b0;
+            mtvec               <= 32'b0;
+            mscratch            <= 32'b0;
         end
         else if (ecall) begin
-            mepc <= ecall_inst; // 保存引发ecall的指令地址
-            mcause <= 32'h0000_000b; // 设置异常原因，0xB表示环境调用
-            mstatus[3] <= 1'b0; // 设置mstatus的MIE位为0，禁止中断
-            ecall_mret_addr <= mtvec; // 跳转到异常处理程序地址
+            current_privilege   <= M;
+            mepc.PC             <= ecall_inst;          // 保存引发ecall的指令地址
+            mcause.CODE         <= 31'hb;               // 设置异常原因，0xB表示环境调用
+            mstatus.MPIE        <= mstatus.MIE;         // 保存当前中断使能
+            mstatus.MIE         <= 1'b0;                // 关闭全局中断
+            mstatus.MPP         <= current_privilege;   // 保存当前特权级
         end
         else if (mret) begin
-            ecall_mret_addr <= mepc; // 从mepc恢复执行地址
-            mstatus[3] <= 1'b1; // 设置mstatus的MIE位为1，允许中断
+            current_privilege   <= mstatus.MPP;     // 恢复特权级
+            mstatus.MIE         <= mstatus.MPIE;    // 恢复之前的中断使能
+            mstatus.MPIE        <= 1'b1;            // 重置 MPIE
+            mstatus.MPP         <= U;
         end
-        else if (csr_wen) begin
-            case (csr_addr)
-                MSTATUS_ADDR: mstatus <= csr_wdata;
-                MEPC_ADDR: mepc <= csr_wdata;
-                MCAUSE_ADDR: mcause <= csr_wdata;
-                MTVEC_ADDR: mtvec <= csr_wdata;
-                MSCATCH_ADDR: mscratch <= csr_wdata;
-                default: ; // 无效地址，保持不变
-            endcase
+        else begin
+            if (csr_wen) begin
+                case (csr_waddr)
+                    MSTATUS_ADDR  : mstatus  <= csr_wdata;
+                    MEPC_ADDR     : mepc     <= csr_wdata;
+                    MCAUSE_ADDR   : mcause   <= csr_wdata;
+                    MTVEC_ADDR    : mtvec    <= csr_wdata;
+                    MSCRATCH_ADDR : mscratch <= csr_wdata;
+
+                    FCSR_ADDR     : fcsr     <= csr_wdata;
+                    default       : ; // 无效地址，保持不变
+                endcase
+            end
+            else begin
+                fcsr.flags <= fflags | fcsr.flags;
+            end
         end 
     end
-    // CSR读数据逻辑
+
+    // CSR 读
     always_comb begin
         case (csr_addr)
-            MSTATUS_ADDR: csr_rdata = mstatus;
-            MEPC_ADDR: csr_rdata = mepc;
-            MCAUSE_ADDR: csr_rdata = mcause;
-            MTVEC_ADDR: csr_rdata = mtvec;
-            MSCATCH_ADDR: csr_rdata = mscratch;
-            default: csr_rdata = 32'b0; // 无效地址，返回0
+            MSTATUS_ADDR  : csr_rdata = mstatus;
+            MEPC_ADDR     : csr_rdata = mepc;
+            MCAUSE_ADDR   : csr_rdata = mcause;
+            MTVEC_ADDR    : csr_rdata = mtvec;
+            MSCRATCH_ADDR : csr_rdata = mscratch;
+
+            FCSR_ADDR     : csr_rdata = fcsr; 
+            default       : csr_rdata = 32'b0; // 无效地址，返回0
         endcase
     end
-
+    
+    // trap 处理
+    assign trap_en = ecall | mret;
+    always_comb begin
+        unique case (1'b1)
+            ecall   : trap_pc = {mtvec.BASE, 2'b0};     // 跳转到异常处理程序地址
+            mret    : trap_pc = mepc.PC;                // 从mepc恢复执行地址
+            default : trap_pc = 32'b0;
+        endcase
+    end
 endmodule

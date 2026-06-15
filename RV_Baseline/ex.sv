@@ -1,5 +1,5 @@
 `include "rv32I.vh"
-`include "alu.vh"
+`include "alu_def.svh"
 `include "switch.vh"
 
 module ex(
@@ -15,9 +15,6 @@ module ex(
 
     // frowarding ex data
     input  logic [31:0]     fwd_ex_rd_data_i,
-
-    // from csr_regs
-    input  logic [31:0]     csr_rdata,
 
     // from d-cache
     input  logic            dcache_load_ready_i,
@@ -42,213 +39,127 @@ module ex(
     // ctrl_stall
     output logic            ctrl_stall
 );
-    // 解码
-    wire [31:0] pc_addr_i    = data_packaged_i.pc;
-    wire [31:0] inst_i       = data_packaged_i.inst;
-    wire [31:0] value1_i     = data_packaged_i.value1;
-    wire [31:0] value2_i     = data_packaged_i.value2;
-    wire [31:0] jump1_i      = data_packaged_i.jump1;
-    wire [31:0] jump2_i      = data_packaged_i.jump2;
-    wire [4:0]  rd_addr_i    = data_packaged_i.rd_addr;
-    wire        pred_taken_i = data_packaged_i.pred_taken;
-    wire        ecall_i      = data_packaged_i.ecall;
-    wire        mret_i       = data_packaged_i.mret;
+    // debug 端口
+    wire [31:0] pc         = data_packaged_i.pc;
+    wire [31:0] inst       = data_packaged_i.inst;
+    wire [31:0] imm        = data_packaged_i.imm;
+    wire [31:0] jump1      = data_packaged_i.jump1;
+    wire [31:0] jump2      = data_packaged_i.jump2;
+    wire [5:0]  rd_addr    = data_packaged_i.rd_addr;
+    wire        pred_taken = data_packaged_i.pred_taken;
 
     // 主操作码独热
     decode_t ipkg;
     assign ipkg = inst_packaged_i;
 
-    // 前推选择 - 当为立即数时 fwd_rs2_data_i 代表 imm
-    wire fwd_rs1_hit_ex_i = data_packaged_i.fwd_rs1_hit_ex;
-    wire fwd_rs2_hit_ex_i = data_packaged_i.fwd_rs2_hit_ex;
-    wire [31:0] fwd_rs1_data_i = data_packaged_i.fwd_rs1_data;
-    wire [31:0] fwd_rs2_data_i = data_packaged_i.fwd_rs2_data;
+    id_ex_data_t dpkg;
+    assign dpkg = data_packaged_i;
 
     // 前推选择 - 当为立即数时 fwd_rs2_data_i 代表 imm
-    (* max_fanout = 20 *) wire [31:0] rs1_data_fwd = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
-    (* max_fanout = 20 *) wire [31:0] rs2_data_fwd = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
-
-    // value1 & value2 仅用于 I & R 型运算
-    (* max_fanout = 20 *) wire [31:0] value1_eff = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
-    (* max_fanout = 20 *) wire [31:0] value2_eff = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
-
-    // 加减法专用前推
-    wire [31:0] value1_eff_add = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
-    wire [31:0] value2_eff_add = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
-    wire [31:0] value1_eff_sub = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
-    wire [31:0] value2_eff_sub = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
-
-    // 计算
-    cmp_result_t alu_cmp;
-    assign alu_cmp = fast_compare(value1_eff, value2_eff);
-
-    wire [4:0]  shamt    = value2_eff[4:0];
-    wire [31:0] add_res  = value1_eff_add + value2_eff_add;
-    wire [31:0] sub_res  = value1_eff_sub - value2_eff_sub;
-    wire [31:0] xor_res  = value1_eff ^ value2_eff;
-    wire [31:0] or_res   = value1_eff | value2_eff;
-    wire [31:0] and_res  = value1_eff & value2_eff;
-    wire [31:0] sll_res  = value1_eff << shamt;
-    wire [31:0] srl_res  = value1_eff >> shamt;
-    wire [31:0] sra_res  = $signed(value1_eff) >>> shamt;
-    wire        ltu_res  = alu_cmp.ltu;
-    wire        lts_res  = alu_cmp.lts;
+    wire fwd_rs1_hit_ex_i = dpkg.fwd_rs1_hit_ex;
+    wire fwd_rs2_hit_ex_i = dpkg.fwd_rs2_hit_ex;
+    wire [31:0] fwd_rs1_data_i = dpkg.fwd_rs1_data;
+    wire [31:0] fwd_rs2_data_i = dpkg.fwd_rs2_data;
     
-    // csr 计算
-    wire [31:0] csr_value1 = (inst_i[14]) ? value1_i : rs1_data_fwd;   // CSR 写数据选择
-    wire [31:0] rw_res     = csr_value1;                               // 读写结果，写入 CSR 的值或原 CSR 值
-    wire [31:0] rs_res     = csr_rdata | csr_value1;                   // 读-置位结果
-    wire [31:0] rc_res     = csr_rdata & ~csr_value1;                  // 读-清零结果 
+    // 前推选择 - 对上一周期 ex 的前推
+    wire [31:0] rs1_data_fwd = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
+    wire [31:0] rs2_data_fwd = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
     
-    // 分支计算
-    cmp_result_t branch_cmp;
-    assign branch_cmp = fast_compare(branch_rs1_data, branch_rs2_data);
-
-    wire [31:0] branch_rs1_data = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
-    wire [31:0] branch_rs2_data = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
-    wire branch_eq_res  = branch_rs1_data == branch_rs2_data;
-    wire branch_ltu_res = branch_cmp.ltu;
-    wire branch_lts_res = branch_cmp.lts;
-    
-    // Branch 计算
-    reg branch_taken;
-    always_comb begin
-        unique case (1'b1)
-            ipkg.sel_beq  : branch_taken = branch_eq_res;
-            ipkg.sel_bne  : branch_taken = ~branch_eq_res;
-            ipkg.sel_blt  : branch_taken = branch_lts_res;
-            ipkg.sel_bge  : branch_taken = ~branch_lts_res;
-            ipkg.sel_bltu : branch_taken = branch_ltu_res;
-            ipkg.sel_bgeu : branch_taken = ~branch_ltu_res;
-            default  : branch_taken = 1'b0;
-        endcase
-    end
-    
-    // 预测错误判断
-    wire [31:0] jalr_target             = rs1_data_fwd + value2_i;
-    wire        jalr_pred_mispredict    = (ipkg.is_jalr && rs1_data_fwd != jump2_i);        // rs1 == pred_pc - imm
-    wire        branch_pred_mispredict  = (ipkg.is_branch && pred_taken_i != branch_taken);
-    wire [31:0] branch_jump_addr        = (~pred_taken_i) ? jump1_i : jump2_i;              // 提前到 id 计算
-    
-    // 两位加法器
-    wire mem_addr_calc_sum0 = rs1_data_fwd[0] ^ value2_i[0];
-    wire mem_addr_calc_carry0 = rs1_data_fwd[0] & value2_i[0];
-    wire mem_addr_calc_sum1 = rs1_data_fwd[1] ^ value2_i[1] ^ mem_addr_calc_carry0;
+    // 访存地址计算
+    wire [31:0]  mem_addr_calc = rs1_data_fwd + dpkg.imm;
+    wire mem_addr_calc_sum0 = rs1_data_fwd[0] ^ dpkg.imm[0];
+    wire mem_addr_calc_carry0 = rs1_data_fwd[0] & dpkg.imm[0];
+    wire mem_addr_calc_sum1 = rs1_data_fwd[1] ^ dpkg.imm[1] ^ mem_addr_calc_carry0;
     wire [1:0]  mem_addr_calc_low = {mem_addr_calc_sum1, mem_addr_calc_sum0};
-    
-    // RV32I 标准结果
-    logic [31:0] alu_rv32i_res;
-    always_comb begin
-        unique case (1'b1)
-            ipkg.sel_add            : alu_rv32i_res = add_res;
-            ipkg.sel_sub            : alu_rv32i_res = sub_res;
-            ipkg.sel_sll            : alu_rv32i_res = sll_res;
-            ipkg.sel_slt            : alu_rv32i_res = {31'b0, lts_res};
-            ipkg.sel_sltu           : alu_rv32i_res = {31'b0, ltu_res};
-            ipkg.sel_xor            : alu_rv32i_res = xor_res;
-            ipkg.sel_srl            : alu_rv32i_res = srl_res;
-            ipkg.sel_sra            : alu_rv32i_res = sra_res;
-            ipkg.sel_or             : alu_rv32i_res = or_res;
-            ipkg.sel_and            : alu_rv32i_res = and_res;
-            ipkg.request_value_only : alu_rv32i_res = value1_i;
-            default                 : alu_rv32i_res = 32'b0;
-        endcase
-    end
     
     // 输出计算结果
     logic [31:0] alu_result;
     always_comb begin
         unique case (1'b1)
-            ipkg.is_rv32i     : alu_result = alu_rv32i_res;
-            ipkg.is_zicsr     : alu_result = csr_rdata;
+            ipkg.is_rv32i     : alu_result = RV32I_res;
+            ipkg.is_zicsr     : alu_result = dpkg.csr_rdata;
             ipkg.is_Mext      : alu_result = Mext_res;
             is_Bext           : alu_result = Bext_res;
             ipkg.is_Zicondext : alu_result = Zicondext_res;
             ipkg.is_Aext      : alu_result = Aext_res;
+            ipkg.is_FP        : alu_result = Fext_res;
             default           : alu_result = 32'b0;
         endcase
     end
     
-    // 跳转
-    ex_bpu_data_t bpkg;
-    assign bpu_data_packaged_o    = bpkg;
-    assign bpkg.update_btb_en     = jalr_pred_mispredict;        // btb 更新使能
-    assign bpkg.update_gshare_en  = branch_pred_mispredict;      // gshare 更新使能
-    assign bpkg.update_pc         = pc_addr_i;
-    assign bpkg.update_target     = jalr_target;
-    assign bpkg.actual_taken      = branch_taken;
-    assign bpkg.rollback_ras_ptr  = data_packaged_i.ras_ptr;
-
-    // 冲刷控制
-    assign pred_flush_en  = (branch_pred_mispredict | jalr_pred_mispredict);
-    assign pred_flush_pc  = (ipkg.is_branch) ? branch_jump_addr :
-    (ipkg.is_jalr)   ? jalr_target : 32'b0;
-    
-    // Load & Store Unit
-    logic atom_req_load, atom_req_store;
-    logic [31:0] atom_addr, atom_wdata;
-    wire [31:0] mem_addr_calc = rs1_data_fwd + value2_i;
-    alu_lsu ALU_LSU (
-        .clk            (clk),
-        .rst            (rst),
-        .flush          (pipe_flush),
-        
-        .rs1            (rs1_data_fwd),
-        .rs2            (rs2_data_fwd),
-        .mem_addr       (mem_addr_calc),
-        .addr_low       (mem_addr_calc_low),
-        .regs_wen       (regs_wen_i),
-        .ipkg           (ipkg),
-
-        .atom_req_load  (atom_req_load),
-        .atom_req_store (atom_req_store),
-        .atom_addr      (atom_addr),
-        .atom_wdata     (atom_wdata),
-
-        .dpkg       (dcache_data_packaged_o)
-    );
-    
     // rd & dram 读写
     ex_mem_data_t mpkg;
     assign mem_data_packaged_o  = mpkg;
-    assign mpkg.rd_addr         = rd_addr_i;
+    assign mpkg.rd_addr         = dpkg.rd_addr;
     assign mpkg.rd_data         = alu_result;
     assign mpkg.regs_wen        = regs_wen_i & ~ctrl_stall; // regs 写使能
     assign mpkg.req_load        = dcache_data_packaged_o.req_load;
     assign mpkg.load_is_signed  = (ipkg.sel_lb | ipkg.sel_lh | ipkg.sel_lw);
     assign mpkg.load_addr_low   = mem_addr_calc_low;
-    assign valid_o              = valid_i;
+    assign valid_o              = valid_i; // 未使用
     
     always_comb begin
         unique case (1'b1)
-            ipkg.sel_lb:  mpkg.load_mask = 2'b01;
-            ipkg.sel_lh:  mpkg.load_mask = 2'b10;
-            ipkg.sel_lw:  mpkg.load_mask = 2'b11;
-            ipkg.sel_lbu: mpkg.load_mask = 2'b01;
-            ipkg.sel_lhu: mpkg.load_mask = 2'b10;
-            default: mpkg.load_mask = 2'b00;
+            ipkg.is_load_FP : mpkg.load_mask = 2'b11;
+            ipkg.sel_lr_w   : mpkg.load_mask = 2'b11;
+            ipkg.sel_lb     : mpkg.load_mask = 2'b01;
+            ipkg.sel_lh     : mpkg.load_mask = 2'b10;
+            ipkg.sel_lw     : mpkg.load_mask = 2'b11;
+            ipkg.sel_lbu    : mpkg.load_mask = 2'b01;
+            ipkg.sel_lhu    : mpkg.load_mask = 2'b10;
+            default         : mpkg.load_mask = 2'b00;
         endcase    
     end
     
+    // RV32I Unit
+    logic [31:0] RV32I_res;
+    alu_RV32I ALU_RV32I (
+        .value1         (rs1_data_fwd),
+        .value2         (rs2_data_fwd),
+        .imm            (dpkg.imm),
+        .jump1          (dpkg.jump1),
+        .jump2          (dpkg.jump2),
+        .ipkg           (ipkg),
+        .dpkg           (dpkg),
+        
+        .bpkg       (bpu_data_packaged_o),
+        .pred_flush_en  (pred_flush_en),
+        .pred_flush_pc  (pred_flush_pc),
+        .result         (RV32I_res)
+    );
+    
+    // Load & Store Unit
+    logic atom_req_load, atom_req_store;
+    logic [31:0] atom_addr, atom_wdata;
+    alu_lsu ALU_LSU (
+        .rs1            (rs1_data_fwd),
+        .rs2            (rs2_data_fwd),
+        .mem_addr       (mem_addr_calc),
+        .mem_addr_low   (mem_addr_calc_low),
+        .regs_wen       (regs_wen_i),
+        .ipkg           (ipkg),
+        
+        .atom_req_load  (atom_req_load),
+        .atom_req_store (atom_req_store),
+        .atom_addr      (atom_addr),
+        .atom_wdata     (atom_wdata),
+        
+        .dcachepkg      (dcache_data_packaged_o)
+    );
+    
     // CSR 控制
-    ex_csr_data_t cpkg;
-    assign csr_data_packaged_o = cpkg;
-    assign cpkg.wen   = ipkg.is_zicsr;     // CSR 写使能
-    assign mpkg.ecall = ecall_i;
-    assign mpkg.mret  = mret_i;
-    assign mpkg.ecall_inst = (ecall_i) ? pc_addr_i : 32'b0; // 传递 ecall 指令给 csr_regs 模块以保存 mepc
-    always_comb begin: ALU_CSR_CTRL
-        unique case (1'b1)
-            ipkg.sel_csrrw:  cpkg.wdata = rw_res;
-            ipkg.sel_csrrs:  cpkg.wdata = rs_res;
-            ipkg.sel_csrrc:  cpkg.wdata = rc_res;
-            ipkg.sel_csrrwi: cpkg.wdata = rw_res;
-            ipkg.sel_csrrsi: cpkg.wdata = rs_res;
-            ipkg.sel_csrrci: cpkg.wdata = rc_res;
-            default: cpkg.wdata = 32'b0;
-        endcase
-    end 
+    logic [4:0] fflags;
+    alu_csr ALU_CSR (
+        .value1     (rs1_data_fwd),
+        .value2     (rs2_data_fwd),
+        .ipkg       (ipkg),
+        .dpkg       (dpkg),
 
+        .fflags     (fflags),
+
+        .cpkg       (csr_data_packaged_o)
+    );
+    
     // M-ext
     logic Mext_ctrl;
     logic [31:0] Mext_res;
@@ -265,6 +176,8 @@ module ex(
         .ctrl       (Mext_ctrl),
         .result     (Mext_res)
     );
+    `else
+    assign Mext_ctrl = 1'b0;
     `endif
 
     // B-ext
@@ -284,6 +197,9 @@ module ex(
         .ctrl       (Bext_ctrl),
         .result     (Bext_res)
     );
+    `else
+    assign Bext_ctrl = 1'b0;
+    assign Bext_res  = 32'b0;
     `endif
 
     // Zicond-ext
@@ -297,6 +213,8 @@ module ex(
             default : Zicondext_res = 32'b0;
         endcase
     end
+    `else
+    assign Zicondext_res = 32'b0;
     `endif
 
     // A-ext
@@ -310,7 +228,6 @@ module ex(
 
         .rs1            (rs1_data_fwd),
         .rs2            (rs2_data_fwd),
-        .regs_wen       (regs_wen_i),
         .ipkg           (ipkg),
 
         .AXI_wen        (1'b0),
@@ -327,9 +244,42 @@ module ex(
         .ctrl           (Aext_ctrl),
         .result         (Aext_res)
     );
+    `else
+    assign atom_req_load  = 1'b0;
+    assign atom_req_store = 1'b0;
+    assign atom_addr      = 32'b0;
+    assign atom_wdata     = 32'b0;
+
+    assign Aext_ctrl      = 1'b0;
+    assign Aext_res       = 32'b0;
+    `endif
+
+    // F-ext
+    logic Fext_ctrl;
+    logic [31:0] Fext_res;
+    `ifdef ENABLE_F
+    alu_Fext ALU_FEXT (
+        .clk        (clk),
+        .rst        (rst),
+        .flush      (pipe_flush),
+
+        .value1     (rs1_data_fwd),
+        .value2     (rs2_data_fwd),
+        .dpkg       (dpkg),
+        .ipkg       (ipkg),
+
+        .fflags     (fflags),
+
+        .ctrl       (Fext_ctrl),
+        .result     (Fext_res)
+    );
+    `else
+    assign fflags    = 0;
+    assign Fext_ctrl = 1'b0;
+    assign Fext_res  = 32'b0;
     `endif
 
 
     // ex 暂停控制
-    assign ctrl_stall = (Mext_ctrl | Bext_ctrl | Aext_ctrl) & ~pipe_flush;
+    assign ctrl_stall = (Mext_ctrl | Bext_ctrl | Aext_ctrl | Fext_ctrl) & ~pipe_flush;
 endmodule

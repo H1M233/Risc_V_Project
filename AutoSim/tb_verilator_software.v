@@ -112,31 +112,31 @@ module tb_verilator_software(
         assign seg = tb_verilator_software.uut.student_top_inst.bridge_inst.seg_driver.s;
         wire hazard_en = tb_verilator_software.uut.student_top_inst.Core_cpu.hazard_hazard_en;
         wire ex_valid = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.valid_o;
-        assign commit = ex_valid & tb_verilator_software.uut.student_top_inst.Core_cpu.EX.inst_packaged_i != 0;
+        assign commit = ex_valid & tb_verilator_software.uut.student_top_inst.Core_cpu.EX.ipkg != 0;
 
-        assign pc0 = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.pc_addr_i;
+        assign pc0 = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.pc;
         assign pc1 = 0;
 
         assign hold_signal = tb_verilator_software.uut.student_top_inst.Core_cpu.pipe_hold_pc;
         assign flush_signal = tb_verilator_software.uut.student_top_inst.Core_cpu.pipe_flush_icache;
 
-        wire ex_is_jal = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.inst_packaged_i.is_jal & ex_valid;
-        wire ex_is_jalr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.inst_packaged_i.is_jalr & ex_valid;
-        wire ex_is_branch = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.inst_packaged_i.is_branch & ex_valid;
+        wire ex_is_jal = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.ipkg.is_jal & ex_valid;
+        wire ex_is_jalr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.ipkg.is_jalr & ex_valid;
+        wire ex_is_branch = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.ipkg.is_branch & ex_valid;
         assign pred_total = (ex_is_jalr | ex_is_branch);
         assign pred_total_b = ex_is_branch;
         assign pred_total_jr = ex_is_jalr;
-        assign pred_miss_b = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.bpu_data_packaged_o.update_gshare_en;
-        assign pred_miss_jr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.bpu_data_packaged_o.update_btb_en;
+        assign pred_miss_b = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.ALU_RV32I.bpkg.update_gshare_en;
+        assign pred_miss_jr = tb_verilator_software.uut.student_top_inst.Core_cpu.EX.ALU_RV32I.bpkg.update_btb_en;
         assign pred_miss = pred_miss_b | pred_miss_jr;
 
         always @(posedge clk_cpu) begin
             if (ex_is_jal)
-                func_block_pc0 <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.add_res;
+                func_block_pc0 <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.dpkg.imm;
             else if (ex_is_jalr)
-                func_block_pc0 <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.jalr_target;
-            else if (ex_is_branch & tb_verilator_software.uut.student_top_inst.Core_cpu.EX.branch_taken == 1'b1)
-                func_block_pc0 <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.branch_jump_addr;
+                func_block_pc0 <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.ALU_RV32I.jalr_target;
+            else if (ex_is_branch & tb_verilator_software.uut.student_top_inst.Core_cpu.EX.ALU_RV32I.branch_taken == 1'b1)
+                func_block_pc0 <= tb_verilator_software.uut.student_top_inst.Core_cpu.EX.ALU_RV32I.branch_jump_addr;
         end
 
     `endif

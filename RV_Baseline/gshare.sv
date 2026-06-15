@@ -22,12 +22,18 @@ module gshare #(
     input      [BHR_WIDTH - 1:0]    update_pht_index_i,     // ex 阶段返回并在控制模块提前算好的更新的索引
     input                           actual_taken_i          // ex 阶段判断跳转为真
 );
-    (* SRL_STYLE = "REGISTER" *) reg [BHR_WIDTH - 1:0] ghr;     // GHR全局历史寄存器：用于投机更新
-    (* SRL_STYLE = "REGISTER" *) reg [BHR_WIDTH - 1:0] ghr_d1;  // EX阶段时的GHR
-    (* SRL_STYLE = "REGISTER" *) reg [BHR_WIDTH - 1:0] ghr_d2;  // EX阶段时的GHR
-    (* SRL_STYLE = "REGISTER" *) reg [BHR_WIDTH - 1:0] ghr_d3;  // 寄存更新后的GHR
-    (* SRL_STYLE = "REGISTER" *) reg [BHR_WIDTH - 1:0] ghr_d4;  // 寄存更新后的GHR
+    reg [BHR_WIDTH - 1:0] ghr;     // GHR全局历史寄存器：用于投机更新
+    reg [BHR_WIDTH - 1:0] ghr_d1;  // EX阶段时的GHR
+    reg [BHR_WIDTH - 1:0] ghr_d2;  // EX阶段时的GHR
+    reg [BHR_WIDTH - 1:0] ghr_d3;  // 寄存更新后的GHR
+    reg [BHR_WIDTH - 1:0] ghr_d4;  // 寄存更新后的GHR
     (* ram_style = "block" *) reg [1:0] pht [0:PHT_SIZE - 1]; // PHT 2 位饱和计数器
+
+    // 初始化
+    initial begin
+        for (int i = 0; i < PHT_SIZE; i++) pht[i] = 2'b01;
+    end
+    
 
     // 查询
     reg pht_update_en_r;
@@ -41,19 +47,13 @@ module gshare #(
     assign pred_taken_o         = pred_taken;
 
     // Block RAM
-    integer i;
     always_ff @(posedge clk) begin
         // �?
         pht_reg         <= pht[pht_index_i];
         pht_update_old  <= pht[update_pht_index_i];
 
         // �?
-		  if (!rst) begin
-				for (i = 0; i < PHT_SIZE; i = i + 1) begin
-					pht[i] <= 2'b01;
-				end
-		  end
-        else if (pht_update_en_r) begin
+        if (pht_update_en_r) begin
             pht[pht_index_update_r] <= pht_update_new;
         end
     end

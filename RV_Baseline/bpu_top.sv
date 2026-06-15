@@ -1,5 +1,5 @@
 `include "rv32I.vh"
-`include "alu.vh"
+`include "alu_def.svh"
 
 // 预测单元顶层，包含：
 // 控制模块 bpu_controller.v

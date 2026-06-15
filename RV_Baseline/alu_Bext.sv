@@ -1,4 +1,4 @@
-`include "alu.vh"
+`include "alu_def.svh"
 `include "switch.vh"
 module alu_Bext(
     input  logic        clk,
@@ -51,11 +51,10 @@ module alu_Bext(
         return {1'b0, 3'b0};
     endfunction
     logic [4:0] clz_result;
-    logic [3:0] clz_byte;
     always_comb begin
         clz_result = 5'b0;
         for (int i = 3; i >= 0; i--) begin
-            clz_byte = clz8(value1_byte[i]);
+            logic [3:0] clz_byte = clz8(value1_byte[i]);
             if (clz_byte[3]) begin
                 clz_result = (8 * 5'(3 - i)) + clz_byte[2:0];
                 break;

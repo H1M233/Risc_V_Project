@@ -27,19 +27,20 @@ module ras #(
     reg [31:0] stack_mem [DEPTH - 1:0];
     reg [PTR_WIDTH:0] ptr;
 
+    // 初始化
+    initial begin
+        for(int i = 0; i < DEPTH; i++) stack_mem[i] = 32'b0;
+    end
+    
+
     assign isempty_o   = (ptr == 0);
     assign isfull_o    = (ptr == DEPTH);
     assign pop_addr_o  = (ptr != 0) ? stack_mem[ptr - 1] : 32'b0;      // 始终输出栈顶
     assign ptr_o       = ptr;
 
-    integer i;
-
     // 压栈
     always_ff @(posedge clk) begin
-        if (!rst) begin
-			for(i = 0; i < DEPTH; i = i + 1) stack_mem[i] <= 32'b0;
-		end
-        else if (push_en_i & ptr != DEPTH) begin
+        if (push_en_i & ptr != DEPTH) begin
             stack_mem[ptr]  <= push_addr_i;
         end
     end

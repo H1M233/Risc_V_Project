@@ -1,18 +1,16 @@
 `include "rv32I.vh"
-`include "alu.vh"
+`include "alu_def.svh"
 
 module id_ex(
-    input               clk,
-    input               rst,
-
-    input               pipe_hold,
-    input               pred_flush,
-    input               hazard_en,
+    input  logic        clk,
+    input  logic        rst,
+    input  logic        pipe_flush,
+    input  logic        pipe_hold,
 
     // from id
     input  id_ex_data_t data_packaged_i,
     input  decode_t     inst_packaged_i,
-    input               regs_wen_i,
+    input  logic        regs_wen_i,
 
     // to ex
     output id_ex_data_t data_packaged_o,
@@ -20,7 +18,6 @@ module id_ex(
     output logic        regs_wen_o,
     output logic        valid_o
 );
-    wire id_ex_flush_en_n = ~(pred_flush | hazard_en);
     always_ff @(posedge clk) begin
         if (!rst) begin
             data_packaged_o     <= 0;
@@ -31,11 +28,17 @@ module id_ex(
         else if (pipe_hold) begin
             // ..
         end
+        else if (pipe_flush) begin
+            data_packaged_o     <= 0;
+            inst_packaged_o     <= 0;
+            regs_wen_o          <= 0;
+            valid_o             <= 0;
+        end
         else begin
             data_packaged_o     <= data_packaged_i;
-            inst_packaged_o     <= (id_ex_flush_en_n) ? inst_packaged_i : 0;
-            regs_wen_o          <= id_ex_flush_en_n && regs_wen_i;
-            valid_o             <= id_ex_flush_en_n;
+            inst_packaged_o     <= inst_packaged_i;
+            regs_wen_o          <= regs_wen_i;
+            valid_o             <= 1'b1;
         end
     end
 endmodule

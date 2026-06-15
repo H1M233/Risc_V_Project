@@ -1,4 +1,4 @@
-`include "alu.vh"
+`include "alu_def.svh"
 `include "switch.vh"
 module alu_Aext(
     input  logic        clk,
@@ -7,7 +7,6 @@ module alu_Aext(
 
     input  logic [31:0] rs1,
     input  logic [31:0] rs2,
-    input  logic        regs_wen,
     input  decode_t     ipkg,
 
     input  logic        AXI_wen,
@@ -31,6 +30,9 @@ module alu_Aext(
     } atom_t;
     atom_t atom_state;
 
+    typedef enum {IDLE, LOAD_REQ, WAIT_RD, STORE_REQ, WAIT_WR} state_t;
+    state_t state;
+    
     // sc.w 命中
     wire sc_w_hit = (rs1 == atom_state.addr) & atom_state.valid & ipkg.sel_sc_w;
 
@@ -53,9 +55,6 @@ module alu_Aext(
             atom_state.valid <= 0;
         end
     end
-
-    typedef enum {IDLE, LOAD_REQ, WAIT_RD, STORE_REQ, WAIT_WR} state_t;
-    state_t state;
 
     wire amo_get_ctrl = (ipkg.is_Aext & ~ipkg.sel_lr_w & ~ipkg.sel_sc_w);
     logic [31:0] rs1_r, rs2_r;
@@ -118,6 +117,7 @@ module alu_Aext(
     // 写回 mem
     always_comb begin
         unique case (1'b1)
+            ipkg.sel_sc_w      : atom_wdata = rs2;
             ipkg.sel_amoswap_w : atom_wdata = rs2_r;
             ipkg.sel_amoadd_w  : atom_wdata = add_res;
             ipkg.sel_amoand_w  : atom_wdata = and_res;

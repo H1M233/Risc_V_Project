@@ -1,23 +1,23 @@
 `include "rv32I.vh"
-`include "alu.vh"
+`include "alu_def.svh"
 
 module mem(
     input  logic clk,
     input  logic rst,
+    input  logic pipe_flush,
+    input  logic pipe_hold,
 
     // from dcache
     input  logic         dcache_ack,
     input  logic [31:0]  dcache_rdata,
-    input  logic         dcache_stall,
 
     // from ex_mem
-    input ex_mem_data_t  data_packaged_i,
-    
-    // to hazard & wb
-    output logic         mem2_is_load_o,
+    input  ex_mem_data_t data_packaged_i,
+    input  ex_csr_data_t csr_data_packaged_i,
 
     // to mem_wb & forwarding
-    output mem_wb_data_t data_packaged_o
+    output mem_wb_data_t data_packaged_o,
+    output ex_csr_data_t csr_data_packaged_o
 );  
     ex_mem_data_t mpkg_i;
     ex_mem_data_t mpkg_o;
@@ -31,13 +31,19 @@ module mem(
     // mem1_mem2
     always_ff @(posedge clk) begin
         if (!rst) begin
-            mpkg_o <= 0;
+            mpkg_o              <= 0;
+            csr_data_packaged_o <= 0;
         end
-        else if (dcache_stall) begin
+        else if (pipe_hold) begin
             // ...
         end
+        else if (pipe_flush) begin
+            mpkg_o              <= 0;
+            csr_data_packaged_o <= 0;
+        end
         else begin
-            mpkg_o <= mpkg_i;
+            mpkg_o              <= mpkg_i;
+            csr_data_packaged_o <= csr_data_packaged_i;
         end
     end
 
@@ -53,9 +59,8 @@ module mem(
         data_packaged_o          = mpkg_o;
         data_packaged_o.rd_addr  = mpkg_o.rd_addr;
         data_packaged_o.rd_data  = (mpkg_o.req_load) ? dcache_rdata_load_shift : mpkg_o.rd_data;
-        data_packaged_o.regs_wen = dcache_ack | mpkg_o.regs_wen;
+        data_packaged_o.regs_wen = (mpkg_o.req_load & dcache_ack) | mpkg_o.regs_wen;
     end
-    assign mem2_is_load_o = mpkg_o.req_load;
         
     // 函数：
     function [31:0] load_shift;

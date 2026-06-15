@@ -26,10 +26,13 @@ module mul(
         if (!rst) begin
             mul_state   <= IDLE;
         end
+        else if (flush_i) begin
+            mul_state   <= IDLE;
+        end
         else begin
             case (mul_state)
                 IDLE: begin
-                    if (is_mul_op && !flush_i) begin
+                    if (is_mul_op) begin
                         mul_state   <= WAIT;
                         sent_value1 <= mul_1_i;
                         sent_value2 <= mul_2_i;

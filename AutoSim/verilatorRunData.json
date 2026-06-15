@@ -4,7 +4,7 @@
     "SOFTWARE TEST": {
       "init": {
         "IPC": "0.780526",
-        "REAL TIME": "8.17571",
+        "REAL TIME": "9.12537",
         "RUN TIME": "146",
         "SEG TIME": "143",
         "BPU ACCURACY": "0.902758",
@@ -36,18 +36,18 @@
       },
       "withMext": {
         "IPC": "0.650449",
-        "REAL TIME": "110.766",
+        "REAL TIME": "113.839",
         "RUN TIME": "1816",
         "SEG TIME": "1815",
         "BPU ACCURACY": "0.975339",
         "LED": "PASS √"
       },
       "withoutMext": {
-        "IPC": "0.701742",
-        "REAL TIME": "291.279",
-        "RUN TIME": "3781",
-        "SEG TIME": "3779",
-        "BPU ACCURACY": "0.744787",
+        "IPC": "0.703816",
+        "REAL TIME": "245.632",
+        "RUN TIME": "3760",
+        "SEG TIME": "3758",
+        "BPU ACCURACY": "0.761526",
         "LED": "PASS √"
       }
     }

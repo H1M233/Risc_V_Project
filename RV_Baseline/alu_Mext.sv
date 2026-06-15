@@ -1,4 +1,4 @@
-`include "alu.vh"
+`include "alu_def.svh"
 module alu_Mext(
     input  logic        clk,
     input  logic        rst,

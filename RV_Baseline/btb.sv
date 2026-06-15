@@ -27,6 +27,14 @@ module btb #(
     // 存储结构：
     reg  [31:0]         target  [0:LINE_NUM - 1];      // 提供上次跳转的目标地址
     reg  [TAG_WIDTH:0]  tagv    [0:LINE_NUM - 1];      // 用于区分映射到同一索引的不同地址，最高位为 valid
+
+    // 初始化
+    initial begin
+        for (int i = 0; i < LINE_NUM; i++) begin
+            target[i] = 0;
+            tagv[i]   = 0;
+        end
+    end
     
     // 查询
     wire [TAG_WIDTH:0]     tagv_query  = tagv[query_index_i];
@@ -35,15 +43,9 @@ module btb #(
     assign hit_o       = (tagv_query == {1'b1, query_tag_i});
     assign target_pc_o = (hit_o) ? target[query_index_i] : 32'b0;
     
-    integer i;
+    // 更新目标地址
     always_ff @(posedge clk) begin
-        if (!rst) begin
-            for (i = 0; i < LINE_NUM; i = i + 1) begin
-                tagv[i] <= 0;
-            end
-		end
-        else if (update_en_i) begin
-            // 更新目标地址
+        if (update_en_i) begin
             tagv[update_index_i]      <= {1'b1, update_tag_i};
             target[update_index_i]    <= update_target_i;
         end

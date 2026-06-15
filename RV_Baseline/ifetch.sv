@@ -1,5 +1,5 @@
 `include "rv32I.vh"
-`include "alu.vh"
+`include "alu_def.svh"
 
 module ifetch(
     input  logic        clk,
