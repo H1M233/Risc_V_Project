@@ -168,8 +168,7 @@ module perip_bridge(
     );
 
     always_comb begin
-        (* parallel_case *)
-        case (1'b1)
+        unique case (1'b1)
             perip_hit_dram: perip_rdata = dram_rdata;
             perip_hit_mmio: perip_rdata = mmio_rdata;
             perip_hit_cnt:  perip_rdata = cnt_rdata;

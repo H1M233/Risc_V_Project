@@ -23,11 +23,11 @@
 // `define ENABLE_B
 `ifdef ENABLE_B
     `define ENABLE_B_ZBA
-    `define ENABLE_B_ZBB
-    `define ENABLE_B_ZBC
+    // `define ENABLE_B_ZBB
+    // `define ENABLE_B_ZBC
     `define ENABLE_B_ZBS
-    `define ENABLE_B_ZBKB
-    `define ENABLE_B_ZBKX
+    // `define ENABLE_B_ZBKB
+    // `define ENABLE_B_ZBKX
 `endif
 
 // `define ENABLE_Zicond

@@ -57,13 +57,13 @@ module dcache(
     wire [TAG_WIDTH - 1:0]   query_tag_tagv   = dpkg.addr[31:INDEX_WIDTH + 2];   // tagv 判断专用
 
     // 状态寄存
-    reg                     tagv_wait, miss_wait, miss_ready;
-    reg                     miss_way;
-    reg [INDEX_WIDTH - 1:0] query_index_r, miss_index;
-    reg [TAG_WIDTH - 1:0]   query_tag_r, miss_tag;
-    reg [3:0]               store_buffer_we;
-    reg [31:0]              cpu_wdata_r;
-    reg                     cpu_req_store_r;
+    logic                     tagv_wait, miss_wait, miss_ready;
+    logic                     miss_way;
+    logic [INDEX_WIDTH - 1:0] query_index_r, miss_index;
+    logic [TAG_WIDTH - 1:0]   query_tag_r, miss_tag;
+    logic [3:0]               store_buffer_we;
+    logic [31:0]              cpu_wdata_r;
+    logic                     cpu_req_store_r;
     always_ff @(posedge clk) begin
         if (!rst) begin
             query_index_r   <= 0;
@@ -86,34 +86,38 @@ module dcache(
     wire [TAG_WIDTH:0] hit_tagv_w1 = tagv_w1[query_index_tagv];
     wire hit_way0 = (hit_tagv_w0 == {1'b1, query_tag_tagv});
     wire hit_way1 = (hit_tagv_w1 == {1'b1, query_tag_tagv});
-    reg hit_way_r;
-    reg dcache_hit, dcache_miss;
-    reg replace_way_r;
-    reg [31:0] data_rdata_w0, data_rdata_w1;
+    logic hit_way_r;
+    logic dcache_hit, dcache_miss;
+    logic replace_way_r;
+    logic [31:0] data_rdata_w0, data_rdata_w1;
     always_ff @(posedge clk) begin
         if (!rst) begin
             hit_way_r       <= 0;
             dcache_hit      <= 0;
             dcache_miss     <= 0;
-            replace_way_r   <= 0;
-            data_rdata_w0   <= 0;
-            data_rdata_w1   <= 0;
         end
         else begin
             hit_way_r       <= hit_way1;
             dcache_hit      <= (hit_way0 | hit_way1);
             dcache_miss     <= ~(hit_way0 | hit_way1);
-            replace_way_r   <= replace_way[query_index];
-            data_rdata_w0   <= data_w0[query_index_data];
-            data_rdata_w1   <= data_w1[query_index_data];
         end
+    end
+
+    wire        replace_way_w   = replace_way[query_index];
+    wire [31:0] data_rdata_w0_w = data_w0[query_index_data];
+    wire [31:0] data_rdata_w1_w = data_w1[query_index_data];
+    always_ff @(posedge clk) begin
+        replace_way_r   <= replace_way_w;
+        data_rdata_w0   <= data_rdata_w0_w;
+        data_rdata_w1   <= data_rdata_w1_w;
     end
 
     // Store Buffer 状态传递
     wire store_buffer_en = dcache_hit & cpu_req_store_r;
-    reg store_buffer_hit;
-    reg [31:0] store_buffer_data_merge;
-    reg [31:0] store_buffer_hit_data;
+    logic        store_buffer_hit;
+    logic [31:0] store_buffer_data_merge;
+    logic [31:0] store_buffer_hit_data;
+
     always_ff @(posedge clk) begin
         if (!rst) begin
             store_buffer_hit        <= 0;

@@ -81,11 +81,12 @@ module id(
     assign hazard_en = id_need_ex | id_need_mem1 | csr_hazard;
 
     // 前推
-    wire using_frs1 = (ipkg.is_FP & ~ipkg.sel_fmv_w_x);
+    wire using_frs1 = (ipkg.is_FP & ~(ipkg.sel_fmv_w_x | ipkg.sel_fcvt_s_w | ipkg.sel_fcvt_s_wu));
     wire using_frs2 = ipkg.is_load_FP | ipkg.is_store_FP | ipkg.is_FP;
     wire using_frd  = ipkg.is_load_FP | ipkg.is_store_FP | 
-                      (ipkg.sel_fmv_w_x | ipkg.sel_fadd_s | ipkg.sel_fsub_s | ipkg.sel_fmin_s | ipkg.sel_fmax_s |
-                       ipkg.sel_fsgnj_s | ipkg.sel_fsgnjn_s | ipkg.sel_fsgnjx_s);
+                      (ipkg.sel_fmv_w_x | ipkg.sel_fadd_s | ipkg.sel_fsub_s | ipkg.sel_fmin_s | 
+                      ipkg.sel_fmax_s | ipkg.sel_fsgnj_s | ipkg.sel_fsgnjn_s | ipkg.sel_fsgnjx_s | 
+                      ipkg.sel_fcvt_s_w | ipkg.sel_fcvt_s_wu | ipkg.sel_fmul_s);
 
     assign rs1_addr_o = {using_frs1, rs1_i};
     assign rs2_addr_o = {using_frs2, rs2_i};
@@ -318,8 +319,9 @@ module id(
         d.sel_fadd_s    = OP_FP & f7_0000000;
         d.sel_fclass_s  = OP_FP & f3_001 & (funct7 == 7'b1110000);
         d.sel_fcvt_s_w  = OP_FP & (rs2 == 5'b00000) & (funct7 == 7'b1101000);
-        d.sel_fcvt_s_wu = OP_FP & (rs2 == 5'b00000) & (funct7 == 7'b1101000);
-        d.sel_fcvt_wu_s = OP_FP & (rs2 == 5'b00000) & (funct7 == 7'b1100000);
+        d.sel_fcvt_s_wu = OP_FP & (rs2 == 5'b00001) & (funct7 == 7'b1101000);
+        d.sel_fcvt_w_s  = OP_FP & (rs2 == 5'b00000) & (funct7 == 7'b1100000);
+        d.sel_fcvt_wu_s = OP_FP & (rs2 == 5'b00001) & (funct7 == 7'b1100000);
         d.sel_fdiv_s    = OP_FP & (funct7 == 7'b0001100);
         d.sel_feq_s     = OP_FP & f3_010 & (funct7 == 7'b1010000);
         d.sel_fle_s     = OP_FP & f3_000 & (funct7 == 7'b1010000);

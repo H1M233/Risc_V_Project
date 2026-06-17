@@ -178,6 +178,7 @@ typedef struct packed {
     logic sel_fclass_s;
     logic sel_fcvt_s_w;
     logic sel_fcvt_s_wu;
+    logic sel_fcvt_w_s;
     logic sel_fcvt_wu_s;
     logic sel_fdiv_s;
     logic sel_feq_s;
@@ -245,7 +246,6 @@ typedef struct packed {
     logic [11:0] waddr;
     logic [31:0] wdata;
     logic        wen;
-    logic [5:0]  fflags;
 } ex_csr_data_t;
 
 typedef struct packed {

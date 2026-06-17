@@ -89,7 +89,7 @@ module alu_Bext(
         return 6'd32;
     endfunction
     
-    wire [31:0] cpop_res = cpop32(value1_r);
+    wire [31:0] cpop_res = {26'b0, cpop32(value1_r)};
     function automatic logic [5:0] cpop32(input logic [31:0] data); // 加法数
         logic [1:0] stage0 [15:0];
         logic [2:0] stage1 [7:0];
@@ -159,9 +159,13 @@ module alu_Bext(
     logic [31:0] zbc_res;
     logic        zbc_finished;
     `ifdef ENABLE_B_ZBC
-    wire [31:0] clmul_res  = clmul_tree(value1_r, value2_r)[31:0];
-    wire [31:0] clmulh_res = clmul_tree(value1_r, value2_r)[63:32];
-    wire [31:0] clmulr_res = rev_bits(clmul_tree(rev_bits(value1_r), rev_bits(value2_r)));
+    wire [63:0] clmul_tree_res = clmul_tree(value1_r, value2_r);
+    wire [31:0] clmul_res      = clmul_tree_res[31:0];
+    wire [31:0] clmulh_res     = clmul_tree_res[63:32];
+
+    wire [63:0] clmul_tree_rev_res = rev_bits(clmul_tree(rev_bits(value1_r), rev_bits(value2_r)));
+    wire [31:0] clmulr_res         = clmul_tree_rev_res[31:0];
+
     function automatic logic [31:0] rev_bits(input logic [31:0] data);
         for (int i = 0; i < 32; i++) begin
             rev_bits[i] = data[31 - i];

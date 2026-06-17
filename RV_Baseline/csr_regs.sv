@@ -24,7 +24,6 @@ module csr_regs(
     wire [11:0] csr_waddr = data_packaged_i.waddr;
     wire [31:0] csr_wdata = data_packaged_i.wdata;
     wire        csr_wen   = data_packaged_i.wen;
-    wire [5:0]  fflags    = data_packaged_i.fflags;
 
     // 特权级寄存器
     pm_t current_privilege;
@@ -71,24 +70,19 @@ module csr_regs(
             mstatus.MPIE        <= 1'b1;            // 重置 MPIE
             mstatus.MPP         <= U;
         end
-        else begin
-            if (csr_wen) begin
-                case (csr_waddr)
-                    MSTATUS_ADDR  : mstatus  <= csr_wdata;
-                    MEPC_ADDR     : mepc     <= csr_wdata;
-                    MCAUSE_ADDR   : mcause   <= csr_wdata;
-                    MTVEC_ADDR    : mtvec    <= csr_wdata;
-                    MSCRATCH_ADDR : mscratch <= csr_wdata;
+        else if (csr_wen) begin
+            case (csr_waddr)
+                MSTATUS_ADDR  : mstatus  <= csr_wdata;
+                MEPC_ADDR     : mepc     <= csr_wdata;
+                MCAUSE_ADDR   : mcause   <= csr_wdata;
+                MTVEC_ADDR    : mtvec    <= csr_wdata;
+                MSCRATCH_ADDR : mscratch <= csr_wdata;
 
-                    FCSR_ADDR     : fcsr       <= csr_wdata[7:0];
-                    FFLAGS_ADDR   : fcsr.flags <= csr_wdata[4:0];
-                    FRM_ADDR      : fcsr.frm   <= rm_t'(csr_wdata[2:0]);
-                    default       : ; // 无效地址，保持不变
-                endcase
-            end
-            else begin
-                fcsr.flags <= fflags | fcsr.flags;
-            end
+                FCSR_ADDR     : fcsr       <= csr_wdata[7:0];
+                FFLAGS_ADDR   : fcsr.flags <= csr_wdata[4:0];
+                FRM_ADDR      : fcsr.frm   <= rm_t'(csr_wdata[2:0]);
+                default       : ; // 无效地址，保持不变
+            endcase
         end 
     end
 

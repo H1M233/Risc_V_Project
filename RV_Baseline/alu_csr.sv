@@ -12,7 +12,6 @@ module alu_csr (
 );
     assign cpkg.waddr       = dpkg.csr_waddr;
     assign cpkg.wen         = ipkg.is_zicsr | (ipkg.is_FP & (fflags != dpkg.csr_rdata[4:0]));     // CSR 写使能
-    assign cpkg.fflags      = fflags;
     assign cpkg.ecall       = ipkg.sel_ecall;
     assign cpkg.mret        = ipkg.sel_mret;
     assign cpkg.ecall_inst  = (ipkg.sel_ecall) ? dpkg.pc : 32'b0;
