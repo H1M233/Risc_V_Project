@@ -1,5 +1,5 @@
-`include "alu_def.svh"
-`include "switch.vh"
+`include "../def/alu_def.svh"
+`include "../def/switch.svh"
 module alu_lsu(
     input  logic [31:0]  rs1,
     input  logic [31:0]  rs2,

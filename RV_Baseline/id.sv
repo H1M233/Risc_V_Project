@@ -1,4 +1,4 @@
-`include "rv32I.vh"
+`include "rv32I.svh"
 `include "alu_def.svh"
 
 module id(
@@ -66,14 +66,27 @@ module id(
     decode_t ipkg;
     assign ipkg = d(inst_i, opcode_i, funct3_i, rs2_i, funct7_i);
     assign inst_packaged_o = ipkg;
+
+    // F 扩展的寄存器扩展
+    wire using_frs1 = (ipkg.is_FP & ~(ipkg.sel_fmv_w_x | ipkg.sel_fcvt_s_w | ipkg.sel_fcvt_s_wu));
+    wire using_frs2 = ipkg.is_load_FP | ipkg.is_store_FP | ipkg.is_FP;
+    wire using_frd  = ipkg.is_load_FP | ipkg.is_store_FP
+                    | (ipkg.sel_fmv_w_x | ipkg.sel_fadd_s | ipkg.sel_fsub_s | ipkg.sel_fmin_s
+                    | ipkg.sel_fmax_s | ipkg.sel_fsgnj_s | ipkg.sel_fsgnjn_s | ipkg.sel_fsgnjx_s
+                    | ipkg.sel_fcvt_s_w | ipkg.sel_fcvt_s_wu | ipkg.sel_fmul_s | ipkg.sel_fdiv_s
+                    );
+    
+    wire [5:0] rs1_addr_with_F = {using_frs1, rs1_i};
+    wire [5:0] rs2_addr_with_F = {using_frs2, rs2_i};
+    wire [5:0] rd_addr_with_F  = {using_frd, rd_addr_o};
     
     // Hazard
-    wire rs1_hit_ex   = (ex_rd_addr_i == rs1_addr_o);
-    wire rs2_hit_ex   = (ex_rd_addr_i == rs2_addr_o);
+    wire rs1_hit_ex   = (ex_rd_addr_i == rs1_addr_with_F);
+    wire rs2_hit_ex   = (ex_rd_addr_i == rs2_addr_with_F);
     wire id_need_ex   = ex_is_load_i & (rs1_hit_ex | rs2_hit_ex);
 
-    wire rs1_hit_mem1 = (mem1_rd_addr_i == rs1_addr_o);
-    wire rs2_hit_mem1 = (mem1_rd_addr_i == rs2_addr_o);
+    wire rs1_hit_mem1 = (mem1_rd_addr_i == rs1_addr_with_F);
+    wire rs2_hit_mem1 = (mem1_rd_addr_i == rs2_addr_with_F);
     wire id_need_mem1 = mem1_is_load_i & (rs1_hit_mem1 | rs2_hit_mem1);
 
     wire csr_hazard = (ipkg.is_zicsr | ipkg.is_FP) & (ex_csr_wen_i | mem1_csr_wen_i | mem2_csr_wen_i | wb_csr_wen_i);
@@ -81,32 +94,22 @@ module id(
     assign hazard_en = id_need_ex | id_need_mem1 | csr_hazard;
 
     // 前推
-    wire using_frs1 = (ipkg.is_FP & ~(ipkg.sel_fmv_w_x | ipkg.sel_fcvt_s_w | ipkg.sel_fcvt_s_wu));
-    wire using_frs2 = ipkg.is_load_FP | ipkg.is_store_FP | ipkg.is_FP;
-    wire using_frd  = ipkg.is_load_FP | ipkg.is_store_FP | 
-                      (ipkg.sel_fmv_w_x | ipkg.sel_fadd_s | ipkg.sel_fsub_s | ipkg.sel_fmin_s | 
-                      ipkg.sel_fmax_s | ipkg.sel_fsgnj_s | ipkg.sel_fsgnjn_s | ipkg.sel_fsgnjx_s | 
-                      ipkg.sel_fcvt_s_w | ipkg.sel_fcvt_s_wu | ipkg.sel_fmul_s);
+    wire forwarding_rs1_ex   = (rs1_addr_with_F == ex_rd_addr_i) & ex_regs_wen_i;
+    wire forwarding_rs1_mem1 = (rs1_addr_with_F == mem1_rd_addr_i) & mem1_regs_wen_i;
+    wire forwarding_rs1_mem2 = (rs1_addr_with_F == mem2_rd_addr_i) & mem2_regs_wen_i;
+    wire forwarding_rs1_wb   = (rs1_addr_with_F == wb_rd_addr_i) & wb_regs_wen_i;
 
-    assign rs1_addr_o = {using_frs1, rs1_i};
-    assign rs2_addr_o = {using_frs2, rs2_i};
-
-    wire forwarding_rs1_ex   = (rs1_addr_o == ex_rd_addr_i) && ex_regs_wen_i;
-    wire forwarding_rs1_mem1 = (rs1_addr_o == mem1_rd_addr_i) && mem1_regs_wen_i;
-    wire forwarding_rs1_mem2 = (rs1_addr_o == mem2_rd_addr_i) && mem2_regs_wen_i;
-    wire forwarding_rs1_wb   = (rs1_addr_o == wb_rd_addr_i) && wb_regs_wen_i;
-
-    wire forwarding_rs2_ex   = (rs2_addr_o == ex_rd_addr_i) && ex_regs_wen_i;
-    wire forwarding_rs2_mem1 = (rs2_addr_o == mem1_rd_addr_i) && mem1_regs_wen_i;
-    wire forwarding_rs2_mem2 = (rs2_addr_o == mem2_rd_addr_i) && mem2_regs_wen_i;
-    wire forwarding_rs2_wb   = (rs2_addr_o == wb_rd_addr_i) && wb_regs_wen_i;
+    wire forwarding_rs2_ex   = (rs2_addr_with_F == ex_rd_addr_i) & ex_regs_wen_i;
+    wire forwarding_rs2_mem1 = (rs2_addr_with_F == mem1_rd_addr_i) & mem1_regs_wen_i;
+    wire forwarding_rs2_mem2 = (rs2_addr_with_F == mem2_rd_addr_i) & mem2_regs_wen_i;
+    wire forwarding_rs2_wb   = (rs2_addr_with_F == wb_rd_addr_i) & wb_regs_wen_i;
 
     // 并行判断减少 MUX 级数
-    wire forwarding_rs1_hit_mem = forwarding_rs1_mem1 | forwarding_rs1_mem2;
+    wire        forwarding_rs1_hit_mem       = forwarding_rs1_mem1 | forwarding_rs1_mem2;
     wire [31:0] forwarding_rs1_hit_mem_data  = (forwarding_rs1_mem1) ? mem1_rd_data_i : mem2_rd_data_i;
     wire [31:0] forwarding_rs1_hit_regs_data = (forwarding_rs1_wb) ? wb_rd_data_i : rs1_data_i;
 
-    wire forwarding_rs2_hit_mem = forwarding_rs2_mem1 | forwarding_rs2_mem2;
+    wire        forwarding_rs2_hit_mem       = forwarding_rs2_mem1 | forwarding_rs2_mem2;
     wire [31:0] forwarding_rs2_hit_mem_data  = (forwarding_rs2_mem1) ? mem1_rd_data_i : mem2_rd_data_i;
     wire [31:0] forwarding_rs2_hit_regs_data = (forwarding_rs2_wb) ? wb_rd_data_i : rs2_data_i;
 
@@ -371,6 +374,9 @@ module id(
     // jump:    只用于传入跳转地址，建议在 id 内提前计算
     //          不够用可以借用
     // ==========================================================
+    assign rs1_addr_o = rs1_addr_with_F;
+    assign rs2_addr_o = rs2_addr_with_F;
+
     wire [31:0] pc_add_4     = pc_i + 32'd4;
     wire [31:0] pc_addr_o    = pc_i;
     wire [31:0] inst_o       = inst_i;
@@ -405,7 +411,7 @@ module id(
     assign data_packaged_o.imm     = imm_o;
     assign data_packaged_o.jump1   = jump1_o;
     assign data_packaged_o.jump2   = jump2_o;
-    assign data_packaged_o.rd_addr = {using_frd, rd_addr_o};
+    assign data_packaged_o.rd_addr = rd_addr_with_F;
 
     wire rd_neq_zero = (rd_i != 5'b0) | using_frd;
     

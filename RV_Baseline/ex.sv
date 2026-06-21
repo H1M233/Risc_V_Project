@@ -1,6 +1,6 @@
-`include "rv32I.vh"
+`include "rv32I.svh"
 `include "alu_def.svh"
-`include "switch.vh"
+`include "switch.svh"
 
 module ex(
     input  logic            clk,
@@ -48,29 +48,23 @@ module ex(
     wire [5:0]  rd_addr    = data_packaged_i.rd_addr;
     wire        pred_taken = data_packaged_i.pred_taken;
 
-    // 主操作码独热
+    // 指令包重命名
     decode_t ipkg;
     assign ipkg = inst_packaged_i;
 
+    // 数据包重命名
+    (* max_fanout = 50 *)
     id_ex_data_t dpkg;
     assign dpkg = data_packaged_i;
-
-    // 前推选择 - 当为立即数时 fwd_rs2_data_i 代表 imm
-    wire fwd_rs1_hit_ex_i = dpkg.fwd_rs1_hit_ex;
-    wire fwd_rs2_hit_ex_i = dpkg.fwd_rs2_hit_ex;
-    wire [31:0] fwd_rs1_data_i = dpkg.fwd_rs1_data;
-    wire [31:0] fwd_rs2_data_i = dpkg.fwd_rs2_data;
     
     // 前推选择 - 对上一周期 ex 的前推
-    wire [31:0] rs1_data_fwd = (fwd_rs1_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs1_data_i;
-    wire [31:0] rs2_data_fwd = (fwd_rs2_hit_ex_i) ? fwd_ex_rd_data_i : fwd_rs2_data_i;
+    (* max_fanout = 32 *) logic [31:0] rs1_data_fwd, rs2_data_fwd;
+    assign rs1_data_fwd = (dpkg.fwd_rs1_hit_ex) ? fwd_ex_rd_data_i : dpkg.fwd_rs1_data;
+    assign rs2_data_fwd = (dpkg.fwd_rs2_hit_ex) ? fwd_ex_rd_data_i : dpkg.fwd_rs2_data;
     
     // 访存地址计算
-    wire [31:0]  mem_addr_calc = rs1_data_fwd + dpkg.imm;
-    wire mem_addr_calc_sum0 = rs1_data_fwd[0] ^ dpkg.imm[0];
-    wire mem_addr_calc_carry0 = rs1_data_fwd[0] & dpkg.imm[0];
-    wire mem_addr_calc_sum1 = rs1_data_fwd[1] ^ dpkg.imm[1] ^ mem_addr_calc_carry0;
-    wire [1:0]  mem_addr_calc_low = {mem_addr_calc_sum1, mem_addr_calc_sum0};
+    wire [31:0] mem_addr_calc     = rs1_data_fwd + dpkg.imm;
+    wire [1:0]  mem_addr_calc_low = rs1_data_fwd[1:0] + dpkg.imm[1:0];
     
     // 输出计算结果
     logic [31:0] alu_result;
@@ -90,16 +84,16 @@ module ex(
     // rd & dram 读写
     ex_mem_data_t mpkg;
     assign mem_data_packaged_o  = mpkg;
-    assign mpkg.rd_addr         = dpkg.rd_addr;
-    assign mpkg.rd_data         = alu_result;
-    assign mpkg.regs_wen        = regs_wen_i & ~ctrl_stall; // regs 写使能
-    assign mpkg.req_load        = dcache_data_packaged_o.req_load;
-    assign mpkg.load_is_signed  = ipkg.sel_lb | ipkg.sel_lh | ipkg.sel_lw;
-    assign mpkg.load_addr_low   = mem_addr_calc_low;
-    assign valid_o              = valid_i; // 未使用
+    assign mpkg.rd_addr         = dpkg.rd_addr;                             // [regs] 写地址
+    assign mpkg.rd_data         = alu_result;                               // [regs] 写数据
+    assign mpkg.regs_wen        = regs_wen_i;                               // [regs] 写使能
+    assign mpkg.req_load        = dcache_data_packaged_o.req_load;          // [ mem] 访存请求
+    assign mpkg.load_is_signed  = ipkg.sel_lb | ipkg.sel_lh | ipkg.sel_lw;  // [ mem] 访存使用符号
+    assign mpkg.load_addr_low   = mem_addr_calc_low;                        // [ mem] 访存地址
+    assign valid_o              = valid_i;                                  // 未使用
     
     always_comb begin
-        unique case (1'b1)
+        unique case (1'b1)                                                  // [ mem] 访存位掩码
             ipkg.is_load_FP : mpkg.load_mask = 2'b11;
             ipkg.sel_lr_w   : mpkg.load_mask = 2'b11;
             ipkg.sel_lb     : mpkg.load_mask = 2'b01;
@@ -150,6 +144,8 @@ module ex(
     // CSR 控制
     logic [4:0] fflags;
     alu_csr ALU_CSR (
+        .ctrl_stall (ctrl_stall),
+
         .value1     (rs1_data_fwd),
         .value2     (rs2_data_fwd),
         .ipkg       (ipkg),

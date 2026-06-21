@@ -4,7 +4,7 @@
     "SOFTWARE TEST": {
       "init": {
         "IPC": "0.780526",
-        "REAL TIME": "9.12537",
+        "REAL TIME": "12.4753",
         "RUN TIME": "146",
         "SEG TIME": "143",
         "BPU ACCURACY": "0.902758",

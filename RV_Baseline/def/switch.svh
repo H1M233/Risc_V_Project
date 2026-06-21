@@ -1,3 +1,7 @@
+
+`ifndef SWITCH
+`define SWITCH
+
 // BPU
 `define GSHARE_BHR_WIDTH 12
 `define GSHARE_PHT_IDX_WIDTH 12
@@ -33,3 +37,8 @@
 // `define ENABLE_Zicond
 // `define ENABLE_A
 `define ENABLE_F
+
+// LUT 存放位置
+`define LUT_PATH "D:/FPGA_Project/Risc_V_Project/LUT"
+
+`endif

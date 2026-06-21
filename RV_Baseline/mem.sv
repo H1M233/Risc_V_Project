@@ -1,4 +1,4 @@
-`include "rv32I.vh"
+`include "rv32I.svh"
 `include "alu_def.svh"
 
 module mem(

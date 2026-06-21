@@ -1,8 +1,12 @@
 `include "alu_def.svh"
 module tb_Fext;
-    logic clk;
+    logic clk, rst;
     initial begin
         clk = 1'b0;
+        rst = 1'b0;
+
+        # 40
+        rst = 1'b1;
     end
     always #10 clk = ~clk;
 
@@ -19,28 +23,23 @@ module tb_Fext;
     initial begin
         ipkg = 0;
         ipkg.is_FP = 1'b1;
-        ipkg.sel_fmul_s = 1'b1;
+        ipkg.sel_fdiv_s = 1'b1;
 
-        value1 = gen_fval(1.1);
-        value2 = gen_fval(2);
+        value1 = gen_fval(2.0);
+        value2 = gen_fval(1.0);
 
-        # 100
-        value1 = gen_fval(114514);
-        value2 = gen_fval(0);
+        # 1000
+        value2 = gen_fval(4.0);
 
-        # 100
-        value2 = gen_fval(0.5);
-
-        # 100
-        value1 = gen_fval(0.114514);
+        # 1000
+        value1 = gen_fval(114514.0);
+        value2 = gen_fval(1919810.0);
 
     end
-
-
     
     alu_Fext alu_Fext_instance (
         .clk(clk),
-        .rst(1'b1),
+        .rst(rst),
         .flush(1'b0),
 
         .value1(value1),

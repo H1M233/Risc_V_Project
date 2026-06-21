@@ -1,5 +1,7 @@
-`include "alu_def.svh"
+`include "../def/alu_def.svh"
 module alu_csr (
+    input  logic            ctrl_stall,
+
     input  logic [31:0]     value1,
     input  logic [31:0]     value2,
     input  decode_t         ipkg,
@@ -11,7 +13,7 @@ module alu_csr (
     output ex_csr_data_t    cpkg
 );
     assign cpkg.waddr       = dpkg.csr_waddr;
-    assign cpkg.wen         = ipkg.is_zicsr | (ipkg.is_FP & (fflags != dpkg.csr_rdata[4:0]));     // CSR 写使能
+    assign cpkg.wen         = (ipkg.is_zicsr | (ipkg.is_FP & (fflags != dpkg.csr_rdata[4:0])));     // CSR 写使能
     assign cpkg.ecall       = ipkg.sel_ecall;
     assign cpkg.mret        = ipkg.sel_mret;
     assign cpkg.ecall_inst  = (ipkg.sel_ecall) ? dpkg.pc : 32'b0;

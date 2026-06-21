@@ -14,7 +14,7 @@ module alu_RV32I(
 );
 
     // 计算
-    cmp_result_t alu_cmp;
+    cmp_result_t alu_cmp;   // {ltu, lts}
     assign alu_cmp = fast_compare(value1, value2);
 
     wire [4:0]  shamt    = value2[4:0];
@@ -29,7 +29,7 @@ module alu_RV32I(
     wire [31:0] ltu_res  = {31'b0, alu_cmp.ltu};
     wire [31:0] lts_res  = {31'b0, alu_cmp.lts};
 
-    // 分支计算
+    // 分支结果计算
     wire branch_eq_res  = (value1 == value2);
     wire branch_ltu_res = alu_cmp.ltu;
     wire branch_lts_res = alu_cmp.lts;
@@ -49,22 +49,22 @@ module alu_RV32I(
 
     // 预测错误判断
     wire [31:0] jalr_target             = value1 + jump2;
-    wire        jalr_pred_mispredict    = (ipkg.is_jalr && value1 != jump1);        // rs1 == pred_pc - imm
-    wire        branch_pred_mispredict  = (ipkg.is_branch && dpkg.pred_taken != branch_taken);
-    wire [31:0] branch_jump_addr        = (~dpkg.pred_taken) ? jump1 : jump2;              // 提前到 id 计算
+    wire        jalr_pred_mispredict    = (ipkg.is_jalr & value1 != jump1);         // rs1 == pred_pc - imm
+    wire        branch_pred_mispredict  = (ipkg.is_branch & dpkg.pred_taken != branch_taken);
+    wire [31:0] branch_jump_addr        = (~dpkg.pred_taken) ? jump1 : jump2;       // 提前到 id 计算
 
-    // 跳转
+    // 预测错误跳转 & 更新 BPU
     assign bpkg.update_btb_en     = jalr_pred_mispredict;        // btb 更新使能
     assign bpkg.update_gshare_en  = branch_pred_mispredict;      // gshare 更新使能
     assign bpkg.update_pc         = dpkg.pc;
     assign bpkg.update_target     = jalr_target;
-    assign bpkg.actual_taken      = branch_taken;
+    assign bpkg.actual_taken      = ~dpkg.pred_taken;
     assign bpkg.rollback_ras_ptr  = dpkg.ras_ptr;
 
     // 冲刷控制
     assign pred_flush_en  = (branch_pred_mispredict | jalr_pred_mispredict);
     assign pred_flush_pc  = (ipkg.is_branch) ? branch_jump_addr :
-    (ipkg.is_jalr)   ? jalr_target : 32'b0;
+                            (ipkg.is_jalr)   ? jalr_target : 32'b0;
 
     // RV32I 标准结果
     always_comb begin

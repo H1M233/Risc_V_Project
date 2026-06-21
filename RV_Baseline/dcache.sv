@@ -1,5 +1,5 @@
-`include "rv32I.vh"
-`include "switch.vh"
+`include "rv32I.svh"
+`include "switch.svh"
 
 module dcache(
     input  logic clk,

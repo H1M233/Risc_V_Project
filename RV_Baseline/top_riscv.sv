@@ -1,6 +1,6 @@
-`include "rv32I.vh"
+`include "rv32I.svh"
 `include "alu_def.svh"
-`include "switch.vh"
+`include "switch.svh"
 
 module top_riscv(
     input           cpu_rst,
@@ -158,7 +158,8 @@ module top_riscv(
     wire pipe_flush_bpu         = bpu_pred_taken | pred_flush_en | csr_regs_trap_en;
     wire pipe_flush_bpu_outer   = pred_flush_en | csr_regs_trap_en;
     wire pipe_flush_id_ex       = pred_flush_en | hazard_hazard_en | csr_regs_trap_en;
-    wire pipe_flush_ex_mem      = pred_flush_en | csr_regs_trap_en;
+    wire pipe_flush_ex          = pred_flush_en | csr_regs_trap_en;
+    wire pipe_flush_ex_mem      = pred_flush_en | csr_regs_trap_en | ex_ctrl_stall;
     wire pipe_flush_ex_bpu      = pred_flush_en | csr_regs_trap_en;
     wire pipe_flush_mem1_mem2   = csr_regs_trap_en;
     wire pipe_flush_mem_wb      = csr_regs_trap_en;
@@ -351,7 +352,7 @@ module top_riscv(
     ex EX(
         .clk                    (cpu_clk),
         .rst                    (cpu_rst),
-        .pipe_flush             (pipe_flush_ex_mem),
+        .pipe_flush             (pipe_flush_ex),
 
         // from id_ex
         .data_packaged_i        (ex_data_packaged_i),
@@ -416,7 +417,7 @@ module top_riscv(
         .dcache_rdata       (dcache_rdata),
 
         .data_packaged_i    (mem_data_packaged_i),
-        .csr_data_packaged_i(ex_csr_data_packaged_o),
+        .csr_data_packaged_i(mem_csr_data_packaged_i),
 
         .data_packaged_o    (mem_data_packaged_o),
         .csr_data_packaged_o(mem_csr_data_packaged_o)

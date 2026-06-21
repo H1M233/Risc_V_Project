@@ -1,4 +1,4 @@
-`include "rv32I.vh"
+`include "rv32I.svh"
 `include "alu_def.svh"
 
 // 预测单元顶层，包含：
@@ -99,14 +99,13 @@ module bpu_top #(
     wire            is_ret_JAL  = (is_JAL && rd_addr == 5'b00001);
     wire            is_ras_push = (is_ret_JAL && !ras_isfull_o);
 
-    (* max_fanout = 20 *)
     wire    [31:0]  pc_add_4    = pc_if2 + 32'h4;
     wire    [31:0]  pc_add_JAL  = pc_if2 + JAL_imm;
     wire    [31:0]  pc_add_B    = pc_if2 + B_imm;
 
     // Gshare索引：取PC中间位与BHR异或
-    wire [PHT_IDX_WIDTH - 1:0]  pht_index           = pc_if1[PHT_IDX_WIDTH + 1:2] ^ {{(PHT_IDX_WIDTH - BHR_WIDTH){1'b0}}, gshare_ghr_o};
-    wire [PHT_IDX_WIDTH - 1:0]  update_pht_index    = bpkg.update_pc[PHT_IDX_WIDTH + 1:2] ^ {{(PHT_IDX_WIDTH - BHR_WIDTH){1'b0}}, gshare_ghr_update_o};
+    wire [PHT_IDX_WIDTH - 1:0]  pht_index        = pc_if1[PHT_IDX_WIDTH + 1:2] ^ {{(PHT_IDX_WIDTH - BHR_WIDTH){1'b0}}, gshare_ghr_o};
+    wire [PHT_IDX_WIDTH - 1:0]  update_pht_index = bpkg.update_pc[PHT_IDX_WIDTH + 1:2] ^ {{(PHT_IDX_WIDTH - BHR_WIDTH){1'b0}}, gshare_ghr_update_o};
 
     // BTB索引和tag（tag取pc高位，用于区分映射到同一索引的不同地址）
     wire [BTB_INDEX_WIDTH - 1:0]        btb_query_index_w   = pc_if1[BTB_INDEX_WIDTH + 1:2];
@@ -115,7 +114,6 @@ module bpu_top #(
     wire [31 - BTB_INDEX_WIDTH - 2:0]   btb_update_tag_w    = bpkg.update_pc[31:BTB_INDEX_WIDTH + 2];
 
     // 查询
-    (* max_fanout = 30 *)
     assign gshare_pht_index_i = (pipe_flush) ? 0 : pht_index;     // 预测跳转后屏蔽查询入口
     always_ff @(posedge clk) begin
         if (!rst) begin

@@ -1,5 +1,5 @@
-`include "alu_def.svh"
-`include "switch.vh"
+`include "../def/alu_def.svh"
+`include "../def/switch.svh"
 module alu_Bext(
     input  logic        clk,
     input  logic        rst,

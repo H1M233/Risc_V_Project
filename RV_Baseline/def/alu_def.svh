@@ -269,7 +269,7 @@ function automatic cmp_result_t fast_compare(input logic [31:0] a, b);
     fast_compare.ltu = a < b;
     
     // lts (a < b signed)
-    fast_compare.lts = (a[31] ^ b[31]) ? a[31] : (a < b);
+    fast_compare.lts = (a[31] ^ b[31]) ? a[31] : fast_compare.ltu;
 endfunction
 
 // Fval 解码

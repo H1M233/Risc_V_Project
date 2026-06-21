@@ -29,6 +29,8 @@ def compile(prj_dict, sim_type, macros):
     prj_folder = prj_dict['folder']
     # 获取目标工程路径
     rtl_dir = AutoSim_dir.parent / prj_folder
+    alu_dir = rtl_dir / 'alu'
+    def_dir = rtl_dir / 'def'
     new_dir = AutoSim_dir / 'new' / prj_folder
     sim_cpp = AutoSim_dir / f'sim_{sim_type}.cpp'
     
@@ -36,7 +38,8 @@ def compile(prj_dict, sim_type, macros):
     source_file.append(AutoSim_dir / f'tb_verilator_{sim_type}.v')
     source_file.extend(rtl_dir.glob('*.v'))
     source_file.extend(rtl_dir.glob('*.sv'))
-    source_file.extend(rtl_dir.glob('*.vh'))
+    source_file.extend(alu_dir.glob('*.v'))
+    source_file.extend(alu_dir.glob('*.sv'))
     source_file.extend(new_dir.glob('*.sv'))
 
     # Verilator 程序
@@ -64,6 +67,7 @@ def compile(prj_dict, sim_type, macros):
                     '-Wno-UNSIGNED'                         # 忽略判断逻辑永远为真警告
     ]
 
+
     for macroName, macroValue in macros.items():
         verilator_cmd.extend(['-CFLAGS', f'-D{macroName}={macroValue}'])
 
@@ -72,8 +76,11 @@ def compile(prj_dict, sim_type, macros):
         verilator_cmd.append(str(file))
 
     # 添加 .vh 和 sim_cpp 文件
-    verilator_cmd.append(f'-I{str(rtl_dir)}')
+    verilator_cmd.append(f'-I{str(def_dir)}')
     verilator_cmd.append(str(sim_cpp))
+
+    # 测试
+    # print(verilator_cmd)
 
     # 编译
     try:

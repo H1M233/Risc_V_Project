@@ -1,4 +1,4 @@
-`include "alu_def.svh"
+`include "../def/alu_def.svh"
 module alu_Fext(
     input  logic        clk,
     input  logic        rst,
@@ -16,6 +16,8 @@ module alu_Fext(
 );
     wire [7:0]  OFFEST_CONST = 8'd127;
     wire [31:0] NORMAL_QNAN  = 32'h7fc00000;
+    wire [31:0] P_INF        = 32'h7f800000;
+    wire [31:0] N_INF        = 32'hff800000;
     
     // F 数据解码
     fval_t fval1, fval2;
@@ -26,11 +28,8 @@ module alu_Fext(
     assign rm = rm_t'((dpkg.imm[2:0] == 3'b111) ? dpkg.csr_rdata[7:5] : dpkg.imm[2:0]); // 3'b111 动态舍入模式
 
     // 特殊值识别
-    wire value1_is_fval = ipkg.is_FP & ~ipkg.sel_fmv_w_x;
-    wire value2_is_fval = ipkg.is_FP;
-    
-    wire fval1_is_nan = (fval1.exp == 8'd255) & (fval1.mant != 0) & value1_is_fval;
-    wire fval2_is_nan = (fval2.exp == 8'd255) & (fval2.mant != 0) & value2_is_fval;
+    wire fval1_is_nan = (fval1.exp == 8'd255) & (fval1.mant != 0);
+    wire fval2_is_nan = (fval2.exp == 8'd255) & (fval2.mant != 0);
 
     wire fval1_is_snan = fval1_is_nan & ~fval1.mant[22];
     wire fval2_is_snan = fval2_is_nan & ~fval2.mant[22];
@@ -38,17 +37,17 @@ module alu_Fext(
     wire fval1_is_qnan = fval1_is_nan & fval1.mant[22];
     wire fval2_is_qnan = fval2_is_nan & fval2.mant[22];
     
-    wire fval1_is_inf = (fval1.exp == 8'd255) & (fval1.mant == 0) & value1_is_fval;
-    wire fval2_is_inf = (fval2.exp == 8'd255) & (fval2.mant == 0) & value2_is_fval;
+    wire fval1_is_inf = (fval1.exp == 8'd255) & (fval1.mant == 0);
+    wire fval2_is_inf = (fval2.exp == 8'd255) & (fval2.mant == 0);
     
-    wire fval1_is_subnormal = (fval1.exp == 8'd0) & (fval1.mant != 0) & value1_is_fval;
-    wire fval2_is_subnormal = (fval2.exp == 8'd0) & (fval2.mant != 0) & value2_is_fval;
+    wire fval1_is_subnormal = (fval1.exp == 8'd0) & (fval1.mant != 0);
+    wire fval2_is_subnormal = (fval2.exp == 8'd0) & (fval2.mant != 0);
     
-    wire fval1_is_zero = (fval1.exp == 8'd0) & (fval1.mant == 0) & value1_is_fval;
-    wire fval2_is_zero = (fval2.exp == 8'd0) & (fval2.mant == 0) & value2_is_fval;
+    wire fval1_is_zero = (fval1.exp == 8'd0) & (fval1.mant == 0);
+    wire fval2_is_zero = (fval2.exp == 8'd0) & (fval2.mant == 0);
 
-    wire fval1_is_normal = (fval1.exp != 8'd0) & (fval1.exp != 8'd255) & value1_is_fval;
-    wire fval2_is_normal = (fval2.exp != 8'd0) & (fval2.exp != 8'd255) & value2_is_fval;
+    wire fval1_is_normal = (fval1.exp != 8'd0) & (fval1.exp != 8'd255);
+    wire fval2_is_normal = (fval2.exp != 8'd0) & (fval2.exp != 8'd255);
     
     // -------------------------------------
     // fclass
@@ -66,24 +65,29 @@ module alu_Fext(
     wire fval1_is_nnormal = fval1_is_normal & fval1.sign;
 
     logic [31:0] fclass_res;
-    assign fclass_res[31:10] = 0;
-    assign fclass_res[9]     = fval1_is_qnan;           // qNaN
-    assign fclass_res[8]     = fval1_is_snan;           // sNan
-    assign fclass_res[7]     = fval1_is_pinf;           // + inf
-    assign fclass_res[6]     = fval1_is_pnormal;        // + 规格化数
-    assign fclass_res[5]     = fval1_is_psubnormal;     // + 非规格化数
-    assign fclass_res[4]     = fval1_is_pzero;          // + 0
-    assign fclass_res[3]     = fval1_is_nzero;          // - 0
-    assign fclass_res[2]     = fval1_is_nsubnormal;     // - 非规格化数
-    assign fclass_res[1]     = fval1_is_nnormal;        // - 规格化数
-    assign fclass_res[0]     = fval1_is_ninf;           // - inf
+    always_comb begin
+        fclass_res = 0;
+
+        fclass_res[9] = fval1_is_qnan;          // qNaN
+        fclass_res[8] = fval1_is_snan;          // sNaN
+        fclass_res[7] = fval1_is_pinf;          // + inf
+        fclass_res[6] = fval1_is_pnormal;       // + 规格化数
+        fclass_res[5] = fval1_is_psubnormal;    // + 非规格化数
+        fclass_res[4] = fval1_is_pzero;         // + 0
+        fclass_res[3] = fval1_is_nzero;         // - 0
+        fclass_res[2] = fval1_is_nsubnormal;    // - 非规格化数
+        fclass_res[1] = fval1_is_nnormal;       // - 规格化数
+        fclass_res[0] = fval1_is_ninf;          // - inf
+    end
 
     // -------------------------------------
     // fadd.s, fsub.s:
     // -------------------------------------
-
-    wire sum_fval_nv  = (fval1_is_nan | fval2_is_nan) && (ipkg.sel_fadd_s | ipkg.sel_fsub_s);
-    wire sum_diff_inf = fval1_is_inf & fval2_is_inf & ((ipkg.sel_fadd_s & (fval1.sign != fval2.sign)) || (ipkg.sel_fsub_s & (fval1.sign == fval2.sign)));
+    wire sum_fval_nv  = (fval1_is_nan | fval2_is_nan) && (ipkg.sel_fadd_s | ipkg.sel_fsub_s);   // flags.NV: 输入其一有 NaN
+    wire sum_diff_inf = fval1_is_inf & fval2_is_inf & 
+                        ((ipkg.sel_fadd_s & (fval1.sign != fval2.sign)) 
+                      | (ipkg.sel_fsub_s & (fval1.sign == fval2.sign))
+                      );   // flags.NV: inf - inf 运算
 
     // 1. 指数比较
     wire fval1_exp_gt_fval2 = (fval1.exp >= fval2.exp);
@@ -273,12 +277,13 @@ module alu_Fext(
     wire flt_s_res = (fval1_is_nan | fval2_is_nan) ? 0 : normal_lt_ignore_zero;
     wire fle_s_res = feq_s_res | flt_s_res;
 
-    wire fcmp_fval_nv = ((fval1_is_snan | fval2_is_snan) & ipkg.sel_feq_s) | ((fval1_is_nan | fval2_is_nan) & (ipkg.sel_flt_s | ipkg.sel_fle_s));
+    wire fcmp_fval_nv = ((fval1_is_snan | fval2_is_snan) & ipkg.sel_feq_s) 
+                      | ((fval1_is_nan | fval2_is_nan) & (ipkg.sel_flt_s | ipkg.sel_fle_s));   // flags.NV: feq.s 时输入其一有 sNaN, flt.s & fle.s 时输入其一有 NaN
 
     // -------------------------------------
     // fmax, fmin:
     // -------------------------------------
-    wire fmaxmin_fval_nv = (fval1_is_snan | fval2_is_snan) && (ipkg.sel_fmax_s | ipkg.sel_fmin_s);
+    wire fmaxmin_fval_nv = (fval1_is_snan | fval2_is_snan) && (ipkg.sel_fmax_s | ipkg.sel_fmin_s);  // flags.NV: 输入其一有 NaN
 
     logic [31:0] fmax_s_res, fmin_s_res;
     always_comb begin
@@ -335,10 +340,10 @@ module alu_Fext(
     wire  fcvt_lsb = fcvt_s_right_shifted[3];
     wire  fcvt_G   = fcvt_s_right_shifted[2];
     wire  fcvt_R   = fcvt_s_right_shifted[1];
-    wire  fcvt_S   = |fcvt_s_shift_collect_S;
+    wire  fcvt_S   = fcvt_s_right_shifted[0] | (|fcvt_s_shift_collect_S);
     logic fcvt_roundup;
     logic fcvt_roundup_inexact;
-    assign fcvt_roundup_inexact = (ipkg.sel_fcvt_s_w | ipkg.sel_fcvt_s_wu) & fcvt_s_need_right_shift & (fcvt_G | fcvt_R | fcvt_S);
+    assign fcvt_roundup_inexact = (ipkg.sel_fcvt_s_w | ipkg.sel_fcvt_s_wu) & fcvt_s_need_right_shift & (fcvt_G | fcvt_R | fcvt_S);  // flags.NX: fcvt.s.w & fcvt.s.wu 时舍入导致不精确
 
     // 根据 GRS 计算进位
     always_comb begin
@@ -437,7 +442,7 @@ module alu_Fext(
 
     logic fcvt_w_roundup;
     logic fcvt_w_roundup_inexact;
-    assign fcvt_w_roundup_inexact = (ipkg.sel_fcvt_w_s | ipkg.sel_fcvt_wu_s) & fcvt_w_need_right_shift & (fcvt_w_G | fcvt_w_R | fcvt_w_S);
+    assign fcvt_w_roundup_inexact = (ipkg.sel_fcvt_w_s | ipkg.sel_fcvt_wu_s) & fcvt_w_need_right_shift & (fcvt_w_G | fcvt_w_R | fcvt_w_S);  // flags.NX: fcvt.w.s & fcvt.wu.s 时舍入导致不精确
 
     // 根据 GRS 计算进位
     always_comb begin
@@ -466,8 +471,7 @@ module alu_Fext(
     wire [31:0] fcvt_w_res       = (fval1_is_zero)      ? 0 : 
                                    (fcvt_w_get_int_max) ? fcvt_w_get_int_max_res : fcvt_w_signed;
 
-    wire fcvt_fval_nv               = ipkg.sel_fcvt_wu_s & (fval1_is_zero | (fval1.sign & fcvt_w_unsigned != 0));
-    wire fcvt_s_right_shift_inexact = (ipkg.sel_fcvt_s_w | ipkg.sel_fcvt_s_wu) & (fcvt_s_need_right_shift & |fcvt_s_shift_collect_S);
+    wire fcvt_fval_nv               = ipkg.sel_fcvt_wu_s & (fval1_is_zero | (fval1.sign & ($signed(fval1_true_exp) >= 0)));   // flags.NV: fcvt.wu.s 时试图输出负值
 
     // -------------------------------------
     // fmul.s: 
@@ -481,16 +485,16 @@ module alu_Fext(
     logic [19:0] fmul_collect_S;
     assign {fmul_mant_mul_carry, fmul_mant_mul_res, fmul_collect_S} = {1'b1, fval1.mant} * {1'b1, fval2.mant};
 
-    wire [23:0] fmul_mant_pre_roundup = (fmul_mant_mul_carry) ? {1'b1, fmul_mant_mul_res[26:4]} : fmul_mant_mul_res[26:3];
+    wire [26:0] fmul_mant_pre_roundup = (fmul_mant_mul_carry) ? {1'b1, fmul_mant_mul_res[26:1]} : fmul_mant_mul_res[26:0];
 
-    wire fmul_lsb = (fmul_mant_mul_carry) ? fmul_mant_mul_res[4] : fmul_mant_mul_res[3];
-    wire fmul_G   = (fmul_mant_mul_carry) ? fmul_mant_mul_res[3] : fmul_mant_mul_res[2];
-    wire fmul_R   = (fmul_mant_mul_carry) ? fmul_mant_mul_res[2] : fmul_mant_mul_res[1];
-    wire fmul_S   = (fmul_mant_mul_carry) ? (|fmul_mant_mul_res[1:0]) | (|fmul_collect_S) : fmul_mant_mul_res[0] | (|fmul_collect_S);
+    wire fmul_lsb = fmul_mant_pre_roundup[3];
+    wire fmul_G   = fmul_mant_pre_roundup[2];
+    wire fmul_R   = fmul_mant_pre_roundup[1];
+    wire fmul_S   = fmul_mant_pre_roundup[0] | (|fmul_collect_S);
 
     logic fmul_roundup;
     logic fmul_roundup_inexact;
-    assign fmul_roundup_inexact = ipkg.sel_fmul_s & ~(fval1_is_zero | fval2_is_zero) & (fmul_G | fmul_R | fmul_S);
+    assign fmul_roundup_inexact = ipkg.sel_fmul_s & ~(fval1_is_zero | fval2_is_zero) & (fmul_G | fmul_R | fmul_S);  // flags.NX: fmul.s 时舍入导致不精确
 
     // 根据 GRS 计算进位
     always_comb begin
@@ -508,8 +512,7 @@ module alu_Fext(
     logic [7:0]  fmul_exp_roundup;
     logic        fmul_mant_roundup_carry;
     logic [23:0] fmul_mant_roundup;
-
-    assign {fmul_mant_roundup_carry, fmul_mant_roundup} = fmul_mant_pre_roundup + fmul_roundup;
+    assign {fmul_mant_roundup_carry, fmul_mant_roundup} = fmul_mant_pre_roundup[26:3] + fmul_roundup;
     assign {fmul_exp_roundup_carry, fmul_exp_roundup}   = fmul_exp_add_res + fmul_mant_mul_carry + fmul_mant_roundup_carry;
 
     fval_t fmul_s_res;
@@ -529,18 +532,146 @@ module alu_Fext(
         end
     end
 
+    // -------------------------------------
+    // fdiv.s: 
+    // -------------------------------------
+    // 特殊值输入判断
+    logic  fdiv_div_zero;           // flags.DZ: 除 0
+    logic  fdiv_zero_div_zero;      // flags.NV: 0 / 0
+    logic  fdiv_special_case;
+    fval_t fdiv_special_res;
+    always_comb begin
+        fdiv_div_zero      = 0;
+        fdiv_zero_div_zero = 0;
+        fdiv_special_case  = 0;
+        fdiv_special_res   = 0;
+
+        if (fval2_is_zero) begin
+            fdiv_special_case = 1'b1;
+            unique case (1'b1)
+                fval1_is_zero: begin
+                    fdiv_zero_div_zero = 1;
+                    fdiv_special_res   = NORMAL_QNAN;
+                end
+
+                fval1_is_nan: begin
+                    fdiv_special_res = fval1;
+                end
+
+                default: begin
+                    fdiv_div_zero         = 1;
+                    fdiv_special_res.sign = fval1.sign ^ fval2.sign;
+                    fdiv_special_res.exp  = 8'd255;
+                    fdiv_special_res.mant = 23'b0;
+                end
+            endcase
+        end
+        else if (fval1_is_zero) begin
+            fdiv_special_res = 0;
+        end
+    end
+
+    logic       fdiv_exp_diff_carry;    // fdiv_exp_diff_carry = 1: 下溢
+    logic [7:0] fdiv_exp_diff_res;
+    assign {fdiv_exp_diff_carry, fdiv_exp_diff_res} = fval1.exp - fval2.exp + OFFEST_CONST;
+
+    logic        fdiv_divider_instance_valid;
+    logic [26:0] fdiv_divider_instance_result;
+    Fdivider FEXT_DIVIDER (
+        .clk        (clk),
+        .rst        (rst),
+        .valid_i    (ipkg.sel_fdiv_s & ~fdiv_special_case),
+        .dividend_i (fval1.mant),
+        .divisor_i  (fval2.mant),
+        .flush_i    (flush),
+        .valid_o    (fdiv_divider_instance_valid),
+        .result_o   (fdiv_divider_instance_result)
+    );
+    
+    wire        fdiv_divider_res_need_left_shift = ~fdiv_divider_instance_result[26];
+    wire [26:0] fdiv_divider_res_left_shifted    = (fdiv_divider_res_need_left_shift) ? fdiv_divider_instance_result << 1 : 
+                                                                                        fdiv_divider_instance_result;
+
+    wire fdiv_lsb = fdiv_divider_res_left_shifted[3];
+    wire fdiv_G   = fdiv_divider_res_left_shifted[2];
+    wire fdiv_R   = fdiv_divider_res_left_shifted[1];
+    wire fdiv_S   = fdiv_divider_res_left_shifted[0];
+
+    logic fdiv_roundup;
+    logic fdiv_roundup_inexact;
+    assign fdiv_roundup_inexact = ~(fval1_is_zero | fval2_is_zero) & (fdiv_G | fdiv_R | fdiv_S);  // flags.NX: fdiv.s 时舍入导致不精确
+
+    // 根据 GRS 计算进位
+    always_comb begin
+        case (rm)
+            RNE     : fdiv_roundup = fdiv_G & (fdiv_R | fdiv_S | fdiv_lsb);
+            RTZ     : fdiv_roundup = 0;
+            RDN     : fdiv_roundup = ~(fdiv_G | fdiv_R | fdiv_S) & (fval1.sign ^ fval2.sign);
+            RUP     : fdiv_roundup = ~(fdiv_G | fdiv_R | fdiv_S) & ~(fval1.sign ^ fval2.sign);
+            RMM     : fdiv_roundup = fdiv_G;
+            default : fdiv_roundup = 0;
+        endcase
+    end
+
+    logic        fdiv_exp_roundup_carry;
+    logic [7:0]  fdiv_exp_roundup;
+    logic        fdiv_mant_roundup_carry;
+    logic [23:0] fdiv_mant_roundup;
+    assign {fdiv_mant_roundup_carry, fdiv_mant_roundup} = fdiv_divider_res_left_shifted[26:3] + fdiv_roundup;
+    assign {fdiv_exp_roundup_carry, fdiv_exp_roundup}   = fdiv_exp_diff_res - fdiv_divider_res_need_left_shift + fdiv_mant_roundup_carry;
+
+    logic  fdiv_roundup_overflow;
+    logic  fdiv_exp_diff_underflow;
+    fval_t fdiv_s_res;
+    always_comb begin
+        fdiv_roundup_overflow   = 0;
+        fdiv_exp_diff_underflow = 0;
+
+        if (fdiv_special_case) begin
+            fdiv_s_res = fdiv_special_res;
+        end
+        else if (fdiv_exp_diff_carry) begin         // 下溢 - 会导致不精确 同时报出 NX
+            fdiv_exp_diff_underflow = 0;
+            fdiv_s_res.sign         = 0;
+            fdiv_s_res.exp          = 0;
+            fdiv_s_res.mant         = 0;
+        end
+        else if  (fdiv_exp_roundup_carry) begin     // 上溢
+            fdiv_roundup_overflow = 1;
+            fdiv_s_res.sign       = 0;
+            fdiv_s_res.exp        = 8'd255;
+            fdiv_s_res.mant       = 0;
+        end
+        else begin
+            fdiv_s_res.sign = fval1.sign ^ fval2.sign;
+            fdiv_s_res.exp  = fdiv_exp_roundup;
+            fdiv_s_res.mant = (fdiv_mant_roundup_carry) ? {1'b1, fdiv_mant_roundup[23:1]} : fdiv_mant_roundup[22:0];
+        end
+    end
+
+    wire fdiv_NV = ipkg.sel_fdiv_s & fdiv_zero_div_zero;
+    wire fdiv_DZ = ipkg.sel_fdiv_s & fdiv_div_zero;
+    wire fdiv_OF = ipkg.sel_fdiv_s & fdiv_roundup_overflow;
+    wire fdiv_UF = ipkg.sel_fdiv_s & fdiv_exp_diff_underflow;
+    wire fdiv_NX = ipkg.sel_fdiv_s & (fdiv_roundup_inexact | fdiv_exp_diff_underflow);
+
+    wire fdiv_ctrl = ipkg.sel_fdiv_s & ~fdiv_divider_instance_valid & ~fdiv_special_case;
+
+    // -------------------------------------
+    // fsqrt.s: 
+    // -------------------------------------
+    
+
 
     // fflags 写入
     fflags_t flags;
-    assign flags.NV = sum_fval_nv | sum_diff_inf | fcmp_fval_nv | fmaxmin_fval_nv | fcvt_fval_nv | fcvt_w_get_int_max;
-    assign flags.DZ = 0;
-    assign flags.OF = sum_norm_overflow | sum_roundup_overflow;
-    assign flags.UF = sum_norm_underflow;
-    assign flags.NX = sum_roundup_inexact | fcvt_s_right_shift_inexact | fcvt_roundup_inexact | fcvt_w_roundup_inexact | fmul_roundup_inexact;
+    assign flags.NV = sum_fval_nv | sum_diff_inf | fcmp_fval_nv | fmaxmin_fval_nv | fcvt_fval_nv | fcvt_w_get_int_max | fdiv_NV;
+    assign flags.DZ = fdiv_DZ;
+    assign flags.OF = sum_norm_overflow | sum_roundup_overflow | fdiv_OF;
+    assign flags.UF = sum_norm_underflow | fdiv_UF;
+    assign flags.NX = sum_roundup_inexact | fcvt_roundup_inexact | fcvt_w_roundup_inexact | fmul_roundup_inexact | fdiv_NX;
 
     assign fflags = (ipkg.is_FP) ? flags : 0;
-
-    // fdiv
 
     always_comb begin
         unique case (1'b1)
@@ -562,10 +693,11 @@ module alu_Fext(
             ipkg.sel_fcvt_w_s  : result = fcvt_w_res;
             ipkg.sel_fcvt_wu_s : result = fcvt_w_res;
             ipkg.sel_fmul_s    : result = fmul_s_res;
+            ipkg.sel_fdiv_s    : result = fdiv_s_res;
             default            : result = 32'b0;
         endcase
     end
     
 
-    assign ctrl = 1'b0;
+    assign ctrl = fdiv_ctrl;
 endmodule

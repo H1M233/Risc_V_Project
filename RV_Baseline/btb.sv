@@ -1,4 +1,4 @@
-`include "rv32I.vh"
+`include "rv32I.svh"
 
 // 为非返回 JALR 使用的直接映射 BTB 模块
 // 直接映射准确率足够（基本上99%，不影响速度）

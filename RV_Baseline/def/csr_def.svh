@@ -1,4 +1,7 @@
 `include "alu_def.svh"
+
+`ifndef CSR_DEF
+`define CSR_DEF
 // CSR 解码
 typedef struct packed { // MSTATU
     logic       SD;
@@ -47,3 +50,5 @@ typedef struct packed { // FCSR
     rm_t         frm; // 舍入模式
     fflags_t     flags;
 } fcsr_t;
+
+`endif

@@ -1,4 +1,4 @@
-`include "rv32I.vh"
+`include "rv32I.svh"
 
 module ex_mem(
     input  logic            clk,
