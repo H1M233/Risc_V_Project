@@ -9,6 +9,11 @@ module regs(
     input  logic [31:0] rd_data_i,
     input  logic        regs_wen,
 
+    `ifdef ENABLE_F
+    input  logic [5:0]  rs3_addr_i,
+    output logic [31:0] rs3_data_o,
+    `endif
+
     // from id
     input  logic [5:0]  rs1_addr_i,
     input  logic [5:0]  rs2_addr_i,
@@ -32,6 +37,9 @@ module regs(
     // 读寄存器
     assign rs1_data_o = regs_p1[rs1_addr_i];
     assign rs2_data_o = regs_p2[rs2_addr_i];
+    `ifdef ENABLE_F
+    assign rs3_data_o = regs_p2[rs3_addr_i];
+    `endif
 
     // 写寄存器
     always_ff @(posedge clk) begin

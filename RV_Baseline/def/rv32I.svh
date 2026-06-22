@@ -60,6 +60,10 @@
 `define TYPE_FP       7'b1010011
 `define TYPE_LOAD_FP  7'b0000111
 `define TYPE_STORE_FP 7'b0100111
+`define OP_FMADD      7'b1000011
+`define OP_FMSUB      7'b1000111
+`define OP_FNMADD     7'b1001111
+`define OP_FNMSUB     7'b1001011
 
 `define ECALL_MRET    3'b000
 

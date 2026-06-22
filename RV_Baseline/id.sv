@@ -16,9 +16,14 @@ module id(
     output logic [11:0] csr_addr_o,
 
     // from regs
-    input  logic [31:0] rs1_data_i,
-    input  logic [31:0] rs2_data_i,
+    input  logic [31:0] rs1_rdata_i,
+    input  logic [31:0] rs2_rdata_i,
     input  logic [31:0] csr_rdata_i,
+
+    `ifdef ENABLE_F
+    output logic [5:0]  rs3_addr_o,
+    input  logic [31:0] rs3_rdata_i,
+    `endif
 
     // to id_ex
     output id_ex_data_t data_packaged_o,
@@ -68,17 +73,25 @@ module id(
     assign inst_packaged_o = ipkg;
 
     // F 扩展的寄存器扩展
-    wire using_frs1 = (ipkg.is_FP & ~(ipkg.sel_fmv_w_x | ipkg.sel_fcvt_s_w | ipkg.sel_fcvt_s_wu));
-    wire using_frs2 = ipkg.is_load_FP | ipkg.is_store_FP | ipkg.is_FP;
+    `ifdef ENABLE_F
+    wire using_frs1 = (ipkg.is_FP & ~(ipkg.sel_fmv_w_x | ipkg.sel_fcvt_s_w | ipkg.sel_fcvt_s_wu)) | ipkg.is_fM;
+    wire using_frs2 = ipkg.is_load_FP | ipkg.is_store_FP | ipkg.is_FP | ipkg.is_fM;
     wire using_frd  = ipkg.is_load_FP | ipkg.is_store_FP
                     | (ipkg.sel_fmv_w_x | ipkg.sel_fadd_s | ipkg.sel_fsub_s | ipkg.sel_fmin_s
                     | ipkg.sel_fmax_s | ipkg.sel_fsgnj_s | ipkg.sel_fsgnjn_s | ipkg.sel_fsgnjx_s
                     | ipkg.sel_fcvt_s_w | ipkg.sel_fcvt_s_wu | ipkg.sel_fmul_s | ipkg.sel_fdiv_s
-                    );
+                    | ipkg.sel_fsqrt_s | ipkg.is_fM);
     
     wire [5:0] rs1_addr_with_F = {using_frs1, rs1_i};
     wire [5:0] rs2_addr_with_F = {using_frs2, rs2_i};
+    wire [5:0] rs3_addr_with_F = (ipkg.is_fM) ? {1'b1, inst_i[31:27]} : 0;
     wire [5:0] rd_addr_with_F  = {using_frd, rd_addr_o};
+    `else
+    wire       using_frd       = 1'b0;
+    wire [5:0] rs1_addr_with_F = {0, rs1_i};
+    wire [5:0] rs2_addr_with_F = {0, rs2_i};
+    wire [5:0] rd_addr_with_F  = {0, rd_addr_o};
+    `endif
     
     // Hazard
     wire rs1_hit_ex   = (ex_rd_addr_i == rs1_addr_with_F);
@@ -91,7 +104,18 @@ module id(
 
     wire csr_hazard = (ipkg.is_zicsr | ipkg.is_FP) & (ex_csr_wen_i | mem1_csr_wen_i | mem2_csr_wen_i | wb_csr_wen_i);
 
-    assign hazard_en = id_need_ex | id_need_mem1 | csr_hazard;
+    logic rs3_hazard;
+    `ifdef ENABLE_F
+    wire hazard_rs3_ex   = (rs3_addr_with_F == ex_rd_addr_i) & ex_regs_wen_i;
+    wire hazard_rs3_mem1 = (rs3_addr_with_F == mem1_rd_addr_i) & mem1_regs_wen_i;
+    wire hazard_rs3_mem2 = (rs3_addr_with_F == mem2_rd_addr_i) & mem2_regs_wen_i;
+    wire hazard_rs3_wb   = (rs3_addr_with_F == wb_rd_addr_i) & wb_regs_wen_i;
+    assign rs3_hazard = ipkg.is_fM & (hazard_rs3_ex | hazard_rs3_mem1 | hazard_rs3_mem2 | hazard_rs3_wb);
+    `else
+    assign rs3_hazard = 0;
+    `endif
+
+    assign hazard_en = id_need_ex | id_need_mem1 | csr_hazard | rs3_hazard;
 
     // 前推
     wire forwarding_rs1_ex   = (rs1_addr_with_F == ex_rd_addr_i) & ex_regs_wen_i;
@@ -107,11 +131,11 @@ module id(
     // 并行判断减少 MUX 级数
     wire        forwarding_rs1_hit_mem       = forwarding_rs1_mem1 | forwarding_rs1_mem2;
     wire [31:0] forwarding_rs1_hit_mem_data  = (forwarding_rs1_mem1) ? mem1_rd_data_i : mem2_rd_data_i;
-    wire [31:0] forwarding_rs1_hit_regs_data = (forwarding_rs1_wb) ? wb_rd_data_i : rs1_data_i;
+    wire [31:0] forwarding_rs1_hit_regs_data = (forwarding_rs1_wb) ? wb_rd_data_i : rs1_rdata_i;
 
     wire        forwarding_rs2_hit_mem       = forwarding_rs2_mem1 | forwarding_rs2_mem2;
     wire [31:0] forwarding_rs2_hit_mem_data  = (forwarding_rs2_mem1) ? mem1_rd_data_i : mem2_rd_data_i;
-    wire [31:0] forwarding_rs2_hit_regs_data = (forwarding_rs2_wb) ? wb_rd_data_i : rs2_data_i;
+    wire [31:0] forwarding_rs2_hit_regs_data = (forwarding_rs2_wb) ? wb_rd_data_i : rs2_rdata_i;
 
     // 前推结果
     wire [31:0] forwarding_rs1_data_hit = (forwarding_rs1_hit_mem) ? forwarding_rs1_hit_mem_data : forwarding_rs1_hit_regs_data;
@@ -330,21 +354,22 @@ module id(
         d.sel_fle_s     = OP_FP & f3_000 & (funct7 == 7'b1010000);
         d.sel_flt_s     = OP_FP & f3_001 & (funct7 == 7'b1010000);
         d.sel_flw       = LOAD_FP & f3_010;
-        // d.sel_fmadd_s   = OP_FP& f3_001 & (funct7 == 7'b1110000); // R4
         d.sel_fmax_s    = OP_FP & f3_001 & (funct7 == 7'b0010100);
         d.sel_fmin_s    = OP_FP & f3_000 & (funct7 == 7'b0010100);
-        // d.sel_fmsub_s   = OP_FP& f3_001 & (funct7 == 7'b1110000); // r4
         d.sel_fmul_s    = OP_FP & (funct7 == 7'b0001000);
         d.sel_fmv_w_x   = OP_FP & f3_000 & (rs2 == 5'b00000) & (funct7 == 7'b1111000);
         d.sel_fmv_x_w   = OP_FP & f3_000 & (rs2 == 5'b00000) & (funct7 == 7'b1110000);
-        // d.sel_fnmadd_s  = OP_FP& f3_001 & (funct7 == 7'b1110000); // r4
-        // d.sel_fnmsub_s  = OP_FP& f3_001 & (funct7 == 7'b1110000); // r4
         d.sel_fsgnj_s   = OP_FP & f3_000 & (funct7 == 7'b0010000);
         d.sel_fsgnjn_s  = OP_FP & f3_001 & (funct7 == 7'b0010000);
         d.sel_fsgnjx_s  = OP_FP & f3_010 & (funct7 == 7'b0010000);
         d.sel_fsqrt_s   = OP_FP & (rs2 == 5'b00000) & (funct7 == 7'b0101100);
         d.sel_fsub_s    = OP_FP & (funct7 == 7'b0000100);
         d.sel_fsw       = STORE_FP & f3_010;
+        d.sel_fmadd_s   = (opcode == `OP_FMADD);
+        d.sel_fmsub_s   = (opcode == `OP_FMSUB);
+        d.sel_fnmadd_s  = (opcode == `OP_FNMADD);
+        d.sel_fnmsub_s  = (opcode == `OP_FNMSUB);
+        d.is_fM         = d.sel_fmadd_s | d.sel_fmsub_s | d.sel_fnmadd_s | d.sel_fnmsub_s;
         `endif
         
         // A-ext
@@ -376,6 +401,7 @@ module id(
     // ==========================================================
     assign rs1_addr_o = rs1_addr_with_F;
     assign rs2_addr_o = rs2_addr_with_F;
+    assign rs3_addr_o = rs3_addr_with_F;
 
     wire [31:0] pc_add_4     = pc_i + 32'd4;
     wire [31:0] pc_addr_o    = pc_i;
@@ -399,6 +425,7 @@ module id(
         unique case (1'b1)
             ipkg.is_zicsr : csr_addr_o = inst_i[31:20];
             ipkg.is_FP    : csr_addr_o = 12'h003;       // fcsr
+            ipkg.is_fM    : csr_addr_o = 12'h003;       // fcsr
             default       : csr_addr_o = 12'h0;
         endcase
     end
@@ -412,6 +439,10 @@ module id(
     assign data_packaged_o.jump1   = jump1_o;
     assign data_packaged_o.jump2   = jump2_o;
     assign data_packaged_o.rd_addr = rd_addr_with_F;
+
+    `ifdef ENABLE_F
+    assign data_packaged_o.rs3_rdata = rs3_rdata_i;
+    `endif
 
     wire rd_neq_zero = (rd_i != 5'b0) | using_frd;
     
@@ -530,7 +561,7 @@ module id(
                 rd_addr_o   = rd_i;
             end
 
-            ipkg.is_FP: begin
+            ipkg.is_FP, ipkg.is_fM: begin
                 regs_wen_o  = rd_neq_zero;
                 imm_o       = {29'b0, funct3_i};
                 jump1_o     = 32'b0;

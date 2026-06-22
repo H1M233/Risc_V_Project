@@ -22,18 +22,18 @@ module tb_Fext;
 
     initial begin
         ipkg = 0;
-        ipkg.is_FP = 1'b1;
-        ipkg.sel_fdiv_s = 1'b1;
+        dpkg = 0;
 
-        value1 = gen_fval(2.0);
-        value2 = gen_fval(1.0);
+        ipkg.is_fM = 1'b1;
+        ipkg.sel_fmadd_s = 1'b1;
 
-        # 1000
-        value2 = gen_fval(4.0);
+        value1 = gen_fval(1.2);
+        value2 = gen_fval(1.2);
 
-        # 1000
-        value1 = gen_fval(114514.0);
-        value2 = gen_fval(1919810.0);
+        dpkg.rs3_rdata = 0;
+
+        # 100
+        dpkg.rs3_rdata = gen_fval(1.0);
 
     end
     

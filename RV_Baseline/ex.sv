@@ -77,6 +77,7 @@ module ex(
             ipkg.is_Zicondext : alu_result = Zicondext_res;
             ipkg.is_Aext      : alu_result = Aext_res;
             ipkg.is_FP        : alu_result = Fext_res;
+            ipkg.is_fM        : alu_result = Fext_res;
             default           : alu_result = 32'b0;
         endcase
     end

@@ -1,3 +1,5 @@
+`include "switch.svh"
+
 `ifndef ALU_DEF
 `define ALU_DEF
 
@@ -30,6 +32,9 @@ typedef struct packed {
     logic [31:0] fwd_rs2_data;
     logic        fwd_rs1_hit_ex;
     logic        fwd_rs2_hit_ex;
+    `ifdef ENABLE_F
+    logic [31:0] rs3_rdata;
+    `endif
 } id_ex_data_t;
 
 typedef struct packed {
@@ -185,21 +190,22 @@ typedef struct packed {
     logic sel_fle_s;
     logic sel_flt_s;
     logic sel_flw;
-    logic sel_fmadd_s;
     logic sel_fmax_s;
     logic sel_fmin_s;
-    logic sel_fmsub_s;
     logic sel_fmul_s;
     logic sel_fmv_w_x;
     logic sel_fmv_x_w;
-    logic sel_fnmadd_s;
-    logic sel_fnmsub_s;
     logic sel_fsgnj_s;
     logic sel_fsgnjn_s;
     logic sel_fsgnjx_s;
     logic sel_fsqrt_s;
     logic sel_fsub_s;
     logic sel_fsw;
+    logic is_fM;
+    logic sel_fmadd_s;
+    logic sel_fmsub_s;
+    logic sel_fnmadd_s;
+    logic sel_fnmsub_s;
 
     // ================================
     // A-ext

@@ -1,6 +1,6 @@
 {
   "RV_Baseline": {
-    "INST TEST": "FAIL x",
+    "INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
         "IPC": "0.780526",

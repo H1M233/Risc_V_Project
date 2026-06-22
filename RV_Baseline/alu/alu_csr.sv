@@ -13,7 +13,7 @@ module alu_csr (
     output ex_csr_data_t    cpkg
 );
     assign cpkg.waddr       = dpkg.csr_waddr;
-    assign cpkg.wen         = (ipkg.is_zicsr | (ipkg.is_FP & (fflags != dpkg.csr_rdata[4:0])));     // CSR 写使能
+    assign cpkg.wen         = (ipkg.is_zicsr | ((ipkg.is_FP | ipkg.is_fM) & (fflags != dpkg.csr_rdata[4:0])));     // CSR 写使能
     assign cpkg.ecall       = ipkg.sel_ecall;
     assign cpkg.mret        = ipkg.sel_mret;
     assign cpkg.ecall_inst  = (ipkg.sel_ecall) ? dpkg.pc : 32'b0;
@@ -36,6 +36,7 @@ module alu_csr (
             ipkg.sel_csrrci : cpkg.wdata = rc_res;
 
             ipkg.is_FP      : cpkg.wdata = fflags_res;
+            ipkg.is_fM      : cpkg.wdata = fflags_res;
             default         : cpkg.wdata = 32'b0;
         endcase
     end 

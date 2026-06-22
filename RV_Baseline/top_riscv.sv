@@ -34,8 +34,9 @@ module top_riscv(
     // ============================================================
     // regs to id
     // ============================================================
-    wire [31:0]     reg_rs1_data_o;
-    wire [31:0]     reg_rs2_data_o;
+    wire [31:0]     reg_rs1_rdata_o;
+    wire [31:0]     reg_rs2_rdata_o;
+    wire [31:0]     reg_rs3_rdata_o;
 
     // ============================================================
     // csr_regs to pc & ex
@@ -60,6 +61,7 @@ module top_riscv(
     // ============================================================
     wire [5:0]      id_rs1_addr_o;
     wire [5:0]      id_rs2_addr_o;
+    wire [5:0]      id_rs3_addr_o;
     wire [11:0]     id_csr_addr_o;
     id_ex_data_t    id_data_packaged_o;
     decode_t        id_inst_packaged_o;
@@ -218,12 +220,17 @@ module top_riscv(
         .rd_addr_i          (wb_rd_addr_o),
         .rd_data_i          (wb_rd_data_o),
         .regs_wen           (wb_regs_wen_o),
+        
+        `ifdef ENABLE_F
+        .rs3_addr_i         (id_rs3_addr_o),
+        .rs3_data_o         (reg_rs3_rdata_o),
+        `endif
 
         .rs1_addr_i         (id_rs1_addr_o),
         .rs2_addr_i         (id_rs2_addr_o),
 
-        .rs1_data_o         (reg_rs1_data_o),
-        .rs2_data_o         (reg_rs2_data_o)
+        .rs1_data_o         (reg_rs1_rdata_o),
+        .rs2_data_o         (reg_rs2_rdata_o)
     );
 
     // ============================================================
@@ -295,9 +302,14 @@ module top_riscv(
         .rs2_addr_o         (id_rs2_addr_o),
         .csr_addr_o         (id_csr_addr_o),
 
-        .rs1_data_i         (reg_rs1_data_o),
-        .rs2_data_i         (reg_rs2_data_o),
+        .rs1_rdata_i        (reg_rs1_rdata_o),
+        .rs2_rdata_i        (reg_rs2_rdata_o),
         .csr_rdata_i        (csr_regs_csr_rdata),
+
+        `ifdef ENABLE_F
+        .rs3_addr_o         (id_rs3_addr_o),
+        .rs3_rdata_i        (reg_rs3_rdata_o),
+        `endif
 
         .data_packaged_o    (id_data_packaged_o),
         .inst_packaged_o    (id_inst_packaged_o),
