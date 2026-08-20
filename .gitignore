@@ -14,15 +14,13 @@ AutoSim/mem_init/inst_test.txt
 AutoSim/mem_init/irom.txt
 AutoSim/mem_init/dram.txt
 AutoSim/software_results.txt
-AutoSim/wave_verilator.vcd
 
 twin/
 
 .library_mapping.xml
 .project
 
-AutoSim/riscv-tests/
 AutoSim/vcd
-AutoSim/cpp
+AutoSim/Gen_MySystem.bat
 
 

@@ -1,8 +1,0 @@
-生成 elf 文件：
-make -C isa rv32ui-p-addi
-
-生成反编译文件：
-make -C isa rv32ui-p-addi.dump
-
-将 elf -> bin：
-riscv32-unknown-elf-objcopy -O binary isa/rv32si-p-addi isa/rv32si-p-addi.bin

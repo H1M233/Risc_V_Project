@@ -34,5 +34,10 @@
       "irom": "irom_wom_v2.bin",
       "dram": "dram_init.bin"
     }
+  },
+  "MySystem": {
+    "cmakePath": "~/RiscV-MySystem",
+    "irom": "~/RiscV-MySystem/output/MySystem.bin",
+    "dram": "~/RiscV-MySystem/output/MySystem.bin"
   }
 }

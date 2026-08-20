@@ -31,22 +31,16 @@ def compile(prj_dict, sim_type, macros):
     # 获取目标工程路径
     rtl_dir = AutoSim_dir.parent / prj_folder
     def_dir = rtl_dir / 'def'
-    mem_dir = AutoSim_dir / 'mem_sim' / prj_folder
-    sim_cpp = AutoSim_dir / f'sim_{sim_type}.cpp'
+    sim_cpp = AutoSim_dir / 'cpp' / f'sim_{sim_type}.cpp'
 
     # 批量添加编译文件
-    foldersInRtl = ['alu', 'new', 'utils']
+    foldersInRtl = ['core', 'mem_sim', 'peripheral', 'utils', 'wrapper']
     
     source_file = []
-    source_file.append(AutoSim_dir / f'tb_verilator_{sim_type}.sv')
-    source_file.extend(rtl_dir.glob('*.v')) 
-    source_file.extend(rtl_dir.glob('*.sv'))
-    source_file.extend(mem_dir.glob('*.sv'))
+    source_file.append(rtl_dir / 'tb' / f'tb_verilator_{sim_type}.sv')
 
     for f in foldersInRtl:
-        folders_dir = rtl_dir / f
-        source_file.extend(folders_dir.glob('*.v'))
-        source_file.extend(folders_dir.glob('*.sv'))
+        source_file.extend(Path(rtl_dir / f).rglob('*.sv'))
 
     # Verilator 程序
     verilator_cmd = ['verilator',
@@ -64,7 +58,7 @@ def compile(prj_dict, sim_type, macros):
                     '--no-assert',                          # 关闭断言检查
 
                     # C++ 编译优化
-                    '-CFLAGS', '-O3 -march=native', 
+                    '-CFLAGS', f'-O3 -march=native', 
                     '-top-module', f'tb_verilator_{sim_type}',
 
                     # 警告控制
@@ -74,7 +68,6 @@ def compile(prj_dict, sim_type, macros):
                     '-Wno-CASEINCOMPLETE',                  # 忽略case不完全警告
                     '-Wno-UNSIGNED'                         # 忽略判断逻辑永远为真警告
     ]
-
 
     for macroName, macroValue in macros.items():
         verilator_cmd.extend(['-CFLAGS', f'-D{macroName}={macroValue}'])
@@ -95,7 +88,7 @@ def compile(prj_dict, sim_type, macros):
         result = subprocess.run(
             verilator_cmd,
             capture_output=True, 
-            text=True             # 以文本模式返回
+            text=True,            # 以文本模式返回
         )
         if result.stderr:
             return False, result.stderr
@@ -104,7 +97,7 @@ def compile(prj_dict, sim_type, macros):
         else:
             return True, '  '
     except subprocess.TimeoutExpired:
-        return False, 'iverilog exec timeout!'
+        return False, 'verilator exec timeout!'
 
 
 def sim(sim_type, stdout=True, env=os.environ.copy()):
@@ -279,14 +272,17 @@ def getPrevTimeJson(prj_name, mem_name):
 
 
 def softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(-1, -1), Debugging=False):
+    print()
     for mem_name, mem_file in mem_dict.items():
         irom_bin_dir = AutoSim_dir / 'mem_init' / mem_file['irom']
         dram_bin_dir = AutoSim_dir / 'mem_init' / mem_file['dram']
-        bin_to_mem(irom_bin_dir, 'irom')
-        bin_to_mem(dram_bin_dir, 'dram')
-        print(f"\n加载 \033[96m{mem_name}\033[0m 至 IROM & DRAM...")
+        print(f"[INFO] 加载 \033[96m{mem_name}\033[0m 至 IROM & DRAM......", end='', flush=True)
+        bin_to_mem(irom_bin_dir, 'software_test_irom')
+        bin_to_mem(dram_bin_dir, 'software_test_dram')
+        print("加载成功", flush=True)
 
         # 宏定义
+        print("[INFO] 编译仿真文件中......", end='', flush=True)
         macros = {}
         if enableTrace:
             macros['ENABLE_TRACE'] = 1
@@ -299,7 +295,7 @@ def softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(-1, -1), Deb
 
         success, error_msg = compile(prj_dict, 'software', macros)
         if success:
-            print(f'编译成功...')
+            print(f'编译成功\n')
 
             # 环境变量定义
             env = os.environ.copy()
@@ -309,10 +305,9 @@ def softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(-1, -1), Deb
 
             updateJson(prj_dict['prj_name'], sim_type='software', mem_name=mem_name)
         else:
-            print('\n')
+            print('编译失败\n')
             print('=' * 40)
-            print('编译失败:')
-            print(error_msg)
+            print(error_msg, end='')
             print('=' * 40)
 
 
@@ -341,7 +336,7 @@ def instTest(prj_dict, testAll=False):
                 enableTrace = True if len(sel_bin_files) == 1 else False
                 break
 
-    print("\n编译中...", end='\r', flush=True)
+    print("\n编译仿真文件中...", end='\r', flush=True)
 
     # 成功失败计数器
     passCnt, failCnt = 0, 0
@@ -383,22 +378,68 @@ def instTest(prj_dict, testAll=False):
                 print('\033[2K指令  ' + print_name.ljust(20, ' ') + 'NO ANSWER', flush=True)
                 print(bar, end='\r', flush=True)
         else:
+            print('编译失败:')
             print('\n')
             print('=' * 40)
-            print('编译失败:')
-            print(error_msg)
+            print(error_msg, end='')
             print('=' * 40)
     
     updateJson(prj_dict['prj_name'], 'Inst Test', inst_result=(passCnt == len(sel_bin_files) and failCnt == 0))
     print(f"\033[2K指令集测试共 \033[92m{passCnt}个成功 \033[91m{failCnt}个失败\033[0m", end='\n\033[2K')
 
 
-def systemTest(prj_dict, enableTrace=False, traceRange=(-1, -1)):
-    binFile = Path('~/RiscV-MySystem/output/MySystem.bin').expanduser()
-    bin_to_mem(binFile, 'system_test')
-    print(f"\n加载 \033[96mMySystem\033[0m 至 IROM & DRAM...")
+def systemTest(prj_dict, cmake=True, enableTrace=False, traceRange=(-1, -1)):
+    print()
+    json_filename = 'settings.json'
+    
+    if Path(AutoSim_dir / json_filename).exists():
+        with open(json_filename, 'r', encoding='utf-8') as f:
+            json_file = json.load(f)
+    else:
+        sys.exit("无法找到settings.json")
+
+    # 交叉编译
+    if cmake:
+        print("[INFO] 交叉编译中...", end='', flush=True)
+        cmakePath = Path(json_file['MySystem']['cmakePath']).expanduser()
+        cmakeErr = False
+        cmakeStd = ''
+        try:
+            result = subprocess.run(
+                'make',
+                capture_output=True, 
+                text=True,            # 以文本模式返回
+                cwd=str(cmakePath)
+            )
+            if result.stderr:
+                cmakeErr = True
+                cmakeStd = result.stderr
+            elif 'error' in result.stdout.lower():
+                cmakeErr = True
+                cmakeStd = result.stdout
+        except subprocess.TimeoutExpired:
+            cmakeErr = True
+            cmakeStd = 'cmake exec timeout!'
+        if cmakeErr:
+            print('交叉编译失败\n')
+            print('=' * 40)
+            print(cmakeStd, end='')
+            print('=' * 40)
+            return 0
+        else:
+            print("交叉编译完成", flush=True)
+
+    # IROM & DRAM 转格式
+    irom_path_expand = Path(json_file['MySystem']['irom']).expanduser()
+    dram_path_expand = Path(json_file['MySystem']['dram']).expanduser()
+
+    print(f"[INFO] 加载 \033[96mMySystem\033[0m 至 IROM & DRAM...", end='', flush=True)
+    bin_to_mem(irom_path_expand, 'MySystem_irom')
+    bin_to_mem(dram_path_expand, 'MySystem_dram')
+    print("加载完成", flush=True)
 
     # 宏定义
+    print("[INFO] 编译仿真文件中...", end='', flush=True)
     macros = {}
     if enableTrace:
         macros['ENABLE_TRACE'] = 1
@@ -406,20 +447,18 @@ def systemTest(prj_dict, enableTrace=False, traceRange=(-1, -1)):
         macros['TRACE_START_TIME'] = '2147483647' if traceStartTime < 0 else str(traceStartTime)
         macros['TRACE_END_TIME'] = '0' if traceEndTime < 0 else str(traceEndTime)
     success, error_msg = compile(prj_dict, 'system', macros)
-    print("编译中...")
 
     if success:
-        print(f'编译成功...')
+        print(f'编译完成')
 
         # 环境变量定义
         env=os.environ.copy()
         env['CLK_FREQ'] = str(prj_dict['clockFreq'])
         sim('system', stdout=True, env=env)
     else:
-        print('\n')
+        print('编译失败\n')
         print('=' * 40)
-        print('编译失败:')
-        print(error_msg)
+        print(error_msg, end='')
         print('=' * 40)
 
 
@@ -430,9 +469,19 @@ def main():
             if testInst:
                 instTest(prj_dict, testAll=testAll)
             if mem_dict:
-                softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(222, 223), Debugging=True)
+                softwareTest(
+                    prj_dict, mem_dict, 
+                    enableTrace=False, 
+                    traceRange=(222, 223), 
+                    Debugging=True
+                )
             if testSys:
-                systemTest(prj_dict, enableTrace=False, traceRange=(0, 1))
+                systemTest(
+                    prj_dict, 
+                    cmake=True, 
+                    enableTrace=False, 
+                    traceRange=(0, 1)
+                )
         except KeyboardInterrupt:
             print("\n\n仿真进程被Ctrl + C终止")
 

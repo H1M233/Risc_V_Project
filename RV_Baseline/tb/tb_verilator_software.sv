@@ -23,8 +23,8 @@ module tb_verilator_software(
         .i_key(), .o_seg_digit(), .o_seg_sel(), .o_led()
     );
     initial begin
-        $readmemh("./mem_init/irom.txt", `IROM_PATH);
-        $readmemh("./mem_init/dram.txt", `DRAM_PATH);
+        $readmemh("./mem_init/software_test_irom.txt", `IROM_PATH);
+        $readmemh("./mem_init/software_test_dram.txt", `DRAM_PATH);
     end
     assign LED = `LED_PATH;
     assign SEG = `SEG_PATH;

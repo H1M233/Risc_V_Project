@@ -30,8 +30,8 @@ module tb_verilator_system(
         .o_led              ()
     );
         initial begin
-            $readmemh("./mem_init/system_test.txt", `IROM_PATH);
-            $readmemh("./mem_init/system_test.txt", `DRAM_PATH);
+            $readmemh("./mem_init/MySystem_irom.txt", `IROM_PATH);
+            $readmemh("./mem_init/MySystem_dram.txt", `DRAM_PATH);
         end
         assign LED = `LED_PATH;
         assign SEG = `SEG_PATH;
