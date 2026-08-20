@@ -27,20 +27,26 @@ def bin_to_mem(infile, mem_type):
 def compile(prj_dict, sim_type, macros):
     '''编译 rtl 代码并输出到 obj_dir'''
     prj_folder = prj_dict['folder']
+
     # 获取目标工程路径
     rtl_dir = AutoSim_dir.parent / prj_folder
-    alu_dir = rtl_dir / 'alu'
     def_dir = rtl_dir / 'def'
-    new_dir = AutoSim_dir / 'new' / prj_folder
+    mem_dir = AutoSim_dir / 'mem_sim' / prj_folder
     sim_cpp = AutoSim_dir / f'sim_{sim_type}.cpp'
+
+    # 批量添加编译文件
+    foldersInRtl = ['alu', 'new', 'utils']
     
     source_file = []
-    source_file.append(AutoSim_dir / f'tb_verilator_{sim_type}.v')
-    source_file.extend(rtl_dir.glob('*.v'))
+    source_file.append(AutoSim_dir / f'tb_verilator_{sim_type}.sv')
+    source_file.extend(rtl_dir.glob('*.v')) 
     source_file.extend(rtl_dir.glob('*.sv'))
-    source_file.extend(alu_dir.glob('*.v'))
-    source_file.extend(alu_dir.glob('*.sv'))
-    source_file.extend(new_dir.glob('*.sv'))
+    source_file.extend(mem_dir.glob('*.sv'))
+
+    for f in foldersInRtl:
+        folders_dir = rtl_dir / f
+        source_file.extend(folders_dir.glob('*.v'))
+        source_file.extend(folders_dir.glob('*.sv'))
 
     # Verilator 程序
     verilator_cmd = ['verilator',
@@ -49,8 +55,10 @@ def compile(prj_dict, sim_type, macros):
                     '-j', '0',
                     '-trace-fst',
 
-                    # Verilator 转换优化
-                    '-O3',
+                    # 启用多线程
+                    '--threads', '1',
+
+                    # Verilator 编译优化
                     '--x-assign', 'fast',                   # 加速未初始化变量的处理
                     '--x-initial', 'fast',                  # 加速初始区块的处理
                     '--no-assert',                          # 关闭断言检查
@@ -185,11 +193,12 @@ def prj_mem_ch(prj_ch=None, mem_ch=None):
     mem_ret = {}
     testInst = False
     testAll = False
+    testSys = False
     
     mem_dict = dict(enumerate([key for key in json_file['mem_init']], start=1))
     while True:
         # 打印信息
-        print('\r[i] Inst Test  [a] ALL  ', end='')
+        print('\r[i] Inst Test  [a] ALL  [s] System ', end='')
         for index, prj_name in mem_dict.items():
             print(f'[{index}] {prj_name}', end='', flush=True)
             print('  ' if index != len(mem_dict) else ': ', end='', flush=True)
@@ -201,9 +210,12 @@ def prj_mem_ch(prj_ch=None, mem_ch=None):
             break
         elif mem_name_ask.lower() == 'a':
             mem_ret = json_file['mem_init']
-            testInst = True
             testAll = True
             print("\033[96mALL\033[0m")
+            break
+        elif mem_name_ask.lower() == 's':
+            testSys = True
+            print("\033[96mSystem\033[0m")
             break
         elif mem_name_ask.lower() == 'i':
             testInst = True
@@ -222,7 +234,7 @@ def prj_mem_ch(prj_ch=None, mem_ch=None):
     for mem_name in mem_ch:
         print(f"\033[96m{mem_name}\033[0m")
         mem_ret[mem_name] = json_file['mem_init'][mem_name]
-    return prj_ret, mem_ret, testInst, testAll
+    return prj_ret, mem_ret, testInst, testAll, testSys
 
 
 def updateJson(prj_name, sim_type, inst_result=False, mem_name='init'):
@@ -266,7 +278,7 @@ def getPrevTimeJson(prj_name, mem_name):
         return 0
 
 
-def softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(-1, -1)):
+def softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(-1, -1), Debugging=False):
     for mem_name, mem_file in mem_dict.items():
         irom_bin_dir = AutoSim_dir / 'mem_init' / mem_file['irom']
         dram_bin_dir = AutoSim_dir / 'mem_init' / mem_file['dram']
@@ -281,6 +293,9 @@ def softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(-1, -1)):
             traceStartTime, traceEndTime = traceRange
             macros['TRACE_START_TIME'] = '2147483647' if traceStartTime < 0 else str(traceStartTime)
             macros['TRACE_END_TIME'] = '0' if traceEndTime < 0 else str(traceEndTime)
+
+        if Debugging:
+            macros['DEBUGGING'] = 1
 
         success, error_msg = compile(prj_dict, 'software', macros)
         if success:
@@ -377,14 +392,47 @@ def instTest(prj_dict, testAll=False):
     updateJson(prj_dict['prj_name'], 'Inst Test', inst_result=(passCnt == len(sel_bin_files) and failCnt == 0))
     print(f"\033[2K指令集测试共 \033[92m{passCnt}个成功 \033[91m{failCnt}个失败\033[0m", end='\n\033[2K')
 
+
+def systemTest(prj_dict, enableTrace=False, traceRange=(-1, -1)):
+    binFile = Path('~/RiscV-MySystem/output/MySystem.bin').expanduser()
+    bin_to_mem(binFile, 'system_test')
+    print(f"\n加载 \033[96mMySystem\033[0m 至 IROM & DRAM...")
+
+    # 宏定义
+    macros = {}
+    if enableTrace:
+        macros['ENABLE_TRACE'] = 1
+        traceStartTime, traceEndTime = traceRange
+        macros['TRACE_START_TIME'] = '2147483647' if traceStartTime < 0 else str(traceStartTime)
+        macros['TRACE_END_TIME'] = '0' if traceEndTime < 0 else str(traceEndTime)
+    success, error_msg = compile(prj_dict, 'system', macros)
+    print("编译中...")
+
+    if success:
+        print(f'编译成功...')
+
+        # 环境变量定义
+        env=os.environ.copy()
+        env['CLK_FREQ'] = str(prj_dict['clockFreq'])
+        sim('system', stdout=True, env=env)
+    else:
+        print('\n')
+        print('=' * 40)
+        print('编译失败:')
+        print(error_msg)
+        print('=' * 40)
+
+
 def main():
     while True:
         try:
-            prj_dict, mem_dict, testInst, testAll = prj_mem_ch()
+            prj_dict, mem_dict, testInst, testAll, testSys = prj_mem_ch()
             if testInst:
                 instTest(prj_dict, testAll=testAll)
             if mem_dict:
-                softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(86, 87))
+                softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(222, 223), Debugging=True)
+            if testSys:
+                systemTest(prj_dict, enableTrace=False, traceRange=(0, 1))
         except KeyboardInterrupt:
             print("\n\n仿真进程被Ctrl + C终止")
 

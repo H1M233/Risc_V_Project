@@ -29,7 +29,7 @@ module divider(
     logic [33:0] divisor_ext;
     logic        div_by_0, div_ovf;    // 除 0 & 溢出判断
     always_ff @(posedge clk) begin
-        if (!rst) begin
+        if (rst) begin
             valid_r      <= 1'b0;
 
             dividend_ext <= 66'b0;
@@ -173,7 +173,7 @@ module divider(
                      | (state_is_remd_corr & want_remd);
 
     always_ff @(posedge clk) begin
-        if (~rst) begin
+        if (rst) begin
             valid_o     <= 1'b0;
             result_o    <= 32'b0;
         end
@@ -189,7 +189,7 @@ module divider(
     wire start = state_is_idle & valid_r & ~valid_o & ~special_case;
 
     always_ff @(posedge clk) begin
-        if (~rst) begin
+        if (rst) begin
             divider_state <= IDLE;
         end 
         else if (flush_i) begin
@@ -232,7 +232,7 @@ module divider(
     //  计数器
     // =========================================================================
     always_ff @(posedge clk) begin
-        if (~rst) begin
+        if (rst) begin
             exec_cnt_r <= 6'd0;
         end 
         else if (flush_i) begin
@@ -268,7 +268,7 @@ module divider(
     end
 
     always_ff @(posedge clk) begin
-        if (~rst) begin
+        if (rst) begin
             part_remd_r      <= 33'd0;
             part_remd_sft1_r <= 1'b0;
         end 
@@ -279,7 +279,7 @@ module divider(
     end
 
     always_ff @(posedge clk) begin
-        if (~rst) begin
+        if (rst) begin
             part_quot_r <= 33'd0;
         end 
         else if (update_quot) begin

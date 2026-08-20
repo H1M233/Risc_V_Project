@@ -1,84 +1,105 @@
 `include "../def/alu_def.svh"
 `include "../def/switch.svh"
 module alu_lsu(
-    input  logic [31:0]  rs1,
-    input  logic [31:0]  rs2,
-    input  logic [31:0]  mem_addr,
-    input  logic [1:0]   mem_addr_low,
-    input  logic         regs_wen,
-    input  decode_t      ipkg,
+    input  logic [31:0]  rs1                ,
+    input  logic [31:0]  rs2                ,
+    input  logic [31:0]  mem_addr           ,
+    input  logic [1:0]   mem_addr_low       ,
+    input  logic         regs_wen           ,
+    input  decode_t      ipkg               ,
+    input  logic         valid_i            ,
 
-    input  logic         atom_req_load,
-    input  logic         atom_req_store,
-    input  logic [31:0]  atom_addr,
-    input  logic [31:0]  atom_wdata,
+    input  logic         atom_req_load      ,
+    input  logic         atom_req_store     ,
+    input  logic [31:0]  atom_addr          ,
+    input  logic [31:0]  atom_wdata         ,
 
-    output ex_lsu_data_t dcachepkg
+    output DCACHE_data_t dcachepkg          
 );
-    always_comb begin 
-        dcachepkg.req_load   = (ipkg.is_load | ipkg.is_load_FP & regs_wen) | atom_req_load;   // dcache 读使能
-        dcachepkg.req_store  = ipkg.is_store | ipkg.is_store_FP | atom_req_store;             // dcache 写使能
-        dcachepkg.addr       = (atom_req_load | atom_req_store) ? atom_addr : mem_addr;
-        dcachepkg.write_dram = (dcachepkg.addr >= `DRAM_ADDR_START && dcachepkg.addr < `DRAM_ADDR_END);
+    logic is_load_FP, is_store_FP;
+    `ifdef ENABLE_F
+    assign is_load_FP = ipkg.is_load_FP;
+    assign is_store_FP = ipkg.is_store_FP;
+    `else
+    assign is_load_FP = 0;
+    assign is_store_FP = 0;
+    `endif
+    always_comb begin
+        if (valid_i) begin
+            `ifdef ENABLE_A
+            dcachepkg.req_load   = (ipkg.is_load | is_load_FP & regs_wen) | atom_req_load;   // dcache 读使能
+            dcachepkg.req_store  = ipkg.is_store | is_store_FP | atom_req_store;             // dcache 写使能
+            dcachepkg.addr       = (atom_req_load | atom_req_store) ? atom_addr : mem_addr;
+            `else
+            dcachepkg.req_load   = (ipkg.is_load | is_load_FP & regs_wen);   // dcache 读使能
+            dcachepkg.req_store  = ipkg.is_store | is_store_FP;             // dcache 写使能
+            dcachepkg.addr       = (dcachepkg.req_load | dcachepkg.req_store) ? mem_addr : 32'b0;
+            `endif
+            dcachepkg.write_dram = (dcachepkg.addr >= `DRAM_ADDR_START && dcachepkg.addr < `DRAM_ADDR_END);
 
-        unique case (1'b1)
-            ipkg.is_store_FP: begin
-                dcachepkg.wdata = rs2;
-                dcachepkg.we    = 4'b1111;
-            end
-            atom_req_store: begin
-                dcachepkg.wdata = atom_wdata;
-                dcachepkg.we    = 4'b1111;
-            end
-            ipkg.sel_sb: begin // byte
-                case (mem_addr_low)
-                    2'b00: begin 
-                        dcachepkg.wdata = {24'b0, rs2[7:0]};
-                        dcachepkg.we    = 4'b0001;
-                    end
-                    2'b01: begin
-                        dcachepkg.wdata = {16'b0, rs2[7:0], 8'b0};
-                        dcachepkg.we    = 4'b0010;
-                    end
-                    2'b10: begin
-                        dcachepkg.wdata = {8'b0, rs2[7:0], 16'b0};
-                        dcachepkg.we    = 4'b0100;
-                    end
-                    2'b11: begin
-                        dcachepkg.wdata = {rs2[7:0], 24'b0};
-                        dcachepkg.we    = 4'b1000;
-                    end
-                    default: begin
-                        dcachepkg.wdata = 32'b0;
-                        dcachepkg.we    = 4'b0000;
-                    end
-                endcase
-            end
-            ipkg.sel_sh: begin // half
-                case (mem_addr_low[1])
-                    1'b0: begin
-                        dcachepkg.wdata = {16'b0, rs2[15:0]};
-                        dcachepkg.we    = 4'b0011;
-                    end
-                    1'b1: begin
-                        dcachepkg.wdata = {rs2[15:0], 16'b0};
-                        dcachepkg.we    = 4'b1100;
-                    end
-                    default: begin
-                        dcachepkg.wdata = 32'b0;
-                        dcachepkg.we    = 4'b0000;
-                    end
-                endcase
-            end
-            ipkg.sel_sw: begin // word
-                dcachepkg.wdata = rs2;
-                dcachepkg.we    = 4'b1111;
-            end
-            default: begin
-                dcachepkg.wdata = 32'b0;
-                dcachepkg.we    = 4'b0000;
-            end
-        endcase
+            unique case (1'b1)
+                is_store_FP: begin
+                    dcachepkg.wdata = rs2;
+                    dcachepkg.we    = 4'b1111;
+                end
+                `ifdef ENABLE_A
+                atom_req_store: begin
+                    dcachepkg.wdata = atom_wdata;
+                    dcachepkg.we    = 4'b1111;
+                end
+                `endif
+                ipkg.sel_sb: begin // byte
+                    case (mem_addr_low)
+                        2'b00: begin 
+                            dcachepkg.wdata = {24'b0, rs2[7:0]};
+                            dcachepkg.we    = 4'b0001;
+                        end
+                        2'b01: begin
+                            dcachepkg.wdata = {16'b0, rs2[7:0], 8'b0};
+                            dcachepkg.we    = 4'b0010;
+                        end
+                        2'b10: begin
+                            dcachepkg.wdata = {8'b0, rs2[7:0], 16'b0};
+                            dcachepkg.we    = 4'b0100;
+                        end
+                        2'b11: begin
+                            dcachepkg.wdata = {rs2[7:0], 24'b0};
+                            dcachepkg.we    = 4'b1000;
+                        end
+                        default: begin
+                            dcachepkg.wdata = 32'b0;
+                            dcachepkg.we    = 4'b0000;
+                        end
+                    endcase
+                end
+                ipkg.sel_sh: begin // half
+                    case (mem_addr_low[1])
+                        1'b0: begin
+                            dcachepkg.wdata = {16'b0, rs2[15:0]};
+                            dcachepkg.we    = 4'b0011;
+                        end
+                        1'b1: begin
+                            dcachepkg.wdata = {rs2[15:0], 16'b0};
+                            dcachepkg.we    = 4'b1100;
+                        end
+                        default: begin
+                            dcachepkg.wdata = 32'b0;
+                            dcachepkg.we    = 4'b0000;
+                        end
+                    endcase
+                end
+                ipkg.sel_sw: begin // word
+                    dcachepkg.wdata = rs2;
+                    dcachepkg.we    = 4'b1111;
+                end
+                default: begin
+                    dcachepkg.wdata = 32'b0;
+                    dcachepkg.we    = 4'b0000;
+                end
+            endcase
+        end else begin
+            dcachepkg = 0;
+        end
     end
 
 endmodule

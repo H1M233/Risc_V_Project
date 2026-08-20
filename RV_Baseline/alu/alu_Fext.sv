@@ -6,7 +6,7 @@ module alu_Fext(
 
     input  logic [31:0] value1,
     input  logic [31:0] value2,
-    input  id_ex_data_t dpkg,
+    input  EX_data_t    dpkg,
     input  decode_t     ipkg,
 
     output logic [4:0]  fflags,
@@ -86,7 +86,7 @@ module alu_Fext(
     // -------------------------------------
     // fadd.s, fsub.s:
     // -------------------------------------
-    wire sum_fval_nv  = (fval1_is_nan | fval2_is_nan) && (ipkg.sel_fadd_s | ipkg.sel_fsub_s);   // flags.NV: 输入其一有 NaN
+    wire sum_fval_nv  = fval1_is_nan | fval2_is_nan;   // flags.NV: 输入其一有 NaN
     wire sum_sub_inf = fval1_is_inf & fval2_is_inf & 
                         ((ipkg.sel_fadd_s & (fval1.sign != fval2.sign)) 
                       | (ipkg.sel_fsub_s & (fval1.sign == fval2.sign))
@@ -255,7 +255,6 @@ module alu_Fext(
         end
     end
     
-    
     // 7. 特殊值处理
     fval_t sum_final;
     assign sum_final.sign = sum_sign_res;
@@ -264,6 +263,7 @@ module alu_Fext(
 
     wire [31:0] sum_res = (sum_sub_inf) ? NORMAL_QNAN : sum_final;
 
+    wire sum_NV = ((ipkg.sel_fadd_s | ipkg.sel_fsub_s) & sum_fval_nv) | sum_sub_inf;
     wire sum_OF = (ipkg.sel_fadd_s | ipkg.sel_fsub_s) & (sum_roundup_overflow | sum_norm_overflow);
     wire sum_UF = (ipkg.sel_fadd_s | ipkg.sel_fsub_s) & sum_norm_underflow;
 
@@ -826,7 +826,7 @@ module alu_Fext(
     wire [47:0] fmsum_pre_sum_mant = (fmsum_pre_sum_special_case) ? {fmsum_pre_sum_special_case_res.mant, 25'b0} : fmsum_mant_mul_norm;
 
     // 求和运算 - +-(fmsum_mul_res +- fval3)
-    wire fmsum_fval_nv = (fmsum_mul_is_nan | fval3_is_nan) & ipkg.is_fM;   // flags.NV: 输入其一有 NaN
+    wire fmsum_fval_nv = (fmsum_mul_is_nan | fval3_is_nan);   // flags.NV: 输入其一有 NaN
     wire fmsum_sub_inf = fmsum_mul_is_inf & fval3_is_inf & 
                          (((ipkg.sel_fmadd_s | ipkg.sel_fnmadd_s) & (fval1.sign != fval2.sign)) 
                        | ((ipkg.sel_fmsub_s | ipkg.sel_fnmsub_s) & (fval1.sign == fval2.sign)));   // flags.NV: inf - inf 运算
@@ -950,7 +950,7 @@ module alu_Fext(
     wire  fmsum_S   = fmsum_S_shift | fmsum_S_sum | fmsum_norm_S | fmsum_mant_norm[0];
     logic fmsum_roundup;
     logic fmsum_roundup_inexact;
-    assign fmsum_roundup_inexact = ipkg.is_fM & (fmsum_G | fmsum_R | fmsum_S);
+    assign fmsum_roundup_inexact = ipkg.is_FM & (fmsum_G | fmsum_R | fmsum_S);
 
     // 根据 GRS 计算进位
     always_comb begin
@@ -999,19 +999,19 @@ module alu_Fext(
 
     wire [31:0] fmsum_res = (fmsum_sub_inf) ? NORMAL_QNAN : fmsum_final;
 
-    wire fmsum_NX = ipkg.is_fM & fmsum_roundup_inexact;
-
+    wire fmsum_NV = ipkg.is_FM & fmsum_fval_nv;
+    wire fmsum_NX = ipkg.is_FM & fmsum_roundup_inexact;
 
 
     // fflags 写入
     fflags_t flags;
-    assign flags.NV = sum_fval_nv | sum_sub_inf | fcmp_fval_nv | fmaxmin_fval_nv | fcvt_NV | fcvt_w_get_int_max | fdiv_NV | fsqrt_NV | fmul_NV;
+    assign flags.NV = sum_NV | fcmp_fval_nv | fmaxmin_fval_nv | fcvt_NV | fcvt_w_get_int_max | fdiv_NV | fsqrt_NV | fmul_NV | fmsum_NV;
     assign flags.DZ = fdiv_DZ;
     assign flags.OF = sum_OF | fdiv_OF | fsqrt_OF;
     assign flags.UF = sum_UF | fdiv_UF | fsqrt_UF;
     assign flags.NX = sum_roundup_inexact | fcvt_roundup_inexact | fcvt_w_roundup_inexact | fmul_NX | fdiv_NX | fsqrt_NX | fmsum_NX;
 
-    assign fflags = (ipkg.is_FP | ipkg.is_fM) ? flags : 0;
+    assign fflags = (ipkg.is_FP | ipkg.is_FM) ? flags : 0;
 
     always_comb begin
         unique case (1'b1)

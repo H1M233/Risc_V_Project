@@ -24,7 +24,7 @@ module tb_Fext;
         ipkg = 0;
         dpkg = 0;
 
-        ipkg.is_fM = 1'b1;
+        ipkg.is_FM = 1'b1;
         ipkg.sel_fmadd_s = 1'b1;
 
         value1 = gen_fval(1.2);

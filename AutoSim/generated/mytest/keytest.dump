@@ -1,0 +1,40 @@
+
+generated/keytest.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .text.init:
+
+80000000 <_start>:
+80000000:	00000d13          	li	s10,0
+80000004:	00000d93          	li	s11,0
+80000008:	80200437          	lui	s0,0x80200
+8000000c:	00000513          	li	a0,0
+
+80000010 <getkey>:
+80000010:	01042503          	lw	a0,16(s0) # 80200010 <_end+0x1fe000>
+80000014:	010000ef          	jal	80000024 <expand>
+80000018:	02b42023          	sw	a1,32(s0)
+8000001c:	04a42823          	sw	a0,80(s0)
+80000020:	ff1ff06f          	j	80000010 <getkey>
+
+80000024 <expand>:
+80000024:	00451593          	slli	a1,a0,0x4
+80000028:	00a585b3          	add	a1,a1,a0
+8000002c:	00859613          	slli	a2,a1,0x8
+80000030:	00c585b3          	add	a1,a1,a2
+80000034:	111116b7          	lui	a3,0x11111
+80000038:	11168693          	addi	a3,a3,273 # 11111111 <_start-0x6eeeeeef>
+8000003c:	00d5f5b3          	and	a1,a1,a3
+80000040:	00008067          	ret
+
+Disassembly of section .data:
+
+80002000 <begin_signature>:
+80002000:	0000                	.insn	2, 0x0000
+80002002:	0000                	.insn	2, 0x0000
+80002004:	0000                	.insn	2, 0x0000
+80002006:	0000                	.insn	2, 0x0000
+80002008:	0000                	.insn	2, 0x0000
+8000200a:	0000                	.insn	2, 0x0000
+8000200c:	0000                	.insn	2, 0x0000
+8000200e:	0000                	.insn	2, 0x0000

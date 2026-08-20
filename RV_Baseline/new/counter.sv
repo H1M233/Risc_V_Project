@@ -25,6 +25,7 @@ module counter(
     input  logic         cnt_clk,
     input  logic         rst,
 
+    input  logic         cnt_reset_cpu,
     input  logic         cnt_enable_cpu,
     output logic [31:0]  perip_rdata
 );
@@ -48,9 +49,10 @@ module counter(
     logic [31:0] cnt_ms_gray;
     logic cnt_enable_cnt_d1, cnt_enable_cnt_d2;
     logic [31:0] cnt_gray_cpu_d1, cnt_gray_cpu_d2;
+    logic cnt_reset_lock, cnt_reset_finished;
 
     // CPU->counter CDC: synchronize level control into cnt_clk domain.
-    always_ff @(posedge cnt_clk) begin
+    always_ff @(posedge cnt_clk or posedge rst) begin
         if (rst) begin
             cnt_enable_cnt_d1 <= 1'b0;
             cnt_enable_cnt_d2 <= 1'b0;
@@ -60,8 +62,10 @@ module counter(
         end
     end
 
-    always_ff @(posedge cnt_clk) begin
+    always_ff @(posedge cnt_clk or posedge rst) begin
         if (rst) begin
+            cnt_1ms <= 0;
+        end else if (cnt_reset_lock) begin
             cnt_1ms <= 0;
         end else if (cnt_enable_cnt_d2) begin
             if (cnt_1ms == 49999) begin
@@ -74,8 +78,10 @@ module counter(
         end
     end
 
-    always_ff @(posedge cnt_clk) begin
+    always_ff @(posedge cnt_clk or posedge rst) begin
         if (rst) begin
+            cnt_ms_bin <= 0;
+        end else if (cnt_reset_lock) begin
             cnt_ms_bin <= 0;
         end else if (cnt_enable_cnt_d2 && cnt_1ms == 49999) begin
             cnt_ms_bin <= cnt_ms_bin + 1;
@@ -84,21 +90,34 @@ module counter(
         end
     end
 
+    always_ff @(posedge cnt_clk or posedge rst) begin
+        if (rst) begin
+            cnt_reset_finished <= 1'b0;
+        end else begin
+            cnt_reset_finished <= cnt_reset_lock;
+        end
+    end
+
     assign cnt_ms_gray = bin_to_gray(cnt_ms_bin);
 
     // Counter->CPU CDC: Gray code allows safe multi-bit crossing.
-    always_ff @(posedge cpu_clk) begin
+    always_ff @(posedge cpu_clk or posedge rst) begin
         if (rst) begin
             cnt_gray_cpu_d1 <= 32'd0;
             cnt_gray_cpu_d2 <= 32'd0;
             perip_rdata     <= 32'b0;
+            cnt_reset_lock  <= 1'b0;
         end else begin
             cnt_gray_cpu_d1 <= cnt_ms_gray;
             cnt_gray_cpu_d2 <= cnt_gray_cpu_d1;
-            perip_rdata     <= gray_to_bin(cnt_gray_cpu_d2);    // *** unsure if it changes the result ***
+            perip_rdata     <= gray_to_bin(cnt_gray_cpu_d2);
+
+            if (cnt_reset_finished) begin
+                cnt_reset_lock <= 1'b0;
+            end else if (~cnt_reset_lock && cnt_reset_cpu) begin
+                cnt_reset_lock <= 1'b1;
+            end
         end
     end
-
-    // assign perip_rdata = gray_to_bin(cnt_gray_cpu_d2);
 
 endmodule

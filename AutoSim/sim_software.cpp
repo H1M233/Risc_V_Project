@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
     double lastRunTime = 0.0;
     double lastSimTime = 0.0;
     double speed_ns = 0.0;
-    int speedRef = 40;
+    int speedRef = 100;
     int validRef = 0;
     
     // 进度条设置
@@ -106,7 +106,11 @@ int main(int argc, char** argv) {
         }
     };
     
-    std::cout << "=================================== Simulation Started ===================================\n\n\n\n\n\n\n\n\n\n\n";
+    #ifdef DEBUGGING
+    std::cout << "=================================== Simulation Started ===================================";
+    std::cout << "\n\n\n\n\n\n\n\n\n";
+    #endif
+    std::cout << "\n\n";
 
     // 计时器
     std::chrono::steady_clock::time_point start_time = std::chrono::steady_clock::now();;
@@ -153,20 +157,25 @@ int main(int argc, char** argv) {
                 commitCycle += top->commit;
                 predTotal   += top->pred_total;
                 predMiss    += top->pred_miss;
+                #ifdef DEBUGGING
                 predTotalB  += top->pred_total_b;
                 predTotalJr += top->pred_total_jr;
                 predMissB   += top->pred_miss_b;
                 predMissJr  += top->pred_miss_jr;
-                if (((top->pc0 < PC_RANGE_START || top->pc0 > PC_RANGE_END) && top->pc0 != 0) && !isPC0_OutOfRange) {
+
+                PC0 = top->pc0;
+                PC1 = top->pc1;
+                if (((PC0 < PC_RANGE_START || PC0 > PC_RANGE_END) && PC0 != 0) && !isPC0_OutOfRange) {
                     isPC0_OutOfRange = true;
                     PC0_firstTime_OutOfRange = sim_time_ns / NS2MS;
-                    PC0_OutOfRange = top->pc0;
+                    PC0_OutOfRange = PC0;
                 }
-                if (((top->pc1 < PC_RANGE_START || top->pc1 > PC_RANGE_END) && top->pc1 != 0) && !isPC1_OutOfRange) {
+                if (((PC1 < PC_RANGE_START || PC1 > PC_RANGE_END) && PC1 != 0) && !isPC1_OutOfRange) {
                     isPC1_OutOfRange = true;
                     PC1_firstTime_OutOfRange = sim_time_ns / NS2MS;
-                    PC1_OutOfRange = top->pc1;
+                    PC1_OutOfRange = PC1;
                 }
+                #endif
             }
         }
         
@@ -177,13 +186,14 @@ int main(int argc, char** argv) {
         step_and_advance(next_event_time - sim_time_ns);
         
         // 每仿真时 1 ms 打印一次
+        #ifdef DEBUGGING
         static double last_print_sim_time = 0.0;
         if (sim_time_ns - last_print_sim_time >= NS2MS / tf) {
             current_time = get_elapsed_ms();
             last_print_sim_time = sim_time_ns;
-            if (top->seg != 0x3700'0000 && top->seg != 0x0000'0000) {
-                waitTime++;
-                if (waitTime > 1) SEG_getTime = top->seg & 0x000F'FFFF;
+            SEG = top->SEG;
+            if (SEG != 0x3700'0000 && SEG != 0x0000'0000) {
+                SEG_getTime = SEG & 0x000F'FFFF;
             }
             
             // 计算剩余时间
@@ -200,15 +210,12 @@ int main(int argc, char** argv) {
             // 统计数据
             REAL_TIME = current_time / 1000.0;
             RUN_TIME = sim_time_ns / NS2MS;
-            SEG = top->seg;
             IPC = commitCycle / static_cast<float>(totalCycle);
             BPU_ACCURACY = (predTotal - predMiss) / static_cast<float>(predTotal);
             BRANCH = (predTotalB - predMissB) / static_cast<float>(predTotalB);
             JALR = (predTotalJr - predMissJr) / static_cast<float>(predTotalJr);
             FUNC_BLOCK_PC0 = top->func_block_pc0;
-            PC0 = top->pc0;
             FUNC_BLOCK_PC1 = top->func_block_pc1;
-            PC1 = top->pc1;
 
             // 打印进度条
             std::cout << "\r" << "\033[11A" << "\033[2K" << "\033[96m";
@@ -251,7 +258,7 @@ int main(int argc, char** argv) {
                       << std::right << std::setw(8) << PC1 << std::dec
                       << std::setw(13) << "IN RANGE: "
                       << ((isPC1_OutOfRange) ? "x | " : "√ | ") << PC1_firstTime_OutOfRange << " ms | " << PC1_OutOfRange
-                      << "  QUERY_VALUE: " << top->branch1 << " / " << std::hex << top->branch2 << std::dec
+                      << "  QUERY_VALUE: " << top->branch1 << " / " << top->branch2
                       << std::endl << std::endl << "\033[2K"
 
                       << "ETA: "
@@ -260,8 +267,50 @@ int main(int argc, char** argv) {
 
                       << std::endl << std::flush;
         }
+        #else
+        static double last_print_sim_time = 0.0;
+        if (sim_time_ns - last_print_sim_time >= NS2MS / tf) {
+            current_time = get_elapsed_ms();
+            last_print_sim_time = sim_time_ns;
+            SEG = top->SEG;
+            if (SEG != 0x3700'0000 && SEG != 0x0000'0000) {
+                SEG_getTime = SEG & 0x000F'FFFF;
+            }
+
+            // 计算剩余时间
+            if (lastSimTime != 0.0) {
+                speed_ns = (speed_ns * (validRef - 1) + (sim_time_ns - lastSimTime) / (current_time - lastRunTime) * 100) / validRef;
+            }
+            if (validRef <= speedRef) validRef++;
+            lastSimTime = sim_time_ns;
+            lastRunTime = current_time;
+            int ETATime_s_total = (PREV_TIME) ? (PREV_TIME - sim_time_ns) / speed_ns / 10 : -1;
+            int ETATime_s = ETATime_s_total % 60;
+            int ETATime_m = ETATime_s_total / 60; 
+
+            // 基础数据统计
+            REAL_TIME = current_time / 1000.0;
+            RUN_TIME = sim_time_ns / NS2MS;
+            IPC = commitCycle / static_cast<float>(totalCycle);
+            BPU_ACCURACY = (predTotal - predMiss) / static_cast<float>(predTotal);
+
+            // 打印进度条
+            std::cout << "\r" << "\033[A" << "\033[2K" << "\033[96m";
+            double percentage = (PREV_TIME) ? sim_time_ns / PREV_TIME : 0.0;
+            int filled = (int)(percentage * barWidth);
+            for (int cnt = 0.0; cnt <= barWidth; ++cnt){
+                if (cnt > filled && !SEG_getTime) std::cout << "\033[0m░";
+                else std::cout << "█";
+            }
+            if (!SEG_getTime) std::cout << "\033[0m";
+            std::cout << " " << std::right << std::setw(3) << int(percentage * 100) << " %";
+            std::cout << "\n ETA: " << std::right << std::setw(2) << ETATime_m << " m" << std::right << std::setw(4) << ETATime_s << " s        ";
+        }
+        #endif
     }
+    #ifdef DEBUGGING
     std::cout << "\n=================================== Simulation Finished ===================================\033[0m\n";
+    #endif
     // 输出 LED 内容
     bool isTick = (top->LED == 0x0122'1c08 | top->LED == 0x078b'7323);
     for (int row = 0; row < 4; ++row){

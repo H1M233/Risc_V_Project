@@ -3,95 +3,95 @@
 
 module id(
     // from if_id
-    input  if_id_t      data_packaged_i,
-
-    // from bpu
-    input  logic        pred_taken_i,
-    input  logic [31:0] pred_pc_i,
-    input  logic [3:0]  ras_ptr_i,
+    input  prefetch_t   data_pkg_i          ,
+    input  logic        valid_i             ,
 
     // to regs
-    output logic [5:0]  rs1_addr_o,
-    output logic [5:0]  rs2_addr_o,
-    output logic [11:0] csr_addr_o,
+    output logic [5:0]  rs1_addr_o          ,
+    output logic [5:0]  rs2_addr_o          ,
+    output logic [11:0] csr_addr_o          ,
 
     // from regs
-    input  logic [31:0] rs1_rdata_i,
-    input  logic [31:0] rs2_rdata_i,
-    input  logic [31:0] csr_rdata_i,
+    input  logic [31:0] rs1_rdata_i         ,
+    input  logic [31:0] rs2_rdata_i         ,
+    input  logic [31:0] csr_rdata_i         ,
 
     `ifdef ENABLE_F
-    output logic [5:0]  rs3_addr_o,
-    input  logic [31:0] rs3_rdata_i,
+    output logic [5:0]  rs3_addr_o          ,
+    input  logic [31:0] rs3_rdata_i         ,
     `endif
 
     // to id_ex
-    output id_ex_data_t data_packaged_o,
-    output decode_t     inst_packaged_o,
-    output logic        regs_wen_o,
+    output EX_data_t    data_pkg_o          ,
+    output decode_t     inst_pkg_o          ,
+    output logic        regs_wen_o          ,
+    output logic        valid_o             ,
 
     // from ex
-    input  logic [5:0]  ex_rd_addr_i,
-    input  logic        ex_regs_wen_i,
-    input  logic        ex_is_load_i,
-    input  logic        ex_csr_wen_i,
+    input  logic [5:0]  ex_rd_addr_i        ,
+    input  logic        ex_regs_wen_i       ,
+    input  logic        ex_is_load_i        ,
+    input  logic        ex_csr_wen_i        ,
 
     // from mem1
-    input  logic [5:0]  mem1_rd_addr_i,
-    input  logic [31:0] mem1_rd_data_i,
-    input  logic        mem1_regs_wen_i,
-    input  logic        mem1_is_load_i,
-    input  logic        mem1_csr_wen_i,
+    input  logic [5:0]  mem1_rd_addr_i      ,
+    input  logic [31:0] mem1_rd_data_i      ,
+    input  logic        mem1_regs_wen_i     ,
+    input  logic        mem1_is_load_i      ,
+    input  logic        mem1_csr_wen_i      ,
 
     // from mem2
-    input  logic [5:0]  mem2_rd_addr_i,
-    input  logic [31:0] mem2_rd_data_i,
-    input  logic        mem2_regs_wen_i,
-    input  logic        mem2_csr_wen_i,
+    input  logic [5:0]  mem2_rd_addr_i      ,
+    input  logic [31:0] mem2_rd_data_i      ,
+    input  logic        mem2_regs_wen_i     ,
+    input  logic        mem2_csr_wen_i      ,
 
     // from wb
-    input  logic [5:0]  wb_rd_addr_i,
-    input  logic [31:0] wb_rd_data_i,
-    input  logic        wb_regs_wen_i,
-    input  logic        wb_csr_wen_i,
+    input  logic [5:0]  wb_rd_addr_i        ,
+    input  logic [31:0] wb_rd_data_i        ,
+    input  logic        wb_regs_wen_i       ,
+    input  logic        wb_csr_wen_i        ,
     
     // hazard
-    output logic        hazard_en
+    output logic        hazard_en           
 );  
+    assign valid_o = valid_i;
+    // assign valid_o = 1'b1;
+
     // 解码
-    wire [31:0] pc_i     = data_packaged_i.pc;
-    wire [31:0] inst_i   = data_packaged_i.inst;
-    wire [6:0]  opcode_i = data_packaged_i.opcode;
-    wire [2:0]  funct3_i = data_packaged_i.funct3;
-    wire [6:0]  funct7_i = data_packaged_i.funct7;
-    wire [4:0]  rd_i     = data_packaged_i.rd;
-    wire [4:0]  rs1_i    = data_packaged_i.rs1;
-    wire [4:0]  rs2_i    = data_packaged_i.rs2;
+    wire [31:0] pc_i     = data_pkg_i.pc;
+    wire [31:0] inst_i   = data_pkg_i.inst;
+    wire [6:0]  opcode_i = inst_i[6:0];
+    wire [4:0]  rd_i     = inst_i[11:7];
+    wire [2:0]  funct3_i = inst_i[14:12];
+    wire [4:0]  rs1_i    = inst_i[19:15];
+    wire [4:0]  rs2_i    = inst_i[24:20];
+    wire [6:0]  funct7_i = inst_i[31:25];
 
     decode_t ipkg;
     assign ipkg = d(inst_i, opcode_i, funct3_i, rs2_i, funct7_i);
-    assign inst_packaged_o = ipkg;
+    assign inst_pkg_o = ipkg;
 
     // F 扩展的寄存器扩展
+    logic using_frs1, using_frs2, using_frd;
     `ifdef ENABLE_F
-    wire using_frs1 = (ipkg.is_FP & ~(ipkg.sel_fmv_w_x | ipkg.sel_fcvt_s_w | ipkg.sel_fcvt_s_wu)) | ipkg.is_fM;
-    wire using_frs2 = ipkg.is_load_FP | ipkg.is_store_FP | ipkg.is_FP | ipkg.is_fM;
-    wire using_frd  = ipkg.is_load_FP | ipkg.is_store_FP
-                    | (ipkg.sel_fmv_w_x | ipkg.sel_fadd_s | ipkg.sel_fsub_s | ipkg.sel_fmin_s
-                    | ipkg.sel_fmax_s | ipkg.sel_fsgnj_s | ipkg.sel_fsgnjn_s | ipkg.sel_fsgnjx_s
-                    | ipkg.sel_fcvt_s_w | ipkg.sel_fcvt_s_wu | ipkg.sel_fmul_s | ipkg.sel_fdiv_s
-                    | ipkg.sel_fsqrt_s | ipkg.is_fM);
+    assign using_frs1   = (ipkg.is_FP & ~(ipkg.sel_fmv_w_x | ipkg.sel_fcvt_s_w | ipkg.sel_fcvt_s_wu)) | ipkg.is_FM;
+    assign using_frs2   = ipkg.is_load_FP | ipkg.is_store_FP | ipkg.is_FP | ipkg.is_FM;
+    assign using_frd    = ipkg.is_load_FP | ipkg.is_store_FP
+                        | (ipkg.sel_fmv_w_x | ipkg.sel_fadd_s | ipkg.sel_fsub_s | ipkg.sel_fmin_s
+                        | ipkg.sel_fmax_s | ipkg.sel_fsgnj_s | ipkg.sel_fsgnjn_s | ipkg.sel_fsgnjx_s
+                        | ipkg.sel_fcvt_s_w | ipkg.sel_fcvt_s_wu | ipkg.sel_fmul_s | ipkg.sel_fdiv_s
+                        | ipkg.sel_fsqrt_s | ipkg.is_FM);
     
+    wire [5:0] rs3_addr_with_F = (ipkg.is_FM) ? {1'b1, inst_i[31:27]} : 0;
+    `else
+    assign using_frs1 = 1'b0;
+    assign using_frs2 = 1'b0;
+    assign using_frd  = 1'b0;
+    `endif
     wire [5:0] rs1_addr_with_F = {using_frs1, rs1_i};
     wire [5:0] rs2_addr_with_F = {using_frs2, rs2_i};
-    wire [5:0] rs3_addr_with_F = (ipkg.is_fM) ? {1'b1, inst_i[31:27]} : 0;
     wire [5:0] rd_addr_with_F  = {using_frd, rd_addr_o};
-    `else
-    wire       using_frd       = 1'b0;
-    wire [5:0] rs1_addr_with_F = {0, rs1_i};
-    wire [5:0] rs2_addr_with_F = {0, rs2_i};
-    wire [5:0] rd_addr_with_F  = {0, rd_addr_o};
-    `endif
     
     // Hazard
     wire rs1_hit_ex   = (ex_rd_addr_i == rs1_addr_with_F);
@@ -102,7 +102,13 @@ module id(
     wire rs2_hit_mem1 = (mem1_rd_addr_i == rs2_addr_with_F);
     wire id_need_mem1 = mem1_is_load_i & (rs1_hit_mem1 | rs2_hit_mem1);
 
-    wire csr_hazard = (ipkg.is_zicsr | ipkg.is_FP) & (ex_csr_wen_i | mem1_csr_wen_i | mem2_csr_wen_i | wb_csr_wen_i);
+    logic is_FP;
+    `ifdef ENABLE_F
+    assign is_FP = ipkg.is_FP;
+    `else
+    assign is_FP = 1'b0;
+    `endif
+    wire csr_hazard = (ipkg.is_zicsr | is_FP) & (ex_csr_wen_i | mem1_csr_wen_i | mem2_csr_wen_i | wb_csr_wen_i);
 
     logic rs3_hazard;
     `ifdef ENABLE_F
@@ -110,7 +116,7 @@ module id(
     wire hazard_rs3_mem1 = (rs3_addr_with_F == mem1_rd_addr_i) & mem1_regs_wen_i;
     wire hazard_rs3_mem2 = (rs3_addr_with_F == mem2_rd_addr_i) & mem2_regs_wen_i;
     wire hazard_rs3_wb   = (rs3_addr_with_F == wb_rd_addr_i) & wb_regs_wen_i;
-    assign rs3_hazard = ipkg.is_fM & (hazard_rs3_ex | hazard_rs3_mem1 | hazard_rs3_mem2 | hazard_rs3_wb);
+    assign rs3_hazard = ipkg.is_FM & (hazard_rs3_ex | hazard_rs3_mem1 | hazard_rs3_mem2 | hazard_rs3_wb);
     `else
     assign rs3_hazard = 0;
     `endif
@@ -159,12 +165,18 @@ module id(
         logic is_load    = (opcode == `TYPE_L);
         logic is_store   = (opcode == `TYPE_S);
         logic is_zicsr   = (opcode == `TYPE_Zicsr);
+        `ifdef ENABLE_A
         logic OP_AMO     = (opcode == `TYPE_AMO);
+        `endif
+        `ifdef ENABLE_F
         logic OP_FP      = (opcode == `TYPE_FP);
         logic LOAD_FP    = (opcode == `TYPE_LOAD_FP);
         logic STORE_FP   = (opcode == `TYPE_STORE_FP);
+        `endif
 
+        `ifdef ENABLE_A
         logic [4:0] funct5 = inst[31:27];
+        `endif
 
         // f3
         logic f3_000 = (funct3 == 3'b000);
@@ -245,6 +257,7 @@ module id(
         d.sel_csrrci  = is_zicsr & f3_111;
         d.sel_ecall   = is_zicsr & f3_000 & (inst[31:20] == 12'b000000000000);
         d.sel_mret    = is_zicsr & f3_000 & (inst[31:20] == 12'b001100000010);
+        d.sel_sret    = 1'b0;
         
         // M-ext
         `ifdef ENABLE_M
@@ -369,7 +382,7 @@ module id(
         d.sel_fmsub_s   = (opcode == `OP_FMSUB);
         d.sel_fnmadd_s  = (opcode == `OP_FNMADD);
         d.sel_fnmsub_s  = (opcode == `OP_FNMSUB);
-        d.is_fM         = d.sel_fmadd_s | d.sel_fmsub_s | d.sel_fnmadd_s | d.sel_fnmsub_s;
+        d.is_FM         = d.sel_fmadd_s | d.sel_fmsub_s | d.sel_fnmadd_s | d.sel_fnmsub_s;
         `endif
         
         // A-ext
@@ -401,47 +414,50 @@ module id(
     // ==========================================================
     assign rs1_addr_o = rs1_addr_with_F;
     assign rs2_addr_o = rs2_addr_with_F;
+    `ifdef ENABLE_F
     assign rs3_addr_o = rs3_addr_with_F;
+    `endif
 
-    wire [31:0] pc_add_4     = pc_i + 32'd4;
+    wire [31:0] pc_next      = data_pkg_i.pc_next;
     wire [31:0] pc_addr_o    = pc_i;
     wire [31:0] inst_o       = inst_i;
-    wire        pred_taken_o = pred_taken_i;
 
     // 指令信息
-    assign data_packaged_o.pc           = pc_addr_o;
-    assign data_packaged_o.inst         = inst_o;
-    assign data_packaged_o.pred_taken   = pred_taken_o;
-    assign data_packaged_o.ras_ptr      = ras_ptr_i;
+    assign data_pkg_o.pc           = pc_addr_o;
+    assign data_pkg_o.inst         = inst_o;
+    assign data_pkg_o.pred_taken   = data_pkg_i.pred_flush.en;
+    assign data_pkg_o.ras_ptr      = data_pkg_i.ras_ptr;
 
     // 前推
-    assign data_packaged_o.fwd_rs1_data = forwarding_rs1_data_hit;
-    assign data_packaged_o.fwd_rs2_data = (ipkg.is_alu_i) ? {{20{inst_i[31]}}, inst_i[31:20]} : forwarding_rs2_data_hit;    // 立即数时返回 imm
-    assign data_packaged_o.fwd_rs1_hit_ex = forwarding_rs1_ex;
-    assign data_packaged_o.fwd_rs2_hit_ex = forwarding_rs2_ex & !ipkg.is_alu_i;  // 当为立即数时，不启用前推
+    assign data_pkg_o.fwd_rs1_data = forwarding_rs1_data_hit;
+    assign data_pkg_o.fwd_rs2_data = (ipkg.is_alu_i) ? {{20{inst_i[31]}}, inst_i[31:20]} : forwarding_rs2_data_hit;    // 立即数时返回 imm
+    assign data_pkg_o.fwd_rs1_hit_ex = forwarding_rs1_ex;
+    assign data_pkg_o.fwd_rs2_hit_ex = forwarding_rs2_ex & !ipkg.is_alu_i;  // 当为立即数时，不启用前推
     
     // CSR
     always_comb begin
         unique case (1'b1)
             ipkg.is_zicsr : csr_addr_o = inst_i[31:20];
+            `ifdef ENABLE_F
             ipkg.is_FP    : csr_addr_o = 12'h003;       // fcsr
-            ipkg.is_fM    : csr_addr_o = 12'h003;       // fcsr
+            ipkg.is_FM    : csr_addr_o = 12'h003;       // fcsr
+            `endif
             default       : csr_addr_o = 12'h0;
         endcase
     end
-    assign data_packaged_o.csr_waddr = csr_addr_o;
-    assign data_packaged_o.csr_rdata = csr_rdata_i;
+    assign data_pkg_o.csr_waddr = csr_addr_o;
+    assign data_pkg_o.csr_rdata = csr_rdata_i;
 
     // 数据
     logic [31:0] imm_o, jump1_o, jump2_o;
     logic [4:0] rd_addr_o;
-    assign data_packaged_o.imm     = imm_o;
-    assign data_packaged_o.jump1   = jump1_o;
-    assign data_packaged_o.jump2   = jump2_o;
-    assign data_packaged_o.rd_addr = rd_addr_with_F;
+    assign data_pkg_o.imm     = imm_o;
+    assign data_pkg_o.jump1   = jump1_o;
+    assign data_pkg_o.jump2   = jump2_o;
+    assign data_pkg_o.rd_addr = rd_addr_with_F;
 
     `ifdef ENABLE_F
-    assign data_packaged_o.rs3_rdata = rs3_rdata_i;
+    assign data_pkg_o.rs3_rdata = rs3_rdata_i;
     `endif
 
     wire rd_neq_zero = (rd_i != 5'b0) | using_frd;
@@ -466,7 +482,7 @@ module id(
 
             ipkg.is_jal: begin
                 regs_wen_o  = rd_neq_zero;
-                imm_o       = pc_add_4;
+                imm_o       = pc_next;
                 jump1_o     = 32'b0;
                 jump2_o     = {{12{inst_i[31]}}, inst_i[19:12], inst_i[20], inst_i[30:21], 1'b0};
                 rd_addr_o   = rd_i;
@@ -474,8 +490,8 @@ module id(
 
             ipkg.is_jalr: begin
                 regs_wen_o  = rd_neq_zero;
-                imm_o       = pc_add_4;
-                jump1_o     = pred_pc_i - {{20{inst_i[31]}}, inst_i[31:20]};     // 提前计算 rs1 == pred_pc - imm
+                imm_o       = pc_next;
+                jump1_o     = data_pkg_i.pred_flush.pc - {{20{inst_i[31]}}, inst_i[31:20]};     // 提前计算 rs1 == pred_pc - imm
                 jump2_o     = {{20{inst_i[31]}}, inst_i[31:20]};
                 rd_addr_o   = rd_i;
             end
@@ -484,11 +500,11 @@ module id(
                 regs_wen_o  = 1'b0;
                 imm_o       = 32'b0;
                 jump1_o     = pc_i + {{20{inst_i[31]}}, inst_i[7], inst_i[30:25], inst_i[11:8], 1'b0};
-                jump2_o     = pc_add_4;
+                jump2_o     = pc_next;
                 rd_addr_o   = 5'b0;
             end
 
-            ipkg.is_load, ipkg.is_load_FP: begin
+            ipkg.is_load: begin
                 regs_wen_o  = rd_neq_zero;
                 imm_o       = {{20{inst_i[31]}}, inst_i[31:20]};
                 jump1_o     = 32'b0;
@@ -496,7 +512,7 @@ module id(
                 rd_addr_o   = rd_i;
             end
 
-            ipkg.is_store, ipkg.is_store_FP: begin
+            ipkg.is_store: begin
                 regs_wen_o  = 1'b0;
                 imm_o       = {{20{inst_i[31]}}, inst_i[31:25], inst_i[11:7]};
                 jump1_o     = 32'b0;
@@ -553,6 +569,7 @@ module id(
                 endcase
             end
 
+            `ifdef ENABLE_A
             ipkg.is_Aext: begin
                 regs_wen_o  = rd_neq_zero;
                 imm_o       = 32'b0;
@@ -560,14 +577,33 @@ module id(
                 jump2_o     = 32'b0;
                 rd_addr_o   = rd_i;
             end
+            `endif
 
-            ipkg.is_FP, ipkg.is_fM: begin
+            `ifdef ENABLE_F
+            ipkg.is_FP, ipkg.is_FM: begin
                 regs_wen_o  = rd_neq_zero;
                 imm_o       = {29'b0, funct3_i};
                 jump1_o     = 32'b0;
                 jump2_o     = 32'b0;
                 rd_addr_o   = rd_i;
             end
+
+            ipkg.is_load_FP: begin
+                regs_wen_o  = rd_neq_zero;
+                imm_o       = {{20{inst_i[31]}}, inst_i[31:20]};
+                jump1_o     = 32'b0;
+                jump2_o     = 32'b0;
+                rd_addr_o   = rd_i;
+            end
+
+            ipkg.is_store_FP: begin
+                regs_wen_o  = 1'b0;
+                imm_o       = {{20{inst_i[31]}}, inst_i[31:25], inst_i[11:7]};
+                jump1_o     = 32'b0;
+                jump2_o     = 32'b0;
+                rd_addr_o   = 5'b0;
+            end
+            `endif
 
             default: begin
                 regs_wen_o  = 1'b0;

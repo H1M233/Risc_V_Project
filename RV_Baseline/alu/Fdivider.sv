@@ -52,7 +52,7 @@ module Fdivider(
     state_t state;
 
     always_ff @(posedge clk) begin
-        if (!rst) begin
+        if (rst) begin
             valid_o <= 1'b0;
             state   <= IDLE;
         end
@@ -93,7 +93,7 @@ module Fdivider(
     typedef enum {IDLE_I, I1, I2, I3, I4, I5, I6, I7, I8, I9, Iend} Iter_t;
     Iter_t iter;
     always_ff @(posedge clk) begin
-        if (!rst) begin
+        if (rst) begin
             iter <= IDLE_I;
         end
         else if (flush_i) begin

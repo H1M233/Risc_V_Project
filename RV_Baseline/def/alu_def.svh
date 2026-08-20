@@ -7,15 +7,17 @@
 typedef enum {U = 2'b00, S = 2'b01, M = 2'b11} pm_t;
 
 typedef struct packed {
+    logic        en;
+    logic [31:0] pc;
+} flush_t;
+
+typedef struct packed {
     logic [31:0] pc;
     logic [31:0] inst;
-    logic [6:0]  opcode;
-    logic [2:0]  funct3;
-    logic [6:0]  funct7;
-    logic [4:0]  rd;
-    logic [4:0]  rs1;
-    logic [4:0]  rs2;
-} if_id_t;
+    logic [31:0] pc_next;
+    flush_t      pred_flush;
+    logic [4:0]  ras_ptr;
+} prefetch_t;
 
 typedef struct packed {
     logic [31:0] pc;
@@ -25,7 +27,7 @@ typedef struct packed {
     logic [31:0] jump2;
     logic [5:0]  rd_addr;
     logic        pred_taken;
-    logic [3:0]  ras_ptr;
+    logic [4:0]  ras_ptr;
     logic [11:0] csr_waddr;
     logic [31:0] csr_rdata;
     logic [31:0] fwd_rs1_data;
@@ -35,7 +37,7 @@ typedef struct packed {
     `ifdef ENABLE_F
     logic [31:0] rs3_rdata;
     `endif
-} id_ex_data_t;
+} EX_data_t;
 
 typedef struct packed {
     // opcode OneShot
@@ -97,10 +99,12 @@ typedef struct packed {
     logic sel_csrrci;
     logic sel_ecall;
     logic sel_mret;
+    logic sel_sret;
 
     // ================================
     // M-ext
     // ================================
+    `ifdef ENABLE_M
     logic is_Mext;
     logic sel_mul;
     logic sel_mulh;
@@ -110,17 +114,22 @@ typedef struct packed {
     logic sel_divu;
     logic sel_rem;
     logic sel_remu;
+    `endif
 
     // ================================
     // B-ext
     // ================================
+    `ifdef ENABLE_B
     // Zba
+    `ifdef ENABLE_B_ZBA
     logic is_Bext_zba;
     logic sel_sh1add;
     logic sel_sh2add;
     logic sel_sh3add;
+    `endif
 
     // Zbb
+    `ifdef ENABLE_B_ZBB
     logic is_Bext_zbb;
     logic sel_andn;
     logic sel_orn;
@@ -139,43 +148,56 @@ typedef struct packed {
     logic sel_ror;
     logic sel_orc_b;
     logic sel_rev8;
+    `endif
 
     // Zbc
+    `ifdef ENABLE_B_ZBC
     logic is_Bext_zbc;
     logic sel_clmul;
     logic sel_clmulh;
     logic sel_clmulr;
+    `endif
 
     // Zbs
+    `ifdef ENABLE_B_ZBS
     logic is_Bext_zbs;
     logic sel_bclr;
     logic sel_bext;
     logic sel_binv;
     logic sel_bset;
+    `endif
 
     // Zbkb
+    `ifdef ENABLE_B_ZBKB
     logic is_Bext_zbkb;
     logic sel_pack;
     logic sel_packh;
     logic sel_brev8;
     logic sel_zip;
     logic sel_unzip;
+    `endif
 
     // Zbkx
+    `ifdef ENABLE_B_ZBKX
     logic is_Bext_zbkx;
     logic sel_xperm4;
     logic sel_xperm8;
+    `endif
+    `endif
 
     // ================================
     // Zicond-ext
     // ================================
+    `ifdef ENABLE_Zicond
     logic is_Zicondext;
     logic sel_czero_eqz;
     logic sel_czero_nez;
+    `endif
 
     // ================================
     // F-ext
     // ================================
+    `ifdef ENABLE_F
     logic is_FP;
     logic is_load_FP;
     logic is_store_FP;
@@ -201,15 +223,17 @@ typedef struct packed {
     logic sel_fsqrt_s;
     logic sel_fsub_s;
     logic sel_fsw;
-    logic is_fM;
+    logic is_FM;
     logic sel_fmadd_s;
     logic sel_fmsub_s;
     logic sel_fnmadd_s;
     logic sel_fnmsub_s;
+    `endif
 
     // ================================
     // A-ext
     // ================================
+    `ifdef ENABLE_A
     logic is_Aext;
     logic sel_lr_w;
     logic sel_sc_w;
@@ -222,6 +246,7 @@ typedef struct packed {
     logic sel_amomaxu_w;
     logic sel_amomin_w;
     logic sel_amominu_w;
+    `endif
     
     logic request_value_only;
 } decode_t;
@@ -234,7 +259,7 @@ typedef struct packed {
     logic [1:0]  load_mask;
     logic [1:0]  load_addr_low;
     logic        load_is_signed;
-} ex_mem_data_t;
+} MEM_data_t;
 
 typedef struct packed {
     logic        req_load;
@@ -243,16 +268,16 @@ typedef struct packed {
     logic [31:0] wdata;
     logic [3:0]  we;
     logic        write_dram;
-} ex_lsu_data_t;
+} DCACHE_data_t;
 
 typedef struct packed {
-    logic        ecall;
-    logic        mret;
-    logic [31:0] ecall_inst;
     logic [11:0] waddr;
     logic [31:0] wdata;
     logic        wen;
-} ex_csr_data_t;
+    logic        ecall;
+    logic        mret;
+    logic        sret;
+} CSR_data_t;
 
 typedef struct packed {
     logic        update_btb_en;
@@ -260,14 +285,14 @@ typedef struct packed {
     logic [31:0] update_pc;
     logic [31:0] update_target;
     logic        actual_taken;
-    logic [3:0]  rollback_ras_ptr;
-} ex_bpu_data_t;
+    logic [4:0]  rollback_ras_ptr;
+} BPU_data_t;
 
 typedef struct packed {
     logic [5:0]  rd_addr;
     logic [31:0] rd_data;
     logic        regs_wen;
-} mem_wb_data_t;
+} RF_data_t;
 
 typedef struct packed {logic ltu, lts;} cmp_result_t;
 function automatic cmp_result_t fast_compare(input logic [31:0] a, b);       
@@ -302,11 +327,4 @@ typedef struct packed {
     logic NX;   // 不精确
 } fflags_t;
 
-// function automatic fval_t fval_decoding(input logic [31:0] val);
-//     {fval_decoding.sign, fval_decoding.exp, fval_decoding.mant} = val;
-// endfunction
-
-// function automatic logic [31:0] fval_encoding(input fval_t fval);
-//     return {fval.sign, fval.exp, fval.mant};
-// endfunction
 `endif

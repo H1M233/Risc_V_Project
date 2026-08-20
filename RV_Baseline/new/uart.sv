@@ -23,16 +23,21 @@ module uart #(
     parameter CLK_FREQ = 50000000,
     parameter BAUD_RATE = 115200
 )(
-    input wire clk,
-    input wire rst_n,
-    input wire rx,
-    output reg [7:0] rx_data,
-    output reg rx_ready,
+    input  logic        clk,
+    input  logic        rst,
 
-    output reg tx,
-    input wire [7:0] tx_data,
-    input wire tx_start,
-    output reg tx_busy
+    // 上位机传输数据
+    output logic [7:0]  rx_data,
+    output logic        rx_ready,
+    
+    // 核心输出数据
+    input  logic [7:0]  tx_data,
+    input  logic        tx_valid,
+    output logic        tx_ready,
+
+    // 传输引脚
+    input  logic        rx,
+    output logic        tx
 );
     localparam BAUD_DIV = CLK_FREQ / BAUD_RATE;
 
@@ -41,8 +46,8 @@ module uart #(
     reg [7:0] rx_shift;
     reg rx_d0, rx_d1, rx_d2;
 
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+    always @(posedge clk) begin
+        if (rst) begin
             rx_d0 <= 1'b1;
             rx_d1 <= 1'b1;
             rx_d2 <= 1'b1;
@@ -59,8 +64,8 @@ module uart #(
     reg rx_ready_pulse;
     reg [15:0] rx_ready_cnt;
 
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+    always @(posedge clk) begin
+        if (rst) begin
             rx_state <= 0;
             rx_cnt <= 0;
             rx_bit_cnt <= 0;
@@ -111,8 +116,8 @@ module uart #(
     end
     
     // rx_ready delay for half of BAUD_DIV
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+    always @(posedge clk) begin
+        if (rst) begin
             rx_ready <= 1'b0;
             rx_ready_cnt <= 0;
         end else begin
@@ -135,10 +140,10 @@ module uart #(
     reg [3:0] tx_bit_cnt;
     reg [9:0] tx_shift;
 
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+    always @(posedge clk) begin
+        if (rst) begin
             tx_state <= 0;
-            tx_busy <= 0;
+            tx_ready <= 1;
             tx_cnt <= 0;
             tx_bit_cnt <= 0;
             tx_shift <= 10'b1111111111;
@@ -146,17 +151,17 @@ module uart #(
         end else begin
             case(tx_state)
                 0: begin
-                    tx_busy <= 0;
-                    if(tx_start) begin
+                    tx_ready <= 1;
+                    if (tx_valid) begin
                         tx_shift <= {1'b1, tx_data, 1'b0};
                         tx_state <= 1;
                         tx_cnt <= 0;
                         tx_bit_cnt <= 0;
-                        tx_busy <= 1;
+                        tx_ready <= 0;
                     end
                 end
                 1: begin
-                    if(tx_cnt == BAUD_DIV-1) begin
+                    if (tx_cnt == BAUD_DIV-1) begin
                         tx_cnt <= 0;
                         tx <= tx_shift[0];
                         tx_shift <= {1'b1, tx_shift[9:1]};

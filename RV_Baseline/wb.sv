@@ -3,20 +3,23 @@
 
 module wb(
     // from mem_wb
-    input  logic [5:0]   rd_addr_i,
-    input  logic [31:0]  rd_data_i,
-    input  logic         regs_wen_i,
-    input  ex_csr_data_t csr_data_packaged_i,
+    input  logic [31:0]     pc_i                ,
+    input  logic            valid_i             ,
+    input  RF_data_t        data_pkg_i          ,
+    input  CSR_data_t       CSR_data_pkg_i      ,
 
     // to regs
-    output logic [5:0]   rd_addr_o,
-    output logic [31:0]  rd_data_o,
-    output logic         regs_wen_o,
-    output ex_csr_data_t csr_data_packaged_o
-);
-    assign rd_addr_o   = rd_addr_i;
-    assign regs_wen_o  = regs_wen_i;
-    assign rd_data_o   = rd_data_i;
+    output RF_data_t        data_pkg_o          ,
 
-    assign csr_data_packaged_o = csr_data_packaged_i;
+    // to csr_regs
+    output logic [31:0]     pc_o                ,
+    output CSR_data_t       CSR_data_pkg_o      
+);
+    always_comb begin
+        pc_o            = pc_i;
+        CSR_data_pkg_o  = CSR_data_pkg_i;
+        data_pkg_o      = data_pkg_i;
+
+        data_pkg_o.regs_wen = data_pkg_o.regs_wen & valid_i;
+    end
 endmodule

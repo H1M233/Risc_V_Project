@@ -44,7 +44,7 @@ module alu_Aext(
     wire set_atom   = ipkg.sel_lr_w;
     wire break_atom = ((rs1 == atom_state.addr) & (ipkg.is_store)) | (ipkg.is_Aext & ~ipkg.sel_lr_w) | AXI_wen;
     always_ff @(posedge clk) begin
-        if (~rst) begin
+        if (rst) begin
             atom_state       <= 0;
         end
         else if (set_atom) begin
@@ -60,8 +60,11 @@ module alu_Aext(
     logic [31:0] rs1_r, rs2_r;
     logic [31:0] load_data;
     always_ff @(posedge clk) begin
-        if (~rst | flush) begin
-            state <= IDLE;
+        if (rst | flush) begin
+            state       <= IDLE;
+            load_data   <= 0;
+            rs1_r       <= 0;
+            rs2_r       <= 0;
         end
         else begin
             case (state)
@@ -79,8 +82,8 @@ module alu_Aext(
                 
                 WAIT_RD: begin
                     if (load_ready) begin
-                        load_data   <= mem_rdata;
                         state       <= STORE_REQ;
+                        load_data   <= mem_rdata;
                     end
                 end
                 

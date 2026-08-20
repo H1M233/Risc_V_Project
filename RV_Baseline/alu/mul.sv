@@ -23,7 +23,7 @@ module mul(
     // 输入寄存器
     logic [31:0] sent_value1, sent_value2;
     always_ff @(posedge clk) begin
-        if (!rst) begin
+        if (rst) begin
             mul_state   <= IDLE;
         end
         else if (flush_i) begin

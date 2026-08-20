@@ -3,33 +3,29 @@
 `ifndef CSR_DEF
 `define CSR_DEF
 // CSR 解码
-typedef struct packed { // MSTATU
-    logic       SD;
+typedef struct packed { // MSTATUS
+    logic       SD;     // is XS | FS | VS Dirty
     logic [7:0] r0;
-    logic       TSR;
-    logic       TW;
-    logic       TVM;
-    logic       MXR;
-    logic       SUM;
-    logic       MPRV;
-    logic [1:0] XS;
-    logic [1:0] FS;
-    pm_t        MPP;
-    logic [1:0] VS;
-    logic       SPP;
-    logic       MPIE;
-    logic       UBE;
-    logic       SPIE;
+    logic       TSR;    // When TSR=1 & 'sret' in S-mode May Cause Illegal Instruction Exception
+    logic       TW;     // If ex WFI & Timeout With No Interrupt, Cause a Illegal Instruction Trap
+    logic       TVM;    // Take Over Mem From S-mode & Modify its Mem Address Translation in M-mode
+    logic       MXR;    // Allow S-mode to Access X=1, R=0 (eXecutable=1, Readable=0) Mem
+    logic       SUM;    // Allow S-mode to Access Mem Marked U-mode (SUM=0 May Cause Page Fault)
+    logic       MPRV;   // Access Mem In MPP-mode When M-mode
+    logic [1:0] XS;     // Custom Status
+    logic [1:0] FS;     // Float Status - For Tracking is FREG Dirty
+    pm_t        MPP;    // Save Prior Privilege Level When Entering M-mode From an Exception / Interrupt Or 0 When 'mret'
+    logic [1:0] VS;     // Vector Status (Unused)
+    logic       SPP;    // Save Prior Privilege Level When Entering S-mode From an Exception / Interrupt Or 0 When 'sret'
+    logic       MPIE;   // Save MIE When Entering M-mode From an Exception / Interrupt Or 1 When 'nret'
+    logic       UBE;    // Controls The Endianness of U-mode (0 = little, 1 = big)
+    logic       SPIE;   // Save SIE When Entering S-mode From an Exception / Interrupt Or 1 When 'sret'
     logic       r1;
-    logic       MIE;
+    logic       MIE;    // M-mode Interrupt Enable
     logic       r2;
-    logic       SIE;
+    logic       SIE;    // S-mode Interrupt Enable
     logic       r3;
 } mstatus_t;
-
-typedef struct packed { // MEPC
-    logic [31:0] PC;
-} mepc_t;
 
 typedef struct packed { // MCAUSE
     logic        INT;
@@ -41,14 +37,60 @@ typedef struct packed { // MTVEC
     logic [1:0]  MODE;
 } mtvec_t;
 
-typedef struct packed { // MSCRATCH
-    logic [31:0] SCRATCH;
-} mscratch_t;
 
 typedef struct packed { // FCSR
     logic [23:0] r0;
     rm_t         frm; // 舍入模式
     fflags_t     flags;
 } fcsr_t;
+
+typedef struct packed { // MIE & MIP
+    logic [17:0] r0;
+    logic        LCOFIE;    // Local Counter Overflow
+    logic        SGEIE;     // Supervisor Guest External
+    logic        MEIE;      // Machine External
+    logic        VSEIE;     // Virtual Supervisor External
+    logic        SEIE;      // Supervisor External
+    logic        r1;
+    logic        MTIE;      // Machine Timer
+    logic        VSTIE;     // Virtual Supervisor Timer
+    logic        STIE;      // Supervisor Timer
+    logic        r2;
+    logic        MSIE;      // Machine Software
+    logic        VSSIE;     // Virtual Supervisor Software
+    logic        SSIE;      // Supervisor Software
+    logic        r3;
+} mi_t;
+
+// MISA 机器信息解码
+`define MISA_XLEN 2'b01             // XLEN - 32=01, 64=10
+`define MISA_EXT_V 1'b0             // V - Vector
+`define MISA_EXT_U 1'b0             // U - User Mode
+`define MISA_EXT_S 1'b0             // S - Supervisor Mode
+`define MISA_EXT_Q 1'b0             // Q - Quad Precision Float
+`ifdef ENABLE_M                     // M - Multiply / Divide
+    `define MISA_EXT_M 1'b1
+`else
+    `define MISA_EXT_M 1'b0
+`endif
+`define MISA_EXT_H 1'b0             // H - Hypervisor
+`define MISA_EXT_G 1'b0             // G - Support I, A, M, F, D
+`ifdef ENABLE_F                     // F - Single Precision Float
+    `define MISA_EXT_F 1'b1
+`else
+    `define MISA_EXT_F 1'b0
+`endif
+`define MISA_EXT_D 1'b0             // D - Double Precision Float
+`define MISA_EXT_C 1'b0             // C - Compressed
+`ifdef ENABLE_B                     // B - Bitmanip
+    `define MISA_EXT_B 1'b1
+`else
+    `define MISA_EXT_B 1'b0
+`endif
+`ifdef ENABLE_A                     // A - Atomic
+    `define MISA_EXT_A 1'b1
+`else
+    `define MISA_EXT_A 1'b0
+`endif
 
 `endif

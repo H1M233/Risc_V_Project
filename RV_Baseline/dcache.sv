@@ -6,9 +6,8 @@ module dcache(
     input  logic rst,
 
     // CPU/MEM side
-    input  ex_lsu_data_t    data_packaged_i,
-
-    output logic [31:0]     mem_rdata,
+    input  DCACHE_data_t    cpu_data_pkg_i,
+    output logic [31:0]     cpu_rdata,
     output logic            load_ready,
     output logic            store_ready,
 
@@ -26,8 +25,8 @@ module dcache(
     localparam LINE_NUM = 2 ** INDEX_WIDTH;
 
     // 解码
-    ex_lsu_data_t dpkg;
-    assign dpkg = data_packaged_i;
+    DCACHE_data_t dpkg;
+    assign dpkg = cpu_data_pkg_i;
 
     // 两路 D-cache
     (* ram_style = "distributed" *) reg [31:0] data_w0 [0:LINE_NUM - 1];
@@ -65,7 +64,7 @@ module dcache(
     logic [31:0]              cpu_wdata_r;
     logic                     cpu_req_store_r;
     always_ff @(posedge clk) begin
-        if (!rst) begin
+        if (rst) begin
             query_index_r   <= 0;
             query_tag_r     <= 0;
             store_buffer_we <= 0;
@@ -91,15 +90,15 @@ module dcache(
     logic replace_way_r;
     logic [31:0] data_rdata_w0, data_rdata_w1;
     always_ff @(posedge clk) begin
-        if (!rst) begin
+        if (rst) begin
             hit_way_r       <= 0;
             dcache_hit      <= 0;
             dcache_miss     <= 0;
         end
         else begin
-            hit_way_r       <= hit_way1;
-            dcache_hit      <= (hit_way0 | hit_way1);
-            dcache_miss     <= ~(hit_way0 | hit_way1);
+            hit_way_r       <= hit_way1 && dpkg.write_dram;
+            dcache_hit      <= (hit_way0 | hit_way1) && dpkg.write_dram;
+            dcache_miss     <= ~(hit_way0 | hit_way1) || ~dpkg.write_dram;
         end
     end
 
@@ -119,7 +118,7 @@ module dcache(
     logic [31:0] store_buffer_hit_data;
 
     always_ff @(posedge clk) begin
-        if (!rst) begin
+        if (rst) begin
             store_buffer_hit        <= 0;
             store_buffer_hit_data   <= 0;
         end
@@ -147,7 +146,7 @@ module dcache(
     // Dcache 写使能
     assign dcache_wen   = store_buffer_en | miss_ready;
     assign dcache_waddr = (miss_ready) ? miss_index : query_index_r;
-    assign dcache_wdata = (miss_ready) ? mem_rdata : store_buffer_data_merge;
+    assign dcache_wdata = (miss_ready) ? cpu_rdata : store_buffer_data_merge;
     assign dcache_wway  = (miss_ready) ? miss_way : hit_way_r;
     always_ff @(posedge clk) begin: dcache_Write
         if (dcache_wen && dcache_wway == 1'b0) begin
@@ -177,7 +176,7 @@ module dcache(
 
     // 未命中状态转换
     always_ff @(posedge clk) begin
-        if (!rst) begin
+        if (rst) begin
             tagv_wait       <= 0;
             miss_wait       <= 0;
             miss_way        <= 0;
@@ -203,7 +202,7 @@ module dcache(
 
     // 输出状态寄存
     always_ff @(posedge clk) begin
-        if (!rst) begin
+        if (rst) begin
             miss_ready  <= 1'b0;
         end
         else begin
@@ -221,7 +220,7 @@ module dcache(
     assign stall = (tagv_wait && dcache_miss) | miss_wait;
 
     // 读数据
-    assign mem_rdata   = (miss_ready) ? perip_rdata : hit_data;
+    assign cpu_rdata   = (miss_ready) ? perip_rdata : hit_data;
     assign load_ready  = dcache_hit | miss_ready;
     always_ff @(posedge clk) begin
         store_ready <= cpu_req_store_r;

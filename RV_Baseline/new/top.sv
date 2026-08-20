@@ -21,27 +21,30 @@
 
 
 module top(
-    input  wire i_sys_clk_p         ,
-    input  wire i_sys_clk_n         ,
-    input  wire i_uart_rx           ,
-    output wire o_uart_tx           ,
+    `ifdef VERILATOR
+    input  logic        w_clk_50Mhz         ,
+    input  logic        cpu_clk             ,
+    input  logic        w_clk_rst           ,
+    `else
+    input  logic        i_sys_clk_p         ,
+    input  logic        i_sys_clk_n         ,
+    `endif
+    input  logic        i_uart_rx           ,
+    output logic        o_uart_tx           ,
 
-    output wire [31:0] virtual_led  ,
-    output wire [39:0] virtual_seg
+    input  logic [3:0]  i_key	            ,
+
+	output logic [7:0]  o_seg_digit	        ,
+    output logic [5:0]  o_seg_sel           ,
+    output logic [3:0]  o_led
 );
 
+    `ifndef VERILATOR
     wire w_clk_50Mhz, cpu_clk;
     wire w_clk_rst;
+    `endif
 
-    wire [7:0] virtual_key;
-    wire [63:0] virtual_sw;
-
-    wire [7:0] rx_data;
-    wire rx_ready;
-    wire tx_start;
-    wire [7:0] tx_data;
-    wire tx_busy;
-
+    `ifndef VERILATOR
     pll pll_inst(
         .clk_in1_p(i_sys_clk_p),
         .clk_in1_n(i_sys_clk_n),
@@ -49,44 +52,18 @@ module top(
         .clk_out2(cpu_clk),
         .locked(w_clk_rst)
     );
-
-    uart #(
-        .CLK_FREQ(50000000),
-        .BAUD_RATE(9600)
-    ) uart_inst(
-        .clk(w_clk_50Mhz),
-        .rst_n(w_clk_rst),
-        .rx(i_uart_rx),
-        .rx_data(rx_data),
-        .rx_ready(rx_ready),
-        .tx(o_uart_tx),
-        .tx_data(tx_data),
-        .tx_start(tx_start),
-        .tx_busy(tx_busy)
-    );
-
-    twin_controller twin_controller_inst(
-        .clk(w_clk_50Mhz),
-        .rst_n(w_clk_rst),
-        .rx_ready(rx_ready),
-        .rx_data(rx_data),
-        .tx_start(tx_start),
-        .tx_data(tx_data),
-        .tx_busy(tx_busy),
-        .sw(virtual_sw),
-        .key(virtual_key),
-        .seg(virtual_seg),
-        .led(virtual_led)
-    );
+    `endif
 
     student_top student_top_inst(
         .w_cpu_clk(cpu_clk),
         .w_clk_50Mhz(w_clk_50Mhz),
         .w_clk_rst(~w_clk_rst),
-        .virtual_key(virtual_key),
-        .virtual_sw(virtual_sw),
-        .virtual_led(virtual_led),
-        .virtual_seg(virtual_seg)
+        .key_input(i_key),
+        .seg_digit_o(o_seg_digit),
+        .seg_sel_o(o_seg_sel),
+        .led_o(o_led),
+        .uart_rx_i(i_uart_rx),
+        .uart_tx_o(o_uart_tx)
     );
 
 endmodule

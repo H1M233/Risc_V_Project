@@ -17,7 +17,7 @@ module alu_Bext(
     logic [31:0] value1_r, value2_r;
     logic        valid_r, finished;
     always_ff @(posedge clk) begin
-        if (~rst) begin
+        if (rst) begin
             valid_r  <= 1'b0;
 
             value1_r <= 32'b0;

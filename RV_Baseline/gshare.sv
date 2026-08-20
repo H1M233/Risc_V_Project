@@ -72,7 +72,7 @@ module gshare #(
     // GHR - 流水线延�?
     reg pred_taken_r;
     always_ff @(posedge clk) begin: gshare_ghr_ctrl
-        if(!rst) begin
+        if(rst) begin
             ghr_d1  <= 0;
             ghr_d2  <= 0;
             ghr_d3  <= 0;
@@ -87,7 +87,7 @@ module gshare #(
     end
 
     always_ff @(posedge clk) begin: gshare_update_ctrl
-        if(!rst) begin
+        if(rst) begin
             pht_update_en_r         <= 0;
             actual_taken_update_r   <= 0;
             pht_index_update_r      <= 0;
@@ -103,7 +103,7 @@ module gshare #(
     
     // GHR
     always_ff @(posedge clk) begin
-        if (!rst) begin
+        if (rst) begin
             ghr     <= 0;
         end
         else begin

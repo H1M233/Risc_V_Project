@@ -2,64 +2,66 @@
 `include "alu_def.svh"
 
 module mem(
-    input  logic clk,
-    input  logic rst,
-    input  logic pipe_flush,
-    input  logic pipe_hold,
+    input  logic            clk                     ,
+    input  logic            rst                     ,
+    input  logic            pipe_hold               ,
 
     // from dcache
-    input  logic         dcache_ack,
-    input  logic [31:0]  dcache_rdata,
+    input  logic            DCACHE_ack              ,
+    input  logic [31:0]     DCACHE_rdata            ,
 
     // from ex_mem
-    input  ex_mem_data_t data_packaged_i,
-    input  ex_csr_data_t csr_data_packaged_i,
+    input  logic [31:0]     pc_i                    ,
+    input  logic            valid_i                 ,
+    input  MEM_data_t       data_pkg_i              ,
+    input  CSR_data_t       CSR_data_pkg_i          ,
 
     // to mem_wb & forwarding
-    output mem_wb_data_t data_packaged_o,
-    output ex_csr_data_t csr_data_packaged_o
+    output logic [31:0]     pc_o                    ,
+    output logic            valid_o                 ,
+    output RF_data_t        data_pkg_o              ,
+    output CSR_data_t       CSR_data_pkg_o          
 );  
-    ex_mem_data_t mpkg_i;
-    ex_mem_data_t mpkg_o;
+    MEM_data_t mpkg_i;
+    MEM_data_t mpkg_o;
 
     // mem1
     always_comb begin
-        mpkg_i          = data_packaged_i;
-        mpkg_i.regs_wen = (data_packaged_i.req_load) ? 1'b0 : data_packaged_i.regs_wen;
+        mpkg_i          = data_pkg_i;
+        mpkg_i.regs_wen = (data_pkg_i.req_load) ? 1'b0 : data_pkg_i.regs_wen;
     end
 
     // mem1_mem2
     always_ff @(posedge clk) begin
-        if (!rst) begin
+        if (rst) begin
+            pc_o                <= 0;
+            valid_o             <= 0;
             mpkg_o              <= 0;
-            csr_data_packaged_o <= 0;
-        end
-        else if (pipe_hold) begin
+            CSR_data_pkg_o      <= 0;
+        end else if (pipe_hold) begin
             // ...
-        end
-        else if (pipe_flush) begin
-            mpkg_o              <= 0;
-            csr_data_packaged_o <= 0;
-        end
-        else begin
+        end else begin
+            pc_o                <= pc_i;
+            valid_o             <= valid_i;
             mpkg_o              <= mpkg_i;
-            csr_data_packaged_o <= csr_data_packaged_i;
+            CSR_data_pkg_o      <= CSR_data_pkg_i;
         end
     end
 
     // mem2
     wire [31:0] dcache_rdata_load_shift = 
         load_shift(
-            dcache_rdata,
+            DCACHE_rdata,
             mpkg_o.load_mask,
             mpkg_o.load_addr_low,
             mpkg_o.load_is_signed
         );
+
     always_comb begin
-        data_packaged_o          = mpkg_o;
-        data_packaged_o.rd_addr  = mpkg_o.rd_addr;
-        data_packaged_o.rd_data  = (mpkg_o.req_load) ? dcache_rdata_load_shift : mpkg_o.rd_data;
-        data_packaged_o.regs_wen = (mpkg_o.req_load & dcache_ack) | mpkg_o.regs_wen;
+        data_pkg_o          = mpkg_o;
+        data_pkg_o.rd_addr  = mpkg_o.rd_addr;
+        data_pkg_o.rd_data  = (mpkg_o.req_load) ? dcache_rdata_load_shift : mpkg_o.rd_data;
+        data_pkg_o.regs_wen = (mpkg_o.req_load & DCACHE_ack) | mpkg_o.regs_wen;
     end
         
     // 函数：

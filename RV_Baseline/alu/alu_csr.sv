@@ -1,22 +1,23 @@
 `include "../def/alu_def.svh"
 module alu_csr (
-    input  logic            ctrl_stall,
-
     input  logic [31:0]     value1,
     input  logic [31:0]     value2,
     input  decode_t         ipkg,
-    input  id_ex_data_t     dpkg,
+    input  EX_data_t        dpkg,
 
     // fcsr
+    `ifdef ENABLE_F
     input  logic [4:0]      fflags,
+    `endif
 
-    output ex_csr_data_t    cpkg
+    output CSR_data_t       cpkg
 );
-    assign cpkg.waddr       = dpkg.csr_waddr;
-    assign cpkg.wen         = (ipkg.is_zicsr | ((ipkg.is_FP | ipkg.is_fM) & (fflags != dpkg.csr_rdata[4:0])));     // CSR 写使能
-    assign cpkg.ecall       = ipkg.sel_ecall;
-    assign cpkg.mret        = ipkg.sel_mret;
-    assign cpkg.ecall_inst  = (ipkg.sel_ecall) ? dpkg.pc : 32'b0;
+    `ifdef ENABLE_F
+    wire fflags_wen        = ((ipkg.is_FP | ipkg.is_FM) & (fflags != dpkg.csr_rdata[4:0]));
+    wire [31:0] fflags_res = dpkg.csr_rdata | {27'b0, fflags};
+    `else
+    wire fflags_wen = 0;
+    `endif
 
     // csr 计算
     wire [31:0] csr_value1 = (dpkg.inst[14]) ? dpkg.imm : value1;      // CSR 写数据选择
@@ -24,9 +25,13 @@ module alu_csr (
     wire [31:0] rs_res     = dpkg.csr_rdata | csr_value1;              // 读-置位结果
     wire [31:0] rc_res     = dpkg.csr_rdata & ~csr_value1;             // 读-清零结果 
 
-    wire [31:0] fflags_res = dpkg.csr_rdata | {27'b0, fflags};
-
     always_comb begin: ALU_CSR_CTRL
+        cpkg.waddr = dpkg.csr_waddr;
+        cpkg.wen   = ipkg.is_zicsr | fflags_wen;     // CSR 写使能
+        cpkg.ecall = ipkg.sel_ecall;
+        cpkg.mret  = ipkg.sel_mret;
+        cpkg.sret  = ipkg.sel_sret;
+
         unique case (1'b1)
             ipkg.sel_csrrw  : cpkg.wdata = rw_res;
             ipkg.sel_csrrwi : cpkg.wdata = rw_res;
@@ -35,8 +40,10 @@ module alu_csr (
             ipkg.sel_csrrc  : cpkg.wdata = rc_res;
             ipkg.sel_csrrci : cpkg.wdata = rc_res;
 
+            `ifdef ENABLE_F
             ipkg.is_FP      : cpkg.wdata = fflags_res;
-            ipkg.is_fM      : cpkg.wdata = fflags_res;
+            ipkg.is_FM      : cpkg.wdata = fflags_res;
+            `endif
             default         : cpkg.wdata = 32'b0;
         endcase
     end 

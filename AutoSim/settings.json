@@ -2,7 +2,7 @@
   "Project": {
     "RV_Baseline": {
       "folder": "RV_Baseline",
-      "clockFreq": 200
+      "clockFreq": 150
     },
     "RV_Superscalar": {
       "folder": "RV_Superscalar",

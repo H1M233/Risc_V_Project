@@ -5,12 +5,7 @@
 \[文档\]/
 
 Quartus_Project/
-
 Vivado_Project/
-
-MODELSIM/
-
-3_LEVEL_CPU/
 
 AutoSim/__pycache__
 AutoSim/out.vvp
@@ -23,13 +18,11 @@ AutoSim/wave_verilator.vcd
 
 twin/
 
-
 .library_mapping.xml
 .project
-AutoSim/riscv-tests/
-AutoSim/vcd/*.vcd
-AutoSim/vcd/*.xlsx
 
-5_LEVEL_CPU_Cache/div.v
+AutoSim/riscv-tests/
+AutoSim/vcd
+AutoSim/cpp
 
 

@@ -58,24 +58,26 @@ int main(int argc, char** argv) {
     // 试探脉冲
     const uint64_t rst_time = 20;
     top->rst = 0;
-    top->clk_cpu = 0;
+    top->clk_50MHz = 0;
     step_and_advance(rst_time);
 
-    top->clk_cpu = 1;
+    top->clk_50MHz = 1;
     step_and_advance(CLK_CPU_HALF_PERIOD);
 
-    top->clk_cpu = 0;
+    top->clk_50MHz = 0;
     step_and_advance(rst_time - CLK_CPU_HALF_PERIOD);
 
     top->rst = 1;
     
     // 时钟主循环
     while (!contextp->gotFinish() && sim_time_ps < SIM_TIME) {
-        top->clk_cpu = !top->clk_cpu;
+        top->clk_50MHz = !top->clk_50MHz;
         step_and_advance(CLK_CPU_HALF_PERIOD);
     }
+
+    bool isPass = top->x26 == 1 && top->x27 == 1;
     
-    std::cout << ((top->x26 == 1 && top->x27 == 1) ? "PASS!!!" : "FAIL!!!") << std::endl;
+    std::cout << ((isPass) ? "PASS!!!" : "FAIL!!!") << std::endl;
 
     #ifdef ENABLE_TRACE
         tfp->close();

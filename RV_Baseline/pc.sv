@@ -1,51 +1,58 @@
 `include "rv32I.svh"
 
 module pc(
-    input  logic        clk,
-    input  logic        rst,
-    input  logic        pipe_hold,
+    input  logic        clk                     ,
+    input  logic        rst                     ,
+    input  logic        pipe_hold               ,
 
-    // from ex
-    input  logic        pred_flush,
-    input  logic [31:0] pred_flush_pc,
+    // from RVCE
+    `ifdef ENABLE_C
+    input  logic        frontend_isCompressed   ,
+    `endif
 
-    // from csr_regs
-    input  logic        trap_en,
-    input  logic [31:0] trap_pc,
+    // flush
+    input  flush_t      BPU_pred_flush          ,
+    input  flush_t      EX_mispred_flush        ,
+    input  flush_t      CSR_trap_flush          ,
 
-    // from bpu
-    input  logic [31:0] pred_pc,
-    input  logic        pred_taken,
-
-    // to if
-    output logic [31:0] pc_o
+    // to I-Cache
+    output logic [31:0] pc_o                    
 );
+    wire [31:0] pc_add_4 = pc_o + 32'd4;
+    `ifdef ENABLE_C
+    wire [31:0] pc_add_2 = pc_o + 32'd2;
+    wire [31:0] pc_next  = (frontend_isCompressed) ? pc_add_2 : pc_add_4;
+    `else
+    wire [31:0] pc_next  = pc_add_4;
+    `endif
+
     // 为冲刷 / 异常留的口
-    reg [31:0] pc_sel;
+    logic        pc_flush_en;
+    logic [31:0] pc_flush_sel;
+    assign pc_flush_en = CSR_trap_flush.en | EX_mispred_flush.en | BPU_pred_flush.en;
     always_comb begin
-        if (trap_en) begin
-            pc_sel = trap_pc;
-        end
-        else if (pred_flush) begin
-            pc_sel = pred_flush_pc;
-        end
-        else if (pred_taken) begin
-            pc_sel = pred_pc;
-        end
-        else begin
-            pc_sel = pc_o + 32'd4;
+        if (CSR_trap_flush.en) begin
+            pc_flush_sel = CSR_trap_flush.pc;
+        end else if (EX_mispred_flush.en) begin
+            pc_flush_sel = EX_mispred_flush.pc;
+        end else if (BPU_pred_flush.en) begin
+            pc_flush_sel = BPU_pred_flush.pc;
+        end else begin
+            pc_flush_sel = 32'b0;
         end
     end
 
     always_ff @(posedge clk) begin
-        if (!rst) begin
-            pc_o <= 32'h8000_0000;
-        end
-        else if (pipe_hold) begin
-            // ...
-        end
-        else begin
-            pc_o <= pc_sel;
+        if (rst) begin
+            pc_o    <= 32'h8000_0000;
+        end else begin
+            if (pc_flush_en) begin
+                pc_o <= pc_flush_sel;
+            end else if (pipe_hold) begin
+                // ...
+            end else begin
+                pc_o <= pc_next;
+            end
         end
     end
 endmodule

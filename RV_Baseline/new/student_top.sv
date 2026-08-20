@@ -20,69 +20,80 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module student_top#(
-    parameter                           P_SW_CNT            = 64,
-    parameter                           P_LED_CNT           = 32,
-    parameter                           P_SEG_CNT           = 40,
-    parameter                           P_KEY_CNT           = 8
-) (
-    input                                       w_cpu_clk     ,
-    input                                       w_clk_50Mhz   ,
-    input                                       w_clk_rst     ,
-    input  [P_KEY_CNT - 1:0]                    virtual_key   ,
-    input  [P_SW_CNT  - 1:0]                    virtual_sw    ,
+module student_top(
+    input  logic        w_cpu_clk           ,
+    input  logic        w_clk_50Mhz         ,
+    input  logic        w_clk_rst           ,
 
-    output [P_LED_CNT - 1:0]                    virtual_led   ,
-    output [P_SEG_CNT - 1:0]                    virtual_seg   
+    input  logic [3:0]  key_input	        ,
+
+	output logic [7:0]  seg_digit_o         ,
+    output logic [5:0]  seg_sel_o           ,
+    output logic [3:0]  led_o               ,
+
+    input  logic        uart_rx_i           ,
+    output logic        uart_tx_o           
 );
-
-    // IROM
-    logic [31:0] pc;
-    logic [11:0] inst_addr;
-    logic [31:0] instruction;
-
     // perip
-    logic [31:0] perip_addr, perip_wdata, perip_rdata;
-    logic perip_wen;
-    logic [3:0] perip_we;
+    logic [31:0]    ICACHE_perip_addr, 
+                    ICACHE_perip_rdata;
 
-    // 16KB = 2^12 * 32bit
-    assign inst_addr = pc[13:2];
+    logic           ICACHE_perip_arvalid,
+                    ICACHE_perip_ren,
+                    ICACHE_perip_ready,
+                    ICACHE_perip_rvalid;
+
+    logic [31:0]    DCACHE_perip_addr, 
+                    DCACHE_perip_wdata, 
+                    DCACHE_perip_rdata;
+
+    logic [3:0]     DCACHE_perip_we;
+    logic           DCACHE_perip_wen;
 
     top_riscv Core_cpu (
-        .cpu_rst            (!w_clk_rst),
-        .cpu_clk            (w_cpu_clk),
+        .cpu_rst                    (w_clk_rst),
+        .cpu_clk                    (w_cpu_clk),
 
-        // Interface to IROM
-        .irom_addr          (pc),             
-        .irom_data          (instruction),   
+        // Interface to Peripheral
+        .ICACHE_perip_addr          (ICACHE_perip_addr),
+        .ICACHE_perip_arvalid       (ICACHE_perip_arvalid),
+        .ICACHE_perip_ren           (ICACHE_perip_ren),
+        .ICACHE_perip_ready         (ICACHE_perip_ready),
+        .ICACHE_perip_rdata         (ICACHE_perip_rdata),
+        .ICACHE_perip_rvalid        (ICACHE_perip_rvalid),
 
-        // Interface to DRAM & periphera
-        .perip_addr         (perip_addr),     
-        .perip_we           (perip_we),
-        .perip_wen          (perip_wen),
-        .perip_wdata        (perip_wdata),    
-        .perip_rdata        (perip_rdata)     
-    );
-
-    IROM Mem_IROM (
-        .a          (inst_addr),
-        .spo        (instruction)
+        .DCACHE_perip_addr          (DCACHE_perip_addr),     
+        .DCACHE_perip_we            (DCACHE_perip_we),
+        .DCACHE_perip_wen           (DCACHE_perip_wen),
+        .DCACHE_perip_wdata         (DCACHE_perip_wdata),    
+        .DCACHE_perip_rdata         (DCACHE_perip_rdata)     
     );
     
     perip_bridge bridge_inst (
-        .clk				(w_cpu_clk),
-        .cnt_clk            (w_clk_50Mhz),
-        .rst                (w_clk_rst),
-        .perip_addr         (perip_addr),     
-        .perip_we           (perip_we),   
-        .perip_wen          (perip_wen),    
-        .perip_wdata        (perip_wdata),    
-        .perip_rdata        (perip_rdata),
-        .virtual_sw_input	(virtual_sw),
-        .virtual_key_input	(virtual_key),	
-        .virtual_seg_output	(virtual_seg),
-        .virtual_led_output (virtual_led)
+        .clk			            (w_cpu_clk),
+        .cnt_clk                    (w_clk_50Mhz),
+        .rst                        (w_clk_rst),
+
+        .ICACHE_perip_addr          (ICACHE_perip_addr),
+        .ICACHE_perip_arvalid       (ICACHE_perip_arvalid),
+        .ICACHE_perip_ren           (ICACHE_perip_ren),
+        .ICACHE_perip_ready         (ICACHE_perip_ready),
+        .ICACHE_perip_rdata         (ICACHE_perip_rdata),
+        .ICACHE_perip_rvalid        (ICACHE_perip_rvalid),
+
+        .DCACHE_perip_addr          (DCACHE_perip_addr),     
+        .DCACHE_perip_we            (DCACHE_perip_we),   
+        .DCACHE_perip_wen           (DCACHE_perip_wen),    
+        .DCACHE_perip_wdata         (DCACHE_perip_wdata),    
+        .DCACHE_perip_rdata         (DCACHE_perip_rdata),
+
+        .key_i	                    (key_input),
+        .seg_digit_o                (seg_digit_o),
+        .seg_sel_o                  (seg_sel_o),
+        .led_o                      (led_o),
+
+        .uart_rx_i                  (uart_rx_i),
+        .uart_tx_o                  (uart_tx_o)
     );
 
 endmodule
