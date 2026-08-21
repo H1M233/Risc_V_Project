@@ -3,6 +3,15 @@
 `ifndef ALU_DEF
 `define ALU_DEF
 
+// F 扩展寄存器
+`ifdef ENABLE_F
+    `define RF_NUM 64
+    `define RF_IDX_WIDTH 6
+`else
+    `define RF_NUM 32
+    `define RF_IDX_WIDTH 5
+`endif
+
 // 特权级模式
 typedef enum {U = 2'b00, S = 2'b01, M = 2'b11} pm_t;
 
@@ -12,30 +21,33 @@ typedef struct packed {
 } flush_t;
 
 typedef struct packed {
-    logic [31:0] pc;
-    logic [31:0] inst;
-    logic [31:0] pc_next;
-    flush_t      pred_flush;
-    logic [4:0]  ras_ptr;
+    logic [31:0]                    pc;
+    logic [31:0]                    inst;
+    logic [31:0]                    pc_next;
+    flush_t                         pred_flush;
+    logic [4:0]                     ras_ptr_snapshot;
+    logic [`GSHARE_BHR_WIDTH - 1:0] gshare_ghr_snapshot;
 } prefetch_t;
 
 typedef struct packed {
-    logic [31:0] pc;
-    logic [31:0] inst;
-    logic [31:0] imm;
-    logic [31:0] jump1;
-    logic [31:0] jump2;
-    logic [5:0]  rd_addr;
-    logic        pred_taken;
-    logic [4:0]  ras_ptr;
-    logic [11:0] csr_waddr;
-    logic [31:0] csr_rdata;
-    logic [31:0] fwd_rs1_data;
-    logic [31:0] fwd_rs2_data;
-    logic        fwd_rs1_hit_ex;
-    logic        fwd_rs2_hit_ex;
+    logic [31:0]                    pc;
+    logic [31:0]                    inst;
+    logic [31:0]                    imm;
+    logic [31:0]                    jump1;
+    logic [31:0]                    jump2;
+    logic [`RF_IDX_WIDTH - 1:0]     rd_addr;
+    logic                           pred_taken;
+    logic                           is_ret;
+    logic [4:0]                     ras_ptr_snapshot;
+    logic [`GSHARE_BHR_WIDTH - 1:0] gshare_ghr_snapshot;
+    logic [11:0]                    csr_waddr;
+    logic [31:0]                    csr_rdata;
+    logic [31:0]                    fwd_rs1_data;
+    logic [31:0]                    fwd_rs2_data;
+    logic                           fwd_rs1_hit_ex;
+    logic                           fwd_rs2_hit_ex;
     `ifdef ENABLE_F
-    logic [31:0] rs3_rdata;
+    logic [31:0]                    rs3_rdata;
     `endif
 } EX_data_t;
 
@@ -252,13 +264,10 @@ typedef struct packed {
 } decode_t;
     
     typedef struct packed {
-    logic [5:0]  rd_addr;
-    logic [31:0] rd_data;
-    logic        regs_wen;
-    logic        req_load;
-    logic [1:0]  load_mask;
-    logic [1:0]  load_addr_low;
-    logic        load_is_signed;
+    logic                       req_load;
+    logic [1:0]                 load_mask;
+    logic [1:0]                 load_addr_low;
+    logic                       load_is_signed;
 } MEM_data_t;
 
 typedef struct packed {
@@ -280,18 +289,20 @@ typedef struct packed {
 } CSR_data_t;
 
 typedef struct packed {
-    logic        update_btb_en;
-    logic        update_gshare_en;
-    logic [31:0] update_pc;
-    logic [31:0] update_target;
-    logic        actual_taken;
-    logic [4:0]  rollback_ras_ptr;
+    logic                           update_btb_en;
+    logic                           update_gshare_en;
+    logic [31:0]                    update_pc;
+    logic [31:0]                    update_target;
+    logic                           actual_taken;
+    logic                           rollback_ras_en;
+    logic [4:0]                     ras_ptr_snapshot;
+    logic [`GSHARE_BHR_WIDTH - 1:0] gshare_ghr_snapshot;
 } BPU_data_t;
 
 typedef struct packed {
-    logic [5:0]  rd_addr;
-    logic [31:0] rd_data;
-    logic        regs_wen;
+    logic [`RF_IDX_WIDTH - 1:0] rd_addr;
+    logic [31:0]                rd_data;
+    logic                       regs_wen;
 } RF_data_t;
 
 typedef struct packed {logic ltu, lts;} cmp_result_t;

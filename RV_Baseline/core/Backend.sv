@@ -64,6 +64,7 @@ module Backend(
     // EX - out
     logic [31:0]    EX_pc_o;
     logic           EX_valid_o;
+    RF_data_t       EX_RF_data_pkg_o;
     MEM_data_t      EX_MEM_data_pkg_o;
     CSR_data_t      EX_CSR_data_pkg_o;
     DCACHE_data_t   EX_DCACHE_data_pkg_o;
@@ -74,13 +75,14 @@ module Backend(
     // MEM - in
     logic [31:0]    MEM_pc_i;
     logic           MEM_valid_i;
-    MEM_data_t      MEM_data_pkg_i;
+    RF_data_t       MEM_RF_data_pkg_i;
+    MEM_data_t      MEM_MEM_data_pkg_i;
     CSR_data_t      MEM_CSR_data_pkg_i;
 
     // MEM - out
     logic [31:0]    MEM_pc_o;
     logic           MEM_valid_o;
-    RF_data_t       MEM_data_pkg_o;
+    RF_data_t       MEM_RF_data_pkg_o;
     CSR_data_t      MEM_CSR_data_pkg_o;
 
     // D-Cache
@@ -93,11 +95,11 @@ module Backend(
     // WB - in
     logic [31:0]    WB_pc_i;
     logic           WB_valid_i;
-    RF_data_t       WB_data_pkg_i;
+    RF_data_t       WB_RF_data_pkg_i;
     CSR_data_t      WB_CSR_data_pkg_i;
 
     // WB - out
-    RF_data_t       WB_data_pkg_o;
+    RF_data_t       WB_RF_data_pkg_o;
     CSR_data_t      WB_CSR_data_pkg_o;
 
     assign ready_o          = ~(DCACHE_stall | ID_hazard_stall | EX_ctrl_stall);
@@ -136,26 +138,19 @@ module Backend(
         .regs_wen_o             (ID_regs_wen_o),
         .valid_o                (ID_valid_o),
 
-        .ex_rd_addr_i           (EX_MEM_data_pkg_o.rd_addr),
-        .ex_regs_wen_i          (EX_MEM_data_pkg_o.regs_wen),
-        .ex_is_load_i           (EX_MEM_data_pkg_o.req_load),
-        .ex_csr_wen_i           (EX_CSR_data_pkg_o.wen),
+        .EX_RF_data_pkg_i       (EX_RF_data_pkg_o),
+        .EX_is_load_i           (EX_MEM_data_pkg_o.req_load),
+        .EX_CSR_wen_i           (EX_CSR_data_pkg_o.wen),
 
-        .mem1_rd_addr_i         (MEM_data_pkg_i.rd_addr),
-        .mem1_rd_data_i         (MEM_data_pkg_i.rd_data),
-        .mem1_regs_wen_i        (MEM_data_pkg_i.regs_wen),
-        .mem1_is_load_i         (MEM_data_pkg_i.req_load),
-        .mem1_csr_wen_i         (MEM_CSR_data_pkg_i.wen),
+        .MEM1_RF_data_pkg_i     (MEM_RF_data_pkg_i),
+        .MEM1_is_load_i         (MEM_MEM_data_pkg_i.req_load),
+        .MEM1_CSR_wen_i         (MEM_CSR_data_pkg_i.wen),
 
-        .mem2_rd_addr_i         (MEM_data_pkg_o.rd_addr),
-        .mem2_rd_data_i         (MEM_data_pkg_o.rd_data),
-        .mem2_regs_wen_i        (MEM_data_pkg_o.regs_wen),
-        .mem2_csr_wen_i         (MEM_CSR_data_pkg_o.wen),
+        .MEM2_RF_data_pkg_i     (MEM_RF_data_pkg_o),
+        .MEM2_CSR_wen_i         (MEM_CSR_data_pkg_o.wen),
 
-        .wb_rd_addr_i           (WB_data_pkg_o.rd_addr),
-        .wb_rd_data_i           (WB_data_pkg_o.rd_data),
-        .wb_regs_wen_i          (WB_data_pkg_o.regs_wen),
-        .wb_csr_wen_i           (WB_CSR_data_pkg_o.wen),
+        .WB_RF_data_pkg_i       (WB_RF_data_pkg_o),
+        .WB_CSR_wen_i           (WB_CSR_data_pkg_o.wen),
 
         .hazard_en              (ID_hazard_stall)
     );
@@ -195,7 +190,7 @@ module Backend(
         .valid_i                (EX_valid_i),
 
         // frowarding EX data
-        .fwd_ex_rd_data_i       (MEM_data_pkg_i.rd_data),
+        .fwd_ex_rd_data_i       (MEM_RF_data_pkg_i.rd_data),
 
         // from D-Cache
         `ifdef ENABLE_A
@@ -208,6 +203,7 @@ module Backend(
         .pc_o                   (EX_pc_o),
         .valid_o                (EX_valid_o),
         .MEM_data_pkg_o         (EX_MEM_data_pkg_o),
+        .RF_data_pkg_o          (EX_RF_data_pkg_o),
         .CSR_data_pkg_o         (EX_CSR_data_pkg_o),
 
         // to D-Cache
@@ -231,7 +227,8 @@ module Backend(
         if (rst | pipe_flush_ex_mem) begin
             MEM_pc_i                <= 0;
             MEM_valid_i             <= 0;
-            MEM_data_pkg_i          <= 0;
+            MEM_MEM_data_pkg_i      <= 0;
+            MEM_RF_data_pkg_i       <= 0;
             MEM_CSR_data_pkg_i      <= 0;
             DCACHE_data_pkg_i       <= 0;
         end else if (pipe_hold_ex_mem) begin
@@ -239,7 +236,8 @@ module Backend(
         end else begin
             MEM_pc_i                <= EX_pc_o;
             MEM_valid_i             <= EX_valid_o;
-            MEM_data_pkg_i          <= EX_MEM_data_pkg_o;
+            MEM_MEM_data_pkg_i      <= EX_MEM_data_pkg_o;
+            MEM_RF_data_pkg_i       <= EX_RF_data_pkg_o;
             MEM_CSR_data_pkg_i      <= EX_CSR_data_pkg_o;
             DCACHE_data_pkg_i       <= EX_DCACHE_data_pkg_o;
         end
@@ -269,12 +267,13 @@ module Backend(
 
         .pc_i                   (MEM_pc_i),
         .valid_i                (MEM_valid_i),
-        .data_pkg_i             (MEM_data_pkg_i),
+        .MEM_data_pkg_i         (MEM_MEM_data_pkg_i),
+        .RF_data_pkg_i          (MEM_RF_data_pkg_i),
         .CSR_data_pkg_i         (MEM_CSR_data_pkg_i),
 
         .pc_o                   (MEM_pc_o),
         .valid_o                (MEM_valid_o),
-        .data_pkg_o             (MEM_data_pkg_o),
+        .RF_data_pkg_o          (MEM_RF_data_pkg_o),
         .CSR_data_pkg_o         (MEM_CSR_data_pkg_o)
     );
 
@@ -302,27 +301,27 @@ module Backend(
         if (rst) begin
             WB_pc_i                 <= 0;
             WB_valid_i              <= 0;
-            WB_data_pkg_i           <= 0;
+            WB_RF_data_pkg_i        <= 0;
             WB_CSR_data_pkg_i       <= 0;
         end else begin
             WB_pc_i                 <= MEM_pc_o;
             WB_valid_i              <= MEM_valid_o;
-            WB_data_pkg_i           <= MEM_data_pkg_o;
+            WB_RF_data_pkg_i        <= MEM_RF_data_pkg_o;
             WB_CSR_data_pkg_i       <= MEM_CSR_data_pkg_o;
         end
     end
 
     // WB
-    assign RF_data_pkg_o  = WB_data_pkg_o;
+    assign RF_data_pkg_o  = WB_RF_data_pkg_o;
     assign CSR_data_pkg_o = WB_CSR_data_pkg_o;
     wb WB(
         .pc_i                   (WB_pc_i),
         .valid_i                (WB_valid_i),
-        .data_pkg_i             (WB_data_pkg_i),
+        .data_pkg_i             (WB_RF_data_pkg_i),
         .CSR_data_pkg_i         (WB_CSR_data_pkg_i),
 
         .pc_o                   (CSR_WB_pc_o),
-        .data_pkg_o             (WB_data_pkg_o),
+        .data_pkg_o             (WB_RF_data_pkg_o),
         .CSR_data_pkg_o         (WB_CSR_data_pkg_o)
     );
 endmodule

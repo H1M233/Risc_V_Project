@@ -21,9 +21,9 @@ module tb_verilator_inst(
     `define VERILATOR_INST_TEST
     `ifdef PROJECT_RV_SUPERSCALAR
     `elsif PROJECT_RV_BASELINE
-        assign x3  = `CPU_PATH.RF.regs_p1[3];   // 进行的test序号
-        assign x26 = `CPU_PATH.RF.regs_p1[26];  // 测试结束信号
-        assign x27 = `CPU_PATH.RF.regs_p1[27];  // 0: fail, 1: pass
+        assign x3  = `CPU_PATH.RF.RF_p1[3];   // 进行的test序号
+        assign x26 = `CPU_PATH.RF.RF_p1[26];  // 测试结束信号
+        assign x27 = `CPU_PATH.RF.RF_p1[27];  // 0: fail, 1: pass
     `endif
 
     logic [31:0] cycle_count;

@@ -1,4 +1,4 @@
-module uart_driver(
+module uart_driver (
     input  logic        cpu_clk         ,
     input  logic        cnt_clk         ,
     input  logic        rst             ,
@@ -61,7 +61,7 @@ module uart_driver(
     assign tx_valid = tx_ready && ~uart_tx_fifo_empty;
     uart #(
         .CLK_FREQ(50000000),
-        .BAUD_RATE(115200)
+        .BAUD_RATE(1000000)
     ) uart_inst(
         .clk        (cnt_clk),
         .rst        (rst),

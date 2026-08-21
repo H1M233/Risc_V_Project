@@ -1,13 +1,13 @@
 {
   "RV_Baseline": {
-    "INST TEST": "PASS √",
+    "INST TEST": "FAIL x",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.931811",
-        "REAL TIME": "12.272",
-        "RUN TIME": "353",
-        "SEG TIME": "352",
-        "BPU ACCURACY": "0.895312",
+        "IPC": "0.928929",
+        "REAL TIME": "13.4144",
+        "RUN TIME": "355",
+        "SEG TIME": "354",
+        "BPU ACCURACY": "0.888382",
         "LED": "PASS √"
       },
       "src0": {
@@ -27,11 +27,11 @@
         "LED": "PASS √"
       },
       "src2": {
-        "IPC": "0.825549",
-        "REAL TIME": "844.682",
-        "RUN TIME": "23216",
-        "SEG TIME": "23215",
-        "BPU ACCURACY": "0.731334",
+        "IPC": "0.825232",
+        "REAL TIME": "889.286",
+        "RUN TIME": "23434",
+        "SEG TIME": "23433",
+        "BPU ACCURACY": "0.743964",
         "LED": "PASS √"
       },
       "withMext": {

@@ -22,7 +22,7 @@
 
 class VirtualUartBridge {
 public:
-    explicit VirtualUartBridge(int baud_rate = 115200)
+    explicit VirtualUartBridge(const std::string& alias_path = "/tmp/RV_UART", int baud_rate = 1000000)
     : baud_rate_(baud_rate),
         bit_period_ns_(static_cast<int64_t>(1'000'000'000.0 / baud_rate + 0.5)),
         next_rx_bit_time_ns_(0.0),
@@ -40,15 +40,24 @@ public:
             int slave_fd = -1;
             if (openpty(&master_fd, &slave_fd, nullptr, nullptr, nullptr) == 0) {
                 master_fd_ = master_fd;
-                // int size = 1024 * 1024;
                 fcntl(master_fd_, F_SETFL, O_NONBLOCK);
-                // fcntl(master_fd_, F_SETFL, size);
                 char* pty_name = ptsname(master_fd_);
                 if (pty_name != nullptr) {
                     pty_path_ = pty_name;
                 }
-                close(slave_fd);
-                std::cout << "[UART] Virtual serial port ready: " << pty_path_ << std::endl;
+                
+                // 创建符号链接
+                unlink(alias_path.c_str());
+                if (symlink(pty_name, alias_path.c_str()) != 0) {
+                    perror("symlink");
+                    close(master_fd_);
+                }
+
+                close(slave_fd);    // 关闭被控
+                std::cout << "[UART] Virtual serial port ready: " << pty_path_ << " or " << alias_path << std::endl;
+
+                // 通知 Python 端
+                std::ofstream("/tmp/RV_UART_screen_ready") << "screen is now open";
 
                 // 等待 PTY 启用
                 std::cout << "[UART] waiting for terminal open..." << std::endl;
@@ -65,7 +74,7 @@ public:
                     std::cerr << "[UART] unexpected PTY error: " << std::strerror(errno) << std::endl;
                     break;
                 }
-                std::cout << "[UART] terminal open, starting simulation in 1 seconds...\n";
+                std::cout << "[UART] terminal open, starting simulation in 1 second...\n\n";
                 std::this_thread::sleep_for(std::chrono::seconds(1));
 
             } else {
@@ -266,7 +275,7 @@ int main(int argc, char** argv) {
     #endif
 
     // 创建虚拟串口
-    VirtualUartBridge uart_bridge(115200);
+    VirtualUartBridge uart_bridge("/tmp/RV_UART", 1000000);
 
     // 计算 IPC
     uint64_t totalCycle = 0;

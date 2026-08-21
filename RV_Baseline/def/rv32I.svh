@@ -70,6 +70,8 @@
 `define CNOP     32'h0000_0001
 `define NOP      32'h0000_0013      
 
-`define EBREAK  32'h0010_0073
+`define EBREAK   32'h0010_0073
+
+`define RET      32'h00008067
 
 `endif

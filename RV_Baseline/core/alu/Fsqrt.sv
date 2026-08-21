@@ -19,8 +19,8 @@ module Fsqrt(
         $readmemb({`LUT_PATH, "/PLUT_sqrt.txt"}, PLUT);
         $readmemb({`LUT_PATH, "/NLUT_sqrt.txt"}, NLUT);
         `else
-        $readmemb("../LUT/PLUT_sqrt.txt", PLUT);
-        $readmemb("../LUT/NLUT_sqrt.txt", NLUT);
+        $readmemb("../Fext_LUT/PLUT_sqrt.txt", PLUT);
+        $readmemb("../Fext_LUT/NLUT_sqrt.txt", NLUT);
         `endif
     end
 

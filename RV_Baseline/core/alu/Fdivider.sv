@@ -19,8 +19,8 @@ module Fdivider(
         $readmemb({`LUT_PATH, "/PLUT_div.txt"}, PLUT);
         $readmemb({`LUT_PATH, "/NLUT_div.txt"}, NLUT);
         `else
-        $readmemb("../LUT/PLUT_div.txt", PLUT);
-        $readmemb("../LUT/NLUT_div.txt", NLUT);
+        $readmemb("../Fext_LUT/PLUT_div.txt", PLUT);
+        $readmemb("../Fext_LUT/NLUT_div.txt", NLUT);
         `endif
     end
 

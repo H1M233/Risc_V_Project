@@ -126,7 +126,7 @@ module perip_bridge(
     end
 
     // seg driver
-    display_seg seg_driver (
+    display_seg seg_driver_inst (
         .clk                (clk),
         .rst                (rst),
         .s                  (SEG),
@@ -157,7 +157,7 @@ module perip_bridge(
     logic [31:0] uart_status;
     logic        uart_wen;
     assign uart_wen = DCACHE_perip_wen && (DCACHE_perip_addr == UART_ADDR);
-    uart_driver uart_driver(
+    uart_driver uart_driver_inst (
         .cpu_clk            (clk),
         .cnt_clk            (cnt_clk),
         .rst                (rst),

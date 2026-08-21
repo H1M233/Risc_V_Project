@@ -1,4 +1,5 @@
 `include "alu_def.svh"
+`include "switch.svh"
 
 module Frontend(
     input  logic            clk                     ,
@@ -53,11 +54,13 @@ module Frontend(
     `ifdef ENABLE_C
     logic           BPU_is_compressed_r;
     `endif
-    logic [31:0]    BPU_pc_next;
-    logic [31:0]    BPU_pc_next_r;
-    logic           BPU_valid_r;
-    flush_t         BPU_pred_flush;
-    logic [4:0]     BPU_ras_ptr;
+    logic [31:0]                        BPU_pc_next;
+    logic [31:0]                        BPU_pc_next_r;
+    logic                               BPU_valid_r;
+    flush_t                             BPU_pred_flush;
+    logic [4:0]                         BPU_ras_ptr_snapshot;
+    logic [`GSHARE_BHR_WIDTH - 1:0]     BPU_gsahre_ghr_snapshot;
+    logic [`GSHARE_BHR_WIDTH - 1:0]     BPU_gsahre_ghr_snapshot_r;
 
     // FIFO
     prefetch_t      Frontend_fifo_din;
@@ -124,40 +127,43 @@ module Frontend(
     `endif
     always_ff @(posedge clk) begin
         if (rst) begin
-            BPU_pc_r                <= 0;
-            BPU_inst_r              <= 0;
+            BPU_pc_r                    <= 0;
+            BPU_inst_r                  <= 0;
             `ifdef ENABLE_C
-            BPU_is_compressed_r     <= 0;
+            BPU_is_compressed_r         <= 0;
             `endif
-            BPU_pc_next_r           <= 0;
-            BPU_valid_r             <= 0;
+            BPU_pc_next_r               <= 0;
+            BPU_valid_r                 <= 0;
+            BPU_gsahre_ghr_snapshot_r   <= 0;
         end else if (Frontend_fifo_isfull) begin
             // ...
         end else if (Frontend_flush_with_pred) begin
-            BPU_pc_r                <= 0;
-            BPU_inst_r              <= 0;
+            BPU_pc_r                    <= 0;
+            BPU_inst_r                  <= 0;
             `ifdef ENABLE_C
-            BPU_is_compressed_r     <= 0;
+            BPU_is_compressed_r         <= 0;
             `endif
-            BPU_pc_next_r           <= 0;
-            BPU_valid_r             <= 0;
+            BPU_pc_next_r               <= 0;
+            BPU_valid_r                 <= 0;
+            BPU_gsahre_ghr_snapshot_r   <= 0;
         end else begin
-            BPU_pc_r                <= ICACHE_res_pc;
+            BPU_pc_r                    <= ICACHE_res_pc;
             `ifdef ENABLE_C
-            BPU_inst_r              <= RVCE_expanded_inst;
-            BPU_is_compressed_r     <= RVCE_is_compressed;
+            BPU_inst_r                  <= RVCE_expanded_inst;
+            BPU_is_compressed_r         <= RVCE_is_compressed;
             `else
-            BPU_inst_r              <= ICACHE_res_inst;
-            BPU_pc_next_r           <= BPU_pc_next;
+            BPU_inst_r                  <= ICACHE_res_inst;
+            BPU_pc_next_r               <= BPU_pc_next;
             `endif
-            BPU_valid_r             <= ICACHE_res_valid;
+            BPU_valid_r                 <= ICACHE_res_valid;
+            BPU_gsahre_ghr_snapshot_r   <= BPU_gsahre_ghr_snapshot;
         end
     end
 
     bpu_top #(
-        .BHR_WIDTH          (12),
-        .PHT_IDX_WIDTH      (12),
-        .BTB_INDEX_WIDTH    (4)
+        .BHR_WIDTH          (`GSHARE_BHR_WIDTH),
+        .PHT_IDX_WIDTH      (`GSHARE_PHT_IDX_WIDTH),
+        .BTB_IDX_WIDTH      (`BTB_IDX_WIDTH)
     ) BPU(
         .clk                (clk),
         .rst                (rst),
@@ -173,19 +179,22 @@ module Frontend(
         .inst_i             (ICACHE_res_inst),
         `endif
         .pc_next_i          (BPU_pc_next),
+        .valid_i            (ICACHE_res_valid),
 
         .data_pkg_i         (BPU_data_pkg_i),
 
         .pred_flush_o       (BPU_pred_flush),
-        .ptr_o              (BPU_ras_ptr)
+        .ptr_o              (BPU_ras_ptr_snapshot),
+        .ghr_o              (BPU_gsahre_ghr_snapshot)
     );
 
     // FIFO 例
-    assign Frontend_fifo_din.pc           = BPU_pc_r;
-    assign Frontend_fifo_din.inst         = BPU_inst_r;
-    assign Frontend_fifo_din.pc_next      = BPU_pc_next_r;
-    assign Frontend_fifo_din.pred_flush   = BPU_pred_flush;
-    assign Frontend_fifo_din.ras_ptr      = BPU_ras_ptr;
+    assign Frontend_fifo_din.pc                     = BPU_pc_r;
+    assign Frontend_fifo_din.inst                   = BPU_inst_r;
+    assign Frontend_fifo_din.pc_next                = BPU_pc_next_r;
+    assign Frontend_fifo_din.pred_flush             = BPU_pred_flush;
+    assign Frontend_fifo_din.ras_ptr_snapshot       = BPU_ras_ptr_snapshot;
+    assign Frontend_fifo_din.gshare_ghr_snapshot    = BPU_gsahre_ghr_snapshot_r;
     fifo #(
         .DEPTH  (16),
         .WIDTH  ($bits(prefetch_t))

@@ -11,16 +11,14 @@ module display_seg (
     
     logic [26:0] cnt;
     logic        display_bit;
-    always_ff @(posedge clk or posedge rst) begin
+    always_ff @(posedge clk) begin
         if (rst) begin
             cnt         <= 0;
             display_bit <= 0;
-        end
-        else if (cnt == CNT_MAX - 1) begin
+        end else if (cnt == CNT_MAX - 1) begin
             cnt         <= 0;
             display_bit <= display_bit + 1'b1;
-        end
-        else begin
+        end else begin
             cnt         <= cnt + 1'b1;
             display_bit <= display_bit;
         end
@@ -39,7 +37,7 @@ module display_seg (
         end
     end
 
-    always_ff @(posedge clk or posedge rst) begin
+    always_ff @(posedge clk) begin
         if (rst)
             update_cnt <= 0;
         else if (update_cnt == 3'd5)
@@ -95,7 +93,7 @@ module display_seg (
 
     seg7 SEG7(.din(seg7_in), .dout(seg7_out));
 
-    always_ff @(posedge clk or posedge rst) begin
+    always_ff @(posedge clk) begin
         if (rst) begin
             sel <= 6'b111_111;
             seg <= 8'b1111_1111;

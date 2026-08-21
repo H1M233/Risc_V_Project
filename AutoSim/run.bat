@@ -1,3 +1,3 @@
 @echo off
-wsl bash -i -c "python3 verilator_sim.py"
+wsl bash -lic "python3 verilator_sim.py"
 pause

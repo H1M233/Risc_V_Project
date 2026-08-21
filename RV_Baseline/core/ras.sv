@@ -1,55 +1,56 @@
 `include "rv32I.svh"
 
-// 为返回类 JALR 使用的 RAS 栈
-// 就是一个物理栈
-
 module ras #(
     parameter DEPTH = 16
 )(
-    input               clk,
-    input               rst,
+    input  logic            clk,
+    input  logic            rst,
 
     // from bpu
-    input               push_en_i,      // 压栈使能
-    input               pop_en_i,       // 弹栈使能
-    input      [31:0]   push_addr_i,    // 压栈地址
-    input               rollback_en_i,
-    input      [4:0]    rollback_ptr_i,
+    input  logic            push_en_i,      // 压栈使能
+    input  logic            pop_en_i,       // 弹栈使能
+    input  logic [31:0]     push_pc_i,      // 压栈地址
+    input  logic            rollback_en_i,
+    input  logic [4:0]      rollback_ptr_i,
 
     // to bpu
-    output     [31:0]   pop_addr_o,     // 弹栈地址
-    output              isempty_o,      // 为空
-    output              isfull_o,       // 为满
-    output     [4:0]    ptr_o
+    output logic [31:0]     pop_pc_o,       // 弹栈地址
+    output logic            isempty_o,      // 为空
+    output logic            isfull_o,       // 为满
+    output logic [4:0]      ptr_o
 );
-    reg [31:0] stack_mem [DEPTH - 1:0];
-    reg [4:0]  ptr;
+    logic [31:0] stack_mem [DEPTH - 1:0];
+    logic [4:0]  ptr;
 
     // 初始化
     initial begin
-        for (int i = 0; i < DEPTH; i++) stack_mem[i] = 32'b0;
+        for (int i = 0; i < DEPTH; i++)
+            stack_mem[i] = 32'b0;
     end
-    
 
-    assign isempty_o   = (ptr == 0);
-    assign isfull_o    = (ptr == DEPTH);
-    assign pop_addr_o  = (ptr != 0) ? stack_mem[ptr - 1] : 32'b0;      // 始终输出栈顶
-    assign ptr_o       = ptr;
+    wire able_to_push = push_en_i && ptr != DEPTH;
+    wire able_to_pop  = pop_en_i && ptr;
+
+    always_comb begin
+        isempty_o    = (ptr == 0);
+        isfull_o     = (ptr == DEPTH);
+        ptr_o        = ptr;
+        pop_pc_o     = (ptr) ? stack_mem[ptr - 1] : stack_mem[0];      // 始终输出栈顶
+    end
 
     // 压栈
     always_ff @(posedge clk) begin
-        if (push_en_i & ptr != DEPTH) begin
-            stack_mem[ptr]  <= push_addr_i;
-        end
+        if (able_to_push)
+            stack_mem[ptr] <= push_pc_i;
     end
 
     // 指针控制
     always_ff @(posedge clk) begin
-        if (rst) ptr <= 0;
-        // else if (rollback_en_i) begin
-        //     ptr <= rollback_ptr_i;
-        // end
-        else if (push_en_i && ptr != DEPTH) ptr <= ptr + 1'b1;    // 压栈
-        else if (pop_en_i && ptr != 1'b0)   ptr <= ptr - 1'b1;    // 出栈
+        if (rst)
+            ptr <= 0;
+        else if (rollback_en_i)
+            ptr <= rollback_ptr_i;
+        else
+            ptr <= ptr + able_to_push - able_to_pop;;
     end
 endmodule

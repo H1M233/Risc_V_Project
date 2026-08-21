@@ -2,6 +2,11 @@
 `ifndef SWITCH
 `define SWITCH
 
+// BPU
+`define GSHARE_BHR_WIDTH     10
+`define GSHARE_PHT_IDX_WIDTH 12
+`define BTB_IDX_WIDTH        4
+
 // RAM
 // L1:   8 KB
 // L2: 256 KB
@@ -39,6 +44,6 @@
 // `define ENABLE_C
 
 // LUT 存放位置
-`define LUT_PATH "D:/FPGA_Project/Risc_V_Project/LUT"
+`define LUT_PATH "D:/FPGA_Project/Risc_V_Project/Fext_LUT"
 
 `endif

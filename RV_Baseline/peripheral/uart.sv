@@ -21,7 +21,7 @@
 
 module uart #(
     parameter CLK_FREQ = 50000000,
-    parameter BAUD_RATE = 115200
+    parameter BAUD_RATE = 1000000
 )(
     input  logic        clk,
     input  logic        rst,

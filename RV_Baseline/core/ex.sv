@@ -25,8 +25,9 @@ module ex(
 
     // to MEM
     output logic [31:0]     pc_o                        ,
-    output logic            valid_o,
+    output logic            valid_o                     ,
     output MEM_data_t       MEM_data_pkg_o              ,
+    output RF_data_t        RF_data_pkg_o               ,
     output CSR_data_t       CSR_data_pkg_o              ,
 
     // to D-Cache
@@ -105,11 +106,12 @@ module ex(
     // rd & dram 读写
     always_comb begin
         MEM_data_pkg_o = 0;
+        RF_data_pkg_o  = 0;
 
         if (valid) begin
-            MEM_data_pkg_o.rd_addr         = dpkg.rd_addr;                              // [RF]  写地址
-            MEM_data_pkg_o.rd_data         = alu_result;                                // [RF]  写数据
-            MEM_data_pkg_o.regs_wen        = regs_wen_i & valid;                        // [RF]  写使能
+            RF_data_pkg_o.rd_addr          = dpkg.rd_addr;                              // [RF]  写地址
+            RF_data_pkg_o.rd_data          = alu_result;                                // [RF]  写数据
+            RF_data_pkg_o.regs_wen         = regs_wen_i & valid;                        // [RF]  写使能
 
             MEM_data_pkg_o.req_load        = DCACHE_data_pkg_o.req_load;                // [MEM] 访存请求
             MEM_data_pkg_o.load_is_signed  = ipkg.sel_lb | ipkg.sel_lh | ipkg.sel_lw;   // [MEM] 访存使用符号

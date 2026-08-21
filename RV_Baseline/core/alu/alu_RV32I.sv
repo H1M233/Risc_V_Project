@@ -63,12 +63,14 @@ module alu_RV32I(
         bpkg = 0;
 
         if (valid_i) begin
-            bpkg.update_btb_en     = jalr_pred_mispredict;        // btb 更新使能
-            bpkg.update_gshare_en  = branch_pred_mispredict;      // gshare 更新使能
-            bpkg.update_pc         = dpkg.pc;
-            bpkg.update_target     = jalr_target;
-            bpkg.actual_taken      = ~dpkg.pred_taken;
-            bpkg.rollback_ras_ptr  = dpkg.ras_ptr;
+            bpkg.update_btb_en          = jalr_pred_mispredict & ~dpkg.is_ret;  // btb 更新使能
+            bpkg.update_gshare_en       = branch_pred_mispredict;               // gshare 更新使能
+            bpkg.update_pc              = dpkg.pc;
+            bpkg.update_target          = jalr_target;
+            bpkg.actual_taken           = ~dpkg.pred_taken;
+            bpkg.rollback_ras_en        = mispred_flush.en;   // RAS 回滚使能
+            bpkg.ras_ptr_snapshot       = dpkg.ras_ptr_snapshot;
+            bpkg.gshare_ghr_snapshot    = dpkg.gshare_ghr_snapshot;
         end
     end
 

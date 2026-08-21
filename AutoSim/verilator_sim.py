@@ -3,6 +3,8 @@ from pathlib import Path
 import sys
 import json
 import os
+import time
+import threading
 
 '''全局变量'''
 AutoSim_dir = Path.cwd()    # 当前文件夹
@@ -271,7 +273,7 @@ def getPrevTimeJson(prj_name, mem_name):
         return 0
 
 
-def softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(-1, -1), Debugging=False):
+def software_test(prj_dict, mem_dict, enableTrace=False, traceRange=(-1, -1), Debugging=False):
     print()
     for mem_name, mem_file in mem_dict.items():
         irom_bin_dir = AutoSim_dir / 'mem_init' / mem_file['irom']
@@ -295,7 +297,7 @@ def softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(-1, -1), Deb
 
         success, error_msg = compile(prj_dict, 'software', macros)
         if success:
-            print(f'编译成功\n')
+            print(f'编译完成\n')
 
             # 环境变量定义
             env = os.environ.copy()
@@ -311,7 +313,7 @@ def softwareTest(prj_dict, mem_dict, enableTrace=False, traceRange=(-1, -1), Deb
             print('=' * 40)
 
 
-def instTest(prj_dict, testAll=False):
+def inst_test(prj_dict, testAll=False):
     inst_name = ''
     enableTrace = False
 
@@ -388,7 +390,7 @@ def instTest(prj_dict, testAll=False):
     print(f"\033[2K指令集测试共 \033[92m{passCnt}个成功 \033[91m{failCnt}个失败\033[0m", end='\n\033[2K')
 
 
-def systemTest(prj_dict, cmake=True, enableTrace=False, traceRange=(-1, -1)):
+def system_test(prj_dict, cmake=True, enableTrace=False, traceRange=(-1, -1)):
     print()
     json_filename = 'settings.json'
     
@@ -449,7 +451,7 @@ def systemTest(prj_dict, cmake=True, enableTrace=False, traceRange=(-1, -1)):
     success, error_msg = compile(prj_dict, 'system', macros)
 
     if success:
-        print(f'编译完成')
+        print(f'编译完成\n')
 
         # 环境变量定义
         env=os.environ.copy()
@@ -462,21 +464,42 @@ def systemTest(prj_dict, cmake=True, enableTrace=False, traceRange=(-1, -1)):
         print('=' * 40)
 
 
+def remove_screen_flag(flag):
+    if os.path.exists(flag):
+        os.remove(flag)
+
+
+def wait_for_screen(flag, timeout=15):
+    startTime = time.time()
+
+    while time.time() - startTime < timeout:
+        if os.path.exists(flag):
+            os.remove(flag)
+            break
+        time.sleep(0.1)
+    
+    subprocess.run('wt.exe -w -1 --colorScheme "One Half Dark" wsl.exe -- bash -lc "screen /tmp/RV_UART"', shell=True)
+
+
 def main():
     while True:
         try:
             prj_dict, mem_dict, testInst, testAll, testSys = prj_mem_ch()
             if testInst:
-                instTest(prj_dict, testAll=testAll)
+                inst_test(prj_dict, testAll=testAll)
             if mem_dict:
-                softwareTest(
+                software_test(
                     prj_dict, mem_dict, 
                     enableTrace=False, 
                     traceRange=(222, 223), 
                     Debugging=True
                 )
             if testSys:
-                systemTest(
+                flag = '/tmp/RV_UART_screen_ready'
+                remove_screen_flag(flag)
+                screenT = threading.Thread(target=wait_for_screen, args=(flag, 15,), daemon=True)
+                screenT.start()
+                system_test(
                     prj_dict, 
                     cmake=True, 
                     enableTrace=False, 

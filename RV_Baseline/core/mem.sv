@@ -13,22 +13,26 @@ module mem(
     // from ex_mem
     input  logic [31:0]     pc_i                    ,
     input  logic            valid_i                 ,
-    input  MEM_data_t       data_pkg_i              ,
+    input  MEM_data_t       MEM_data_pkg_i          ,
+    input  RF_data_t        RF_data_pkg_i           ,
     input  CSR_data_t       CSR_data_pkg_i          ,
 
     // to mem_wb & forwarding
     output logic [31:0]     pc_o                    ,
     output logic            valid_o                 ,
-    output RF_data_t        data_pkg_o              ,
+    output RF_data_t        RF_data_pkg_o           ,
     output CSR_data_t       CSR_data_pkg_o          
 );  
-    MEM_data_t mpkg_i;
-    MEM_data_t mpkg_o;
+    RF_data_t RF_pkg_i;
+    RF_data_t RF_pkg_o;
+    MEM_data_t MEM_pkg_i;
+    MEM_data_t MEM_pkg_o;
 
     // mem1
     always_comb begin
-        mpkg_i          = data_pkg_i;
-        mpkg_i.regs_wen = (data_pkg_i.req_load) ? 1'b0 : data_pkg_i.regs_wen;
+        RF_pkg_i          = RF_data_pkg_i;
+        RF_pkg_i.regs_wen = (MEM_data_pkg_i.req_load) ? 1'b0 : RF_data_pkg_i.regs_wen;
+        MEM_pkg_i         = MEM_data_pkg_i;
     end
 
     // mem1_mem2
@@ -36,14 +40,16 @@ module mem(
         if (rst) begin
             pc_o                <= 0;
             valid_o             <= 0;
-            mpkg_o              <= 0;
+            RF_pkg_o            <= 0;
+            MEM_pkg_o           <= 0;
             CSR_data_pkg_o      <= 0;
         end else if (pipe_hold) begin
             // ...
         end else begin
             pc_o                <= pc_i;
             valid_o             <= valid_i;
-            mpkg_o              <= mpkg_i;
+            RF_pkg_o            <= RF_pkg_i;
+            MEM_pkg_o           <= MEM_pkg_i;
             CSR_data_pkg_o      <= CSR_data_pkg_i;
         end
     end
@@ -52,16 +58,15 @@ module mem(
     wire [31:0] dcache_rdata_load_shift = 
         load_shift(
             DCACHE_rdata,
-            mpkg_o.load_mask,
-            mpkg_o.load_addr_low,
-            mpkg_o.load_is_signed
+            MEM_pkg_o.load_mask,
+            MEM_pkg_o.load_addr_low,
+            MEM_pkg_o.load_is_signed
         );
 
     always_comb begin
-        data_pkg_o          = mpkg_o;
-        data_pkg_o.rd_addr  = mpkg_o.rd_addr;
-        data_pkg_o.rd_data  = (mpkg_o.req_load) ? dcache_rdata_load_shift : mpkg_o.rd_data;
-        data_pkg_o.regs_wen = (mpkg_o.req_load & DCACHE_ack) | mpkg_o.regs_wen;
+        RF_data_pkg_o.rd_addr  = RF_pkg_o.rd_addr;
+        RF_data_pkg_o.rd_data  = (MEM_pkg_o.req_load) ? dcache_rdata_load_shift : RF_pkg_o.rd_data;
+        RF_data_pkg_o.regs_wen = (MEM_pkg_o.req_load & DCACHE_ack) | RF_pkg_o.regs_wen;
     end
         
     // 函数：
