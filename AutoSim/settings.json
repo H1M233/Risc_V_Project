@@ -38,6 +38,6 @@
   "MySystem": {
     "cmakePath": "~/RiscV-MySystem",
     "irom": "~/RiscV-MySystem/output/MySystem.bin",
-    "dram": "~/RiscV-MySystem/output/MySystem.bin"
+    "dram": "~/RiscV-MySystem/output/MySystem_data.bin"
   }
 }

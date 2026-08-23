@@ -3,28 +3,58 @@
 `define SWITCH
 
 // BPU
-`define GSHARE_BHR_WIDTH     10
-`define GSHARE_PHT_IDX_WIDTH 12
-`define BTB_IDX_WIDTH        4
+`define GSHARE_BHR_WIDTH        10
+`define GSHARE_PHT_IDX_WIDTH    12
+`define BTB_IDX_WIDTH           4
 
-// RAM
-// L1:   8 KB
-// L2: 256 KB
-
-// I-CACHE
-`define ICACHE_INDEX_WIDTH 7 // 4 KB
-
-// D-CACHE
-`define DCACHE_INDEX_WIDTH 9 // 4 KB
-
-// Perip Range
+// 空间分配
 `ifdef VERILATOR_INST_TEST
-    `define DRAM_ADDR_START  32'h0000_0000
-    `define DRAM_ADDR_END    32'hFFFF_FFFF
+    `define IROM_ADDR_START         32'h8000_0000
+    `define IROM_ADDR_END           32'h8000_3FFF
+    `define DRAM_ADDR_START         32'h8000_0000
+    `define DRAM_ADDR_END           32'h8000_3FFF
+    `define PERIP_KEY_ADDR          32'h8020_0010
+    `define PERIP_SEG_ADDR          32'h8020_0020
+    `define PERIP_LED_ADDR          32'h8020_0040
+    `define PERIP_CNT_ADDR          32'h8020_0050
+    `define PERIP_UART_ADDR         32'h8020_0060   // (+4): STATUS
+`elsif VERILATOR_SOFTWARE_TEST
+    `define IROM_ADDR_START         32'h8000_0000       // 16 KB
+    `define IROM_ADDR_END           32'h8000_3FFF
+    `define DRAM_ADDR_START         32'h8010_0000       // 256 KB
+    `define DRAM_ADDR_END           32'h8013_FFFF
+    `define PERIP_KEY_ADDR          32'h8020_0010
+    `define PERIP_SEG_ADDR          32'h8020_0020
+    `define PERIP_LED_ADDR          32'h8020_0040
+    `define PERIP_CNT_ADDR          32'h8020_0050
+    `define PERIP_UART_ADDR         32'h8020_0060   // (+4): STATUS
+`elsif VIVADO_SIM
+    `define IROM_ADDR_START         32'h8000_0000       // 16 KB
+    `define IROM_ADDR_END           32'h8000_3FFF
+    `define DRAM_ADDR_START         32'h8010_0000       // 256 KB
+    `define DRAM_ADDR_END           32'h8013_FFFF
+    `define PERIP_KEY_ADDR          32'h8020_0010
+    `define PERIP_SEG_ADDR          32'h8020_0020
+    `define PERIP_LED_ADDR          32'h8020_0040
+    `define PERIP_CNT_ADDR          32'h8020_0050
+    `define PERIP_UART_ADDR         32'h8020_0060   // (+4): STATUS
 `else
-    `define DRAM_ADDR_START  32'h8000_0000
-    `define DRAM_ADDR_END    32'h8013_FFFF
+    `define IROM_ADDR_START         32'h4000_0000       // 16 KB
+    `define IROM_ADDR_END           32'h4000_3FFF
+    `define DRAM_ADDR_START         32'h8000_0000       // 256 KB
+    `define DRAM_ADDR_END           32'h8003_FFFF
+    // `define DRAM_ADDR_START         32'h8000_0000       // 1 GB
+    // `define DRAM_ADDR_END           32'hBFFF_FFFF
+    `define PERIP_KEY_ADDR          32'h2000_0010
+    `define PERIP_SEG_ADDR          32'h2000_0014
+    `define PERIP_LED_ADDR          32'h2020_0018
+    `define PERIP_CNT_ADDR          32'h2020_001C
+    `define PERIP_UART_ADDR         32'h2020_0020   // (+4): STATUS
 `endif
+
+// Cache 配置
+`define ICACHE_INDEX_WIDTH 7 // I-Cache : 4 KB
+`define DCACHE_INDEX_WIDTH 9 // D-Cache : 4 KB
 
 // 扩展
 `define ENABLE_M

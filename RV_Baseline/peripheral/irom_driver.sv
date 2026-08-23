@@ -14,17 +14,18 @@ module irom_driver(
     assign irom_addr = perip_addr[13:2];
 
     IROM Mem_IROM (
-        .clka       (clk),
-        .addra      (irom_addr),
-        .douta      (perip_rdata),
-        .ena        (ren)
+        // .clka       (clk),
+        // .addra      (irom_addr),
+        // .douta      (perip_rdata),
+        // .ena        (ren)
+        .a              (irom_addr),
+        .spo            (perip_rdata)
     );
 
     // 握手信号
     assign ready = 1'b1;
-    logic arvalid_d;
     always_ff @(posedge clk) begin
-        arvalid_d   <= (ren) ? arvalid : 0;
-        rvalid      <= (ren) ? arvalid_d : 0;
+        // rvalid      <= (ren) ? arvalid : 0;
     end
+    assign rvalid = ren & arvalid;
 endmodule

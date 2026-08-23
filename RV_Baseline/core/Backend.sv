@@ -1,51 +1,51 @@
 `include "alu_def.svh"
 `include "switch.svh"
 module Backend(
-    input  logic            clk                     ,
-    input  logic            rst                     ,
+    input  logic                        clk                     ,
+    input  logic                        rst                     ,
 
     // from Frontend
-    input  prefetch_t       data_pkg_i              ,
-    input  logic            valid_i                 ,
+    input  prefetch_t                   data_pkg_i              ,
+    input  logic                        valid_i                 ,
 
     // to Frontend
-    output flush_t          EX_mispred_flush        ,
-    output BPU_data_t       BPU_data_pkg_o          ,
-    output logic            ready_o                 ,
+    output flush_t                      EX_mispred_flush        ,
+    output BPU_data_t                   BPU_data_pkg_o          ,
+    output logic                        ready_o                 ,
 
     // to RF
-    output logic [5:0]      RF_rs1_addr_o           ,
-    output logic [5:0]      RF_rs2_addr_o           ,
-    output RF_data_t        RF_data_pkg_o           ,
+    output logic [`RF_IDX_WIDTH - 1:0]  RF_rs1_addr_o           ,
+    output logic [`RF_IDX_WIDTH - 1:0]  RF_rs2_addr_o           ,
+    output RF_data_t                    RF_data_pkg_o           ,
     `ifdef ENABLE_F
-    output logic [5:0]      RF_rs3_addr_o           ,
+    output logic [`RF_IDX_WIDTH - 1:0]  RF_rs3_addr_o           ,
     `endif
 
     // to CSR
-    output logic [11:0]     CSR_addr_o              ,
-    output logic [31:0]     CSR_WB_pc_o             ,
-    output CSR_data_t       CSR_data_pkg_o          ,
-    output logic            EX_ecall_o              ,
-    output logic            EX_mret_o               ,
-    output logic            EX_sret_o               ,
+    output logic [11:0]                 CSR_addr_o              ,
+    output logic [31:0]                 CSR_WB_pc_o             ,
+    output CSR_data_t                   CSR_data_pkg_o          ,
+    output logic                        EX_ecall_o              ,
+    output logic                        EX_mret_o               ,
+    output logic                        EX_sret_o               ,
 
     // from RF
-    input  logic [31:0]     RF_rs1_rdata_i          ,
-    input  logic [31:0]     RF_rs2_rdata_i          ,
+    input  logic [31:0]                 RF_rs1_rdata_i          ,
+    input  logic [31:0]                 RF_rs2_rdata_i          ,
     `ifdef ENABLE_F
-    input  logic [31:0]     RF_rs3_rdata_i          ,
+    input  logic [31:0]                 RF_rs3_rdata_i          ,
     `endif
 
     // from CSR
-    input  logic [31:0]     CSR_rdata_i             ,
-    input  flush_t          CSR_trap_flush_i        ,
+    input  logic [31:0]                 CSR_rdata_i             ,
+    input  flush_t                      CSR_trap_flush_i        ,
 
     // Perip Bridge side
-    output logic [31:0]     DCACHE_perip_addr       ,
-    output logic [3:0]      DCACHE_perip_we         ,
-    output logic            DCACHE_perip_wen        ,
-    output logic [31:0]     DCACHE_perip_wdata      ,
-    input  logic [31:0]     DCACHE_perip_rdata      
+    output logic [31:0]                 DCACHE_perip_addr       ,
+    output logic [3:0]                  DCACHE_perip_we         ,
+    output logic                        DCACHE_perip_wen        ,
+    output logic [31:0]                 DCACHE_perip_wdata      ,
+    input  logic [31:0]                 DCACHE_perip_rdata      
 );
 
     // ID - out
@@ -112,9 +112,6 @@ module Backend(
 
     wire pipe_flush_id_ex       = EX_mispred_flush.en | CSR_trap_flush_i.en | ID_hazard_stall;
     wire pipe_flush_ex          = EX_mispred_flush.en;
-    wire pipe_flush_ex_mem      = 1'b0;
-    wire pipe_flush_ex_bpu      = EX_mispred_flush.en;
-
     // ID 例化
     id ID(
         .data_pkg_i             (data_pkg_i),
@@ -224,7 +221,7 @@ module Backend(
 
     // EX -> MEM
     always_ff @(posedge clk) begin
-        if (rst | pipe_flush_ex_mem) begin
+        if (rst) begin
             MEM_pc_i                <= 0;
             MEM_valid_i             <= 0;
             MEM_MEM_data_pkg_i      <= 0;
@@ -245,7 +242,7 @@ module Backend(
     
     // EX -> BPU
     always_ff @(posedge clk) begin
-        if (rst | pipe_flush_ex_bpu) begin
+        if (rst) begin
             BPU_data_pkg_o      <= 0;
             EX_mispred_flush    <= 0;
         end else if (pipe_hold_ex_bpu) begin

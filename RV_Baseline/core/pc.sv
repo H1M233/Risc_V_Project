@@ -1,4 +1,5 @@
 `include "rv32I.svh"
+`include "switch.svh"
 
 module pc(
     input  logic        clk                     ,
@@ -44,7 +45,7 @@ module pc(
 
     always_ff @(posedge clk) begin
         if (rst) begin
-            pc_o    <= 32'h8000_0000;
+            pc_o    <= `IROM_ADDR_START;
         end else begin
             if (pc_flush_en) begin
                 pc_o <= pc_flush_sel;

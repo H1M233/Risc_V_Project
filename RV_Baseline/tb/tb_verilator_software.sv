@@ -29,7 +29,7 @@ module tb_verilator_software(
     assign LED = `LED_PATH;
     assign SEG = `SEG_PATH;
 
-    `define VERILATOR_SOFTEWARE_TEST
+    `define VERILATOR_SOFTWARE_TEST
     `ifdef PROJECT_RV_SUPERSCALAR
     `elsif PROJECT_RV_BASELINE
         wire EX_valid = `EX_PATH.valid_o;

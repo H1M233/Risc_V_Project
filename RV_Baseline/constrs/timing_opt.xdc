@@ -4,5 +4,5 @@
 # set_property KEEP_HIERARCHY SOFT [get_cells -hierarchical *Mem_DRAM*]
 
 # ÉÈ³öÏÞÖÆ
-#set_property MAX_FANOUT 30 [get_nets -hierarchical *pc_o*]
+# set_property MAX_FANOUT 30 [get_nets -hierarchical *pc_o*]
 

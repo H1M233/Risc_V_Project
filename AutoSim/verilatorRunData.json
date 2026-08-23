@@ -1,53 +1,53 @@
 {
   "RV_Baseline": {
-    "INST TEST": "FAIL x",
+    "INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
-        "IPC": "0.928929",
-        "REAL TIME": "13.4144",
+        "IPC": "0.928928",
+        "REAL TIME": "14.7776",
         "RUN TIME": "355",
         "SEG TIME": "354",
-        "BPU ACCURACY": "0.888382",
+        "BPU ACCURACY": "0.888388",
         "LED": "PASS √"
       },
       "src0": {
-        "IPC": "0.766427",
-        "REAL TIME": "567.092",
-        "RUN TIME": "16738",
-        "SEG TIME": "16737",
-        "BPU ACCURACY": "0.690661",
+        "IPC": "0.756644",
+        "REAL TIME": "556.773",
+        "RUN TIME": "15898",
+        "SEG TIME": "15897",
+        "BPU ACCURACY": "0.755051",
         "LED": "PASS √"
       },
       "src1": {
-        "IPC": "0.675427",
-        "REAL TIME": "621.183",
-        "RUN TIME": "18506",
-        "SEG TIME": "18505",
-        "BPU ACCURACY": "0.601352",
+        "IPC": "0.643915",
+        "REAL TIME": "572.845",
+        "RUN TIME": "15975",
+        "SEG TIME": "15974",
+        "BPU ACCURACY": "0.870328",
         "LED": "PASS √"
       },
       "src2": {
-        "IPC": "0.825232",
-        "REAL TIME": "889.286",
-        "RUN TIME": "23434",
-        "SEG TIME": "23433",
-        "BPU ACCURACY": "0.743964",
+        "IPC": "0.826011",
+        "REAL TIME": "853.448",
+        "RUN TIME": "22549",
+        "SEG TIME": "22548",
+        "BPU ACCURACY": "0.772184",
         "LED": "PASS √"
       },
       "withMext": {
-        "IPC": "0.657825",
-        "REAL TIME": "167.034",
-        "RUN TIME": "4519",
-        "SEG TIME": "4518",
-        "BPU ACCURACY": "0.0192573",
+        "IPC": "0.622604",
+        "REAL TIME": "162.905",
+        "RUN TIME": "4198",
+        "SEG TIME": "4197",
+        "BPU ACCURACY": "0.759679",
         "LED": "PASS √"
       },
       "withoutMext": {
-        "IPC": "0.795883",
-        "REAL TIME": "331.053",
-        "RUN TIME": "9125",
-        "SEG TIME": "9124",
-        "BPU ACCURACY": "0.696726",
+        "IPC": "0.782279",
+        "REAL TIME": "336.88",
+        "RUN TIME": "8774",
+        "SEG TIME": "8773",
+        "BPU ACCURACY": "0.734007",
         "LED": "PASS √"
       }
     }
