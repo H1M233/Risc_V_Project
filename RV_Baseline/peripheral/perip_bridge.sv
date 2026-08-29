@@ -28,12 +28,12 @@ module perip_bridge(
     input  logic        uart_rx_i                   ,
     output logic        uart_tx_o                   
 );
-    localparam KEY_ADDR         = 32'h8020_0010;    // key[3:0]
-    localparam SEG_ADDR         = 32'h8020_0020;    // seg
-    localparam LED_ADDR         = 32'h8020_0040;    // led[3:0]
-    localparam CNT_ADDR         = 32'h8020_0050;    // counter
-    localparam UART_ADDR        = 32'h8020_0060;    // uart[7:0]
-    localparam UART_STATUS_ADDR = 32'h8020_0064;
+    localparam KEY_ADDR         = `PERIP_KEY_ADDR;          // KEY[3:0]
+    localparam SEG_ADDR         = `PERIP_SEG_ADDR;          // SEG
+    localparam LED_ADDR         = `PERIP_LED_ADDR;          // LED[3:0]
+    localparam CNT_ADDR         = `PERIP_CNT_ADDR;          // CNT
+    localparam UART_ADDR        = `PERIP_UART_ADDR;         // UART[7:0]
+    localparam UART_STATUS_ADDR = `PERIP_UART_ADDR + 4;     // UART_STATUS
     
     localparam CNT_RESET_CMD = 32'h4000_0000;
     localparam CNT_START_CMD = 32'h8000_0000;
@@ -53,7 +53,7 @@ module perip_bridge(
     // read & write process
     always_ff @(posedge clk) begin
         if (rst) begin
-            for (int i = 0; i < 3; i++) begin
+            for (int i = 0; i < 2; i++) begin
                 perip_addr_d[i] <= 0;
                 perip_wen_d[i]  <= 0;  
             end
@@ -134,15 +134,6 @@ module perip_bridge(
         .seg                (seg_digit_o)
     ); 
 
-    // DRAM rw
-    dram_driver dram_driver_inst (
-        .clk				(clk),
-        .perip_addr			(DCACHE_perip_addr),
-        .perip_wdata		(DCACHE_perip_wdata),
-        .perip_we 			(DCACHE_perip_we),
-        .perip_rdata		(dram_rdata)
-    );
-
     // counter rw
     counter counter_inst (
         .cpu_clk            (clk),
@@ -177,6 +168,15 @@ module perip_bridge(
         .ren                (ICACHE_perip_ren),
         .ready              (ICACHE_perip_ready),
         .rvalid             (ICACHE_perip_rvalid)
+    );
+
+    // DRAM rw
+    dram_driver dram_driver_inst (
+        .clk				(clk),
+        .perip_addr			(DCACHE_perip_addr),
+        .perip_wdata		(DCACHE_perip_wdata),
+        .perip_we 			(DCACHE_perip_we),
+        .perip_rdata		(dram_rdata)
     );
 
     always_comb begin

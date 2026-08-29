@@ -451,7 +451,7 @@ def system_test(prj_dict, cmake=True, enableTrace=False, traceRange=(-1, -1)):
     success, error_msg = compile(prj_dict, 'system', macros)
 
     if success:
-        print(f'编译完成\n')
+        print(f'编译完成\n', flush=True )
 
         # 环境变量定义
         env=os.environ.copy()
@@ -469,14 +469,12 @@ def remove_screen_flag(flag):
         os.remove(flag)
 
 
-def wait_for_screen(flag, timeout=15):
-    startTime = time.time()
-
-    while time.time() - startTime < timeout:
+def wait_for_screen(flag):
+    while True:
+        time.sleep(0.1)
         if os.path.exists(flag):
             os.remove(flag)
             break
-        time.sleep(0.1)
     
     subprocess.run('wt.exe -w -1 --colorScheme "One Half Dark" wsl.exe -- bash -lc "screen /tmp/RV_UART"', shell=True)
 
@@ -497,7 +495,7 @@ def main():
             if testSys:
                 flag = '/tmp/RV_UART_screen_ready'
                 remove_screen_flag(flag)
-                screenT = threading.Thread(target=wait_for_screen, args=(flag, 15,), daemon=True)
+                screenT = threading.Thread(target=wait_for_screen, args=(flag,), daemon=True)
                 screenT.start()
                 system_test(
                     prj_dict, 

@@ -63,6 +63,18 @@ module icache (
         end
     end
 
+    // IROM 旁路输出
+    logic IROM_bypass;
+    `ifdef VERILATOR_INST_TEST
+        assign IROM_bypass = 1'b1;
+    `elsif VERILATOR_SOFTWARE_TEST
+        assign IROM_bypass = 1'b1;
+    `elsif VIVADO_SIM
+        assign IROM_bypass = 1'b1;
+    `else
+        assign IROM_bypass = cpu_addr[31:28] == 4'h4;
+    `endif
+
     // 地址解码
     `ifdef ENABLE_C
     logic [31:0] cpu_pc_add2_r;
@@ -86,8 +98,8 @@ module icache (
     // 命中判断
     wire hit_way0    = tagv_w0[query_index] == {1'b1, query_tag};
     wire hit_way1    = tagv_w1[query_index] == {1'b1, query_tag};
-    wire icache_hit  = hit_way0 | hit_way1;
-    wire icache_miss = ~icache_hit;
+    wire ICACHE_hit  = hit_way0 | hit_way1;
+    wire ICACHE_miss = ~ICACHE_hit & ~IROM_bypass;
 
     // 读数据
     wire         replace_way_rdata  = replace_way[query_index];
@@ -104,7 +116,8 @@ module icache (
 
     // IROM 请求
     wire [31:0] request_addr = {miss_tag, miss_index, miss_word_sel, 2'b0};
-    assign perip_addr = (requset_arvalid) ? request_addr : 32'b0;
+    assign perip_addr = (IROM_bypass)     ? cpu_addr :
+                        (requset_arvalid) ? request_addr : 32'b0;
 
     // 写入行缓存
     logic [127:0] line_buffer;
@@ -132,8 +145,8 @@ module icache (
     end
 
     // 状态机
-    assign perip_arvalid = requset_arvalid;
-    assign perip_ren     = state == REQUEST_n_FILL;
+    assign perip_arvalid = requset_arvalid | IROM_bypass;
+    assign perip_ren     = state == REQUEST_n_FILL | IROM_bypass;
     always_ff @(posedge clk) begin
         if (rst | pipe_flush) begin
             state               <= IDLE;
@@ -152,7 +165,7 @@ module icache (
         end else begin
             case (state)
                 IDLE : begin
-                    if (icache_miss) begin
+                    if (ICACHE_miss) begin
                         state           <= REQUEST_n_FILL;
                         miss_index      <= query_index;
                         miss_tag        <= query_tag;
@@ -162,7 +175,7 @@ module icache (
 
                 `ifdef ENABLE_C
                     if (align2x_line) begin
-                        if (icache_hit) begin
+                        if (ICACHE_hit) begin
                             if (align2x_low_valid) begin
                                 align2x_high_valid <= 1'b1;
                                 align2x_high_rdata <= data_rdata[15:0];
@@ -216,9 +229,9 @@ module icache (
 
     // CPU 输出
     `ifdef ENABLE_C
-    assign cpu_stall = state != IDLE | icache_miss | (align2x_line & ~(align2x_low_valid & align2x_high_valid));
+    assign cpu_stall = state != IDLE | ICACHE_miss | (align2x_line & ~(align2x_low_valid & align2x_high_valid));
     `else
-    assign cpu_stall = state != IDLE | icache_miss;
+    assign cpu_stall = state != IDLE | ICACHE_miss;
     `endif
 
     always_ff @(posedge clk) begin
@@ -228,8 +241,12 @@ module icache (
             cpu_rvalid  <= 1'b0;
         end else if (pipe_hold) begin
             // ...
+        end else if (IROM_bypass) begin
+            cpu_addr_r  <= cpu_addr;
+            cpu_rdata   <= perip_rdata;
+            cpu_rvalid  <= 1'b1;
         `ifdef ENABLE_C
-        end else if (state == IDLE & icache_hit & ~align2x_line) begin
+        end else if (state == IDLE & ICACHE_hit & ~align2x_line) begin
             cpu_addr_r  <= cpu_addr;
             cpu_rdata   <= data_rdata;
             cpu_rvalid  <= 1'b1;
@@ -238,7 +255,7 @@ module icache (
             cpu_rdata   <= data_xline_rdata;
             cpu_rvalid  <= 1'b1;
         `else
-        end else if (state == IDLE & icache_hit) begin
+        end else if (state == IDLE & ICACHE_hit) begin
             cpu_addr_r  <= cpu_addr;
             cpu_rdata   <= data_rdata;
             cpu_rvalid  <= 1'b1;

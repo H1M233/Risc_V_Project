@@ -21,36 +21,36 @@ module top_riscv(
     input  logic [31:0]     DCACHE_perip_rdata      
 );
     // RF
-    logic [5:0]     RF_rs1_addr_i;
-    logic [5:0]     RF_rs2_addr_i;
-    logic [31:0]    RF_rs1_rdata_o;
-    logic [31:0]    RF_rs2_rdata_o;
+    logic [`RF_IDX_WIDTH - 1:0] RF_rs1_addr_i;
+    logic [`RF_IDX_WIDTH - 1:0] RF_rs2_addr_i;
+    logic [31:0]                RF_rs1_rdata_o;
+    logic [31:0]                RF_rs2_rdata_o;
     `ifdef ENABLE_F
-    logic [5:0]     RF_rs3_addr_i;
-    logic [31:0]    RF_rs3_rdata_o;
+    logic [`RF_IDX_WIDTH - 1:0] RF_rs3_addr_i;
+    logic [31:0]                RF_rs3_rdata_o;
     `endif
     
     // CSR
-    logic [11:0]    CSR_addr_i;
-    logic [31:0]    CSR_rdata;
-    flush_t         CSR_trap_flush;
+    logic [11:0]                CSR_addr_i;
+    logic [31:0]                CSR_rdata;
+    flush_t                     CSR_trap_flush;
     
     // Frontend to Backend
-    prefetch_t      Backend_data_pkg_i;
-    logic           Backend_valid_i;
+    prefetch_t                  Backend_data_pkg_i;
+    logic                       Backend_valid_i;
     
     // Backend to Frontend
-    BPU_data_t      Backend_BPU_data_pkg_o;
-    logic           Backend_ready;
-    flush_t         Backend_EX_mispred_flush_o;
-    logic           Backend_EX_ecall_o;
-    logic           Backend_EX_mret_o;
-    logic           Backend_EX_sret_o;
+    BPU_data_t                  Backend_BPU_data_pkg_o;
+    logic                       Backend_ready;
+    flush_t                     Backend_EX_mispred_flush_o;
+    logic                       Backend_EX_ecall_o;
+    logic                       Backend_EX_mret_o;
+    logic                       Backend_EX_sret_o;
     
     // Backend to RF & CSR
-    RF_data_t       Backend_RF_data_pkg_o;
-    logic [31:0]    Backend_WB_pc_o;
-    CSR_data_t      Backend_CSR_data_pkg_o;
+    RF_data_t                   Backend_RF_data_pkg_o;
+    logic [31:0]                Backend_WB_pc_o;
+    CSR_data_t                  Backend_CSR_data_pkg_o;
 
     // RF 例化
     RF RF(

@@ -37,9 +37,9 @@ module Frontend(
     // I-Cache
     logic [31:0]    ICACHE_req_pc;
     logic           ICACHE_req_valid;
-    logic [31:0]    ICACHE_res_pc;
-    logic [31:0]    ICACHE_res_inst;
-    logic           ICACHE_res_valid;
+    logic [31:0]    ICACHE_resp_pc;
+    logic [31:0]    ICACHE_resp_inst;
+    logic           ICACHE_resp_valid;
     logic           ICACHE_stall;
 
     // RVCExpander
@@ -49,10 +49,10 @@ module Frontend(
     `endif
 
     // BPU
-    logic [31:0]    BPU_pc_r;
-    logic [31:0]    BPU_inst_r;
+    logic [31:0]                        BPU_pc_r;
+    logic [31:0]                        BPU_inst_r;
     `ifdef ENABLE_C
-    logic           BPU_is_compressed_r;
+    logic                               BPU_is_compressed_r;
     `endif
     logic [31:0]                        BPU_pc_next;
     logic [31:0]                        BPU_pc_next_r;
@@ -97,9 +97,9 @@ module Frontend(
 
         .cpu_addr               (ICACHE_req_pc),
         .cpu_arvalid            (ICACHE_req_valid),
-        .cpu_addr_r             (ICACHE_res_pc),
-        .cpu_rdata              (ICACHE_res_inst),
-        .cpu_rvalid             (ICACHE_res_valid),
+        .cpu_addr_r             (ICACHE_resp_pc),
+        .cpu_rdata              (ICACHE_resp_inst),
+        .cpu_rvalid             (ICACHE_resp_valid),
         .cpu_stall              (ICACHE_stall),
 
         .perip_addr             (ICACHE_perip_addr),
@@ -123,7 +123,7 @@ module Frontend(
     `ifdef ENABLE_C
     assign BPU_pc_next = (RVCE_is_compressed) ? ICACHE_res_pc + 32'h2 : ICACHE_res_pc + 32'h4;
     `else
-    assign BPU_pc_next = ICACHE_res_pc + 32'h4;
+    assign BPU_pc_next = ICACHE_resp_pc + 32'h4;
     `endif
     always_ff @(posedge clk) begin
         if (rst) begin
@@ -147,15 +147,15 @@ module Frontend(
             BPU_valid_r                 <= 0;
             BPU_gsahre_ghr_snapshot_r   <= 0;
         end else begin
-            BPU_pc_r                    <= ICACHE_res_pc;
+            BPU_pc_r                    <= ICACHE_resp_pc;
             `ifdef ENABLE_C
             BPU_inst_r                  <= RVCE_expanded_inst;
             BPU_is_compressed_r         <= RVCE_is_compressed;
             `else
-            BPU_inst_r                  <= ICACHE_res_inst;
+            BPU_inst_r                  <= ICACHE_resp_inst;
             BPU_pc_next_r               <= BPU_pc_next;
             `endif
-            BPU_valid_r                 <= ICACHE_res_valid;
+            BPU_valid_r                 <= ICACHE_resp_valid;
             BPU_gsahre_ghr_snapshot_r   <= BPU_gsahre_ghr_snapshot;
         end
     end
@@ -172,14 +172,14 @@ module Frontend(
         .outer_flush        (Frontend_flush),
 
         .pc_early_i         (ICACHE_req_pc),
-        .pc_i               (ICACHE_res_pc),
+        .pc_i               (ICACHE_resp_pc),
         `ifdef ENMABLE_C
         .inst_i             (RVCE_expanded_inst),
         `else
-        .inst_i             (ICACHE_res_inst),
+        .inst_i             (ICACHE_resp_inst),
         `endif
         .pc_next_i          (BPU_pc_next),
-        .valid_i            (ICACHE_res_valid),
+        .valid_i            (ICACHE_resp_valid),
 
         .data_pkg_i         (BPU_data_pkg_i),
 
