@@ -1,26 +1,21 @@
 .history/
 .settings/
 .vscode/
+.sigasi/
 
 \[文档\]/
 
-Quartus_Project/
 Vivado_Project/
 
-AutoSim/__pycache__
-AutoSim/out.vvp
-AutoSim/obj_dir
+AutoSim/src/__pycache__
 AutoSim/mem_init/inst_test.txt
-AutoSim/mem_init/irom.txt
-AutoSim/mem_init/dram.txt
+AutoSim/mem_init/software_test_irom.txt
+AutoSim/mem_init/software_test_dram.txt
+AutoSim/mem_init/MySystem_irom.txt
+AutoSim/mem_init/MySystem_dram.txt
 AutoSim/software_results.txt
-
-twin/
-
-.library_mapping.xml
-.project
-
 AutoSim/vcd
 AutoSim/Gen_MySystem.bat
 
+project.sigasi
 

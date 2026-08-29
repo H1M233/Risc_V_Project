@@ -1,10 +1,10 @@
 {
   "RV_Baseline": {
-    "INST TEST": "FAIL x",
+    "INST TEST": "PASS √",
     "SOFTWARE TEST": {
       "init": {
         "IPC": "0.928929",
-        "REAL TIME": "13.4144",
+        "REAL TIME": "9.27259",
         "RUN TIME": "355",
         "SEG TIME": "354",
         "BPU ACCURACY": "0.888382",

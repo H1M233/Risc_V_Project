@@ -1,6 +1,6 @@
 `include "tb_def.svh"
 
-module tb_verilator_system(
+module tb_verilator_software_test(
     input  logic            clk_50MHz,
     input  logic            clk_cpu,
     input  logic            rst,
@@ -17,27 +17,22 @@ module tb_verilator_system(
     input  logic            uart_rx,
     output logic            uart_tx
 );
+`define VERILATOR_SOFTWARE_TEST
+
     top uut (
-        .w_clk_50Mhz        (clk_50MHz),
-        .cpu_clk            (clk_cpu),
-        .w_clk_rst          (rst),
-        .i_uart_rx          (uart_rx),
-        .o_uart_tx          (uart_tx),
-
-        .i_key              (),
-        .o_seg_digit        (),
-        .o_seg_sel          (),
-        .o_led              ()
+        .w_clk_50Mhz(clk_50MHz), .cpu_clk (clk_cpu), .w_clk_rst(rst), 
+        .i_uart_rx(uart_rx), .o_uart_tx(uart_tx),
+        .i_key(), .o_seg_digit(), .o_seg_sel(), .o_led()
     );
-        initial begin
-            $readmemh("./mem_init/MySystem_irom.txt", `IROM_PATH);
-            $readmemh("./mem_init/MySystem_dram.txt", `DRAM_PATH);
-        end
-        assign LED = `LED_PATH;
-        assign SEG = `SEG_PATH;
+    initial begin
+        $readmemh("./mem_init/software_test_irom.txt", `IROM_PATH);
+        $readmemh("./mem_init/software_test_dram.txt", `DRAM_PATH);
+    end
+    assign LED = `LED_PATH;
+    assign SEG = `SEG_PATH;
 
-    `define VERILATOR_SYSTEM_TEST
-    `ifdef PROJECT_RV_BASELINE
+    `ifdef PROJECT_RV_SUPERSCALAR
+    `elsif PROJECT_RV_BASELINE
         wire EX_valid = `EX_PATH.valid_o;
         assign commit = EX_valid;
 
@@ -58,13 +53,21 @@ module tb_verilator_system(
         assign pred_miss_b = EX_is_branch & EX_is_mispred;
         assign pred_miss_jr = EX_is_jalr & EX_is_mispred;
 
-        always @(posedge clk_cpu) begin
+        always_ff @(posedge clk_cpu) begin
             if (EX_is_jal)
                 func_block_pc0 <= `EX_PATH.dpkg.imm;
             else if (EX_is_jalr)
                 func_block_pc0 <= `EX_PATH.ALU_RV32I.jalr_target;
             else if (EX_is_branch & `EX_PATH.ALU_RV32I.branch_taken == 1'b1)
                 func_block_pc0 <= `EX_PATH.ALU_RV32I.branch_target;
+
+            // if (pc0 == 32'h80000bb0) begin
+            //     branch1 <= `EX_PATH.rs1_data_fwd;
+            //     branch2 <= `EX_PATH.rs2_data_fwd;
+            // end
+            // if (pc0 == 32'h80000bb0) begin
+            //     $finish();
+            // end
         end
 
     `endif

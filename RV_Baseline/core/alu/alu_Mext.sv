@@ -1,4 +1,6 @@
 `include "../def/alu_def.svh"
+
+`ifdef ENABLE_M
 module alu_Mext(
     input  logic        clk,
     input  logic        rst,
@@ -59,3 +61,4 @@ module alu_Mext(
         endcase
     end
 endmodule
+`endif

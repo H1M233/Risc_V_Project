@@ -1,4 +1,6 @@
 `include "alu_def.svh"
+
+`ifdef ENABLE_F
 module alu_Fext(
     input  logic        clk,
     input  logic        rst,
@@ -1046,3 +1048,4 @@ module alu_Fext(
 
     assign ctrl = fdiv_ctrl | fsqrt_ctrl;
 endmodule
+`endif

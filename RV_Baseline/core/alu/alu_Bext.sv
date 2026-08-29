@@ -1,5 +1,7 @@
 `include "../def/alu_def.svh"
 `include "../def/switch.svh"
+
+`ifdef ENABLE_B
 module alu_Bext(
     input  logic        clk,
     input  logic        rst,
@@ -335,3 +337,4 @@ module alu_Bext(
         endcase
     end
 endmodule
+`endif

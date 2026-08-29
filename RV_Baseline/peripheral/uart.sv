@@ -46,7 +46,7 @@ module uart #(
     reg [7:0] rx_shift;
     reg rx_d0, rx_d1, rx_d2;
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (rst) begin
             rx_d0 <= 1'b1;
             rx_d1 <= 1'b1;
@@ -64,7 +64,7 @@ module uart #(
     reg rx_ready_pulse;
     reg [15:0] rx_ready_cnt;
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (rst) begin
             rx_state <= 0;
             rx_cnt <= 0;
@@ -116,7 +116,7 @@ module uart #(
     end
     
     // rx_ready delay for half of BAUD_DIV
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (rst) begin
             rx_ready <= 1'b0;
             rx_ready_cnt <= 0;
@@ -140,7 +140,7 @@ module uart #(
     reg [3:0] tx_bit_cnt;
     reg [9:0] tx_shift;
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (rst) begin
             tx_state <= 0;
             tx_ready <= 1;

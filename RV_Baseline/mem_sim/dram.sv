@@ -23,13 +23,13 @@ module dram_BRAM(
         dram_we_i[0] ? dram_wdata_i[7 :0 ] : dram_rdata_raw[7 :0 ]
     };
     
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         dram_rdata_d1_o <= (dram_wen_i) ? pre_wdata : dram_rdata_raw;
         dram_rdata_d2_o <= dram_rdata_d1_o;
         dram_rdata_d3_o <= dram_rdata_d2_o;
     end
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if(dram_wen_i) ram_mem[dram_word_addr] <= pre_wdata;
     end
 endmodule

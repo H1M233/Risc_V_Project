@@ -1,6 +1,6 @@
 #include <verilated.h>
 #include <verilated_fst_c.h>
-#include "Vtb_verilator_inst.h"
+#include "Vtb_verilator_inst_test.h"
 #include <iostream>
 #include <iomanip>
 #include <cfloat>
@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
     contextp->timeprecision(-9);   // ns
 
     // 创建顶层模块
-    Vtb_verilator_inst* top = new Vtb_verilator_inst{contextp, "TOP"};
+    Vtb_verilator_inst_test* top = new Vtb_verilator_inst_test{contextp, "TOP"};
 
     // 记录波形
     #ifdef ENABLE_TRACE

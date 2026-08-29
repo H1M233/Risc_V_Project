@@ -1,6 +1,6 @@
 `include "tb_def.svh"
 
-module tb_verilator_inst(
+module tb_verilator_inst_test(
     input  logic    clk_50MHz,
     input  logic    rst,
 
@@ -8,6 +8,8 @@ module tb_verilator_inst(
     output logic    x26,
     output logic    x27
 );
+`define VERILATOR_INST_TEST
+
     top uut (
         .w_clk_50Mhz(clk_50MHz), .cpu_clk (clk_50MHz), .w_clk_rst(rst), 
         .i_uart_rx(), .o_uart_tx(),
@@ -17,8 +19,7 @@ module tb_verilator_inst(
             $readmemh("./mem_init/inst_test.txt", `IROM_PATH);
             $readmemh("./mem_init/inst_test.txt", `DRAM_PATH);
         end
-
-    `define VERILATOR_INST_TEST
+    
     `ifdef PROJECT_RV_SUPERSCALAR
     `elsif PROJECT_RV_BASELINE
         assign x3  = `CPU_PATH.RF.RF_p1[3];   // 进行的test序号

@@ -68,7 +68,6 @@ module bpu_top #(
     // 取出 rd 和 rs1 的地址
     wire [4:0]  rd_addr  = inst_i[11:7];
     wire [4:0]  rs1_addr = inst_i[19:15];
-    wire [11:0] I_imm    = inst_i[31:25];
 
     // 处理 TYPE_B
     wire            is_B_type   = (inst_i[6:0] == `TYPE_B);

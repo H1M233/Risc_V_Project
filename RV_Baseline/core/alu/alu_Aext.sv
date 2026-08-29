@@ -1,5 +1,7 @@
 `include "../def/alu_def.svh"
 `include "../def/switch.svh"
+
+`ifdef ENABLE_A
 module alu_Aext(
     input  logic        clk,
     input  logic        rst,
@@ -142,3 +144,4 @@ module alu_Aext(
     assign AXI_lock = (amo_get_ctrl) & ~finished;
     assign ctrl     = (amo_get_ctrl) & ~finished;
 endmodule
+`endif
