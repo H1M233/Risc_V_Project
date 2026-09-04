@@ -98,7 +98,7 @@ class Console:
         mem_dict = dict(enumerate([key for key in self.json_settings['mem_init']], start=1))
         while not skip_choice:
             # 打印信息
-            print('\r[I] Inst Test  [A] ALL  [S] System ', end='')
+            print('\r[I] Inst Test  [A] ALL  [S] System  ', end='')
             for index, prj_name in mem_dict.items():
                 print(f'[{index}] {prj_name}', end='', flush=True)
                 print('  ' if index != len(mem_dict) else ': ', end='', flush=True)
@@ -122,8 +122,9 @@ class Console:
                 print("\033[96mInst Test\033[0m")
                 break
             else:
-                mem_ch.append(mem_dict.get(int(key_get)) if key_get.isdecimal() else None)
-                if mem_ch[-1] is not None:
+                mem_ch_get = mem_dict.get(int(key_get)) if key_get.isdecimal() else None
+                if mem_ch_get is not None:
+                    mem_ch.append(mem_ch_get)
                     break
 
         # 打印结果
@@ -170,7 +171,6 @@ class Console:
                 AutoSim_dir = self.AutoSim_dir,
                 json_settings = self.json_settings,
                 prj_dict = prj_dict,
-                cmake = False,
                 debugging = True,
                 enableTrace = False,
                 traceRange = (-1, -1)

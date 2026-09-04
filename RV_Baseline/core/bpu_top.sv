@@ -17,7 +17,6 @@ module bpu_top #(
     input  logic [31:0]     pc_early_i          ,
     input  logic [31:0]     pc_i                ,
     input  logic [31:0]     inst_i              ,
-    input  logic [31:0]     pc_next_i           ,
     input  logic            valid_i             ,
 
     // from ex
@@ -123,7 +122,7 @@ module bpu_top #(
     // ---
     // RAS -> POP -> PRED
     // ---
-    assign ras_push_pc_i = pc_next_i;
+    assign ras_push_pc_i = pc_early_i;
     assign ras_pop_en_i    = ras_can_pop & ~pipe_hold & ~pipe_flush & valid_i;
     assign ras_push_en_i   = is_ras_push & ~pipe_hold & ~pipe_flush & valid_i;
     always_ff @(posedge clk) begin

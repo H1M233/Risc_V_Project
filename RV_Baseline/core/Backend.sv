@@ -50,6 +50,7 @@ module Backend(
 
     // ID - out
     EX_data_t       ID_data_pkg_o;
+    EX_FWD_data_t   ID_fwd_data_pkg_o;
     decode_t        ID_inst_pkg_o;
     logic           ID_regs_wen_o;
     logic           ID_valid_o;
@@ -57,6 +58,7 @@ module Backend(
 
     // EX - in
     EX_data_t       EX_data_pkg_i;
+    EX_FWD_data_t   EX_fwd_data_pkg_i;
     decode_t        EX_inst_pkg_i;
     logic           EX_regs_wen_i;
     logic           EX_valid_i;
@@ -131,6 +133,7 @@ module Backend(
         `endif
 
         .data_pkg_o             (ID_data_pkg_o),
+        .fwd_data_pkg_o         (ID_fwd_data_pkg_o),
         .inst_pkg_o             (ID_inst_pkg_o),
         .regs_wen_o             (ID_regs_wen_o),
         .valid_o                (ID_valid_o),
@@ -156,18 +159,23 @@ module Backend(
     always_ff @(posedge clk) begin
         if (rst) begin
             EX_data_pkg_i       <= 0;
+            EX_fwd_data_pkg_i   <= 0;
             EX_inst_pkg_i       <= 0;
             EX_regs_wen_i       <= 0;
             EX_valid_i          <= 0;
         end else if (pipe_hold_id_ex) begin
             // ..
+            EX_fwd_data_pkg_i.fwd_rs1_hit_ex <= EX_fwd_data_pkg_i.fwd_rs1_hit_ex & pipe_hold_ex_mem;
+            EX_fwd_data_pkg_i.fwd_rs2_hit_ex <= EX_fwd_data_pkg_i.fwd_rs2_hit_ex & pipe_hold_ex_mem;
         end else if (pipe_flush_id_ex) begin
             EX_data_pkg_i       <= 0;
+            EX_fwd_data_pkg_i   <= 0;
             EX_inst_pkg_i       <= 0;
             EX_regs_wen_i       <= 0;
             EX_valid_i          <= 0;
         end else begin
             EX_data_pkg_i       <= ID_data_pkg_o;
+            EX_fwd_data_pkg_i   <= ID_fwd_data_pkg_o;
             EX_inst_pkg_i       <= ID_inst_pkg_o;
             EX_regs_wen_i       <= ID_regs_wen_o;
             EX_valid_i          <= ID_valid_o;
@@ -182,6 +190,7 @@ module Backend(
 
         // from ID
         .data_pkg_i             (EX_data_pkg_i),
+        .fwd_data_pkg_i         (EX_fwd_data_pkg_i),
         .inst_pkg_i             (EX_inst_pkg_i),
         .regs_wen_i             (EX_regs_wen_i),
         .valid_i                (EX_valid_i),

@@ -9,6 +9,7 @@ module ex(
 
     // from ID
     input  EX_data_t        data_pkg_i                  ,
+    input  EX_FWD_data_t    fwd_data_pkg_i              ,
     input  decode_t         inst_pkg_i                  ,
     input  logic            regs_wen_i                  ,
     input  logic            valid_i                     ,
@@ -69,9 +70,10 @@ module ex(
     assign valid_o = valid;
     
     // 前推选择 - 对上一周期 ex 的前推
-    (* max_fanout = 64 *) logic [31:0] rs1_data_fwd, rs2_data_fwd;
-    assign rs1_data_fwd = (dpkg.fwd_rs1_hit_ex) ? fwd_ex_rd_data_i : dpkg.fwd_rs1_data;
-    assign rs2_data_fwd = (dpkg.fwd_rs2_hit_ex) ? fwd_ex_rd_data_i : dpkg.fwd_rs2_data;
+    (* max_fanout = 64 *) 
+    logic [31:0] rs1_data_fwd, rs2_data_fwd;
+    assign rs1_data_fwd = (fwd_data_pkg_i.fwd_rs1_hit_ex) ? fwd_ex_rd_data_i : fwd_data_pkg_i.fwd_rs1_data;
+    assign rs2_data_fwd = (fwd_data_pkg_i.fwd_rs2_hit_ex) ? fwd_ex_rd_data_i : fwd_data_pkg_i.fwd_rs2_data;
     
     // 访存地址计算
     wire [31:0] mem_addr_calc     = rs1_data_fwd + dpkg.imm;

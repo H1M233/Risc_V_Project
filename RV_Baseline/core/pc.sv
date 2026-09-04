@@ -19,9 +19,13 @@ module pc(
     // to I-Cache
     output logic [31:0] pc_o                    
 );
-    wire [31:0] pc_add_4 = pc_o + 32'd4;
-    `ifdef ENABLE_C
+    logic [31:0] pc_add_2_r;
+    logic [31:0] pc_add_4_r;
+
     wire [31:0] pc_add_2 = pc_o + 32'd2;
+    wire [31:0] pc_add_4 = pc_o + 32'd4;
+    
+    `ifdef ENABLE_C
     wire [31:0] pc_next  = (frontend_isCompressed) ? pc_add_2 : pc_add_4;
     `else
     wire [31:0] pc_next  = pc_add_4;
@@ -45,15 +49,24 @@ module pc(
 
     always_ff @(posedge clk) begin
         if (rst) begin
-            pc_o    <= `IROM_ADDR_START;
+            pc_add_2_r  <= `IROM_ADDR_START;
+            pc_add_4_r  <= `IROM_ADDR_START;
         end else begin
             if (pc_flush_en) begin
-                pc_o <= pc_flush_sel;
+                pc_add_2_r <= pc_flush_sel;
+                pc_add_4_r <= pc_flush_sel;
             end else if (pipe_hold) begin
                 // ...
             end else begin
-                pc_o <= pc_next;
+                pc_add_2_r <= pc_add_2;
+                pc_add_4_r <= pc_add_4;
             end
         end
     end
+
+    `ifdef ENABLE_C
+    assign pc_o = (frontend_isCompressed) ? pc_add_2_r : pc_add_4_r;
+    `else
+    assign pc_o = pc_add_4_r;
+    `endif
 endmodule

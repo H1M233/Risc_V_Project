@@ -37,8 +37,9 @@
     }
   },
   "MySystem": {
+    "cmake": "True",
     "cmakePath": "~/RiscV-MySystem",
-    "irom": "~/RiscV-MySystem/output/MySystem.bin",
-    "dram": "~/RiscV-MySystem/output/MySystem_data.bin"
+    "irom": "~/RiscV-MySystem/build/MySystem.bin",
+    "dram": "~/RiscV-MySystem/build/MySystem_data.bin"
   }
 }

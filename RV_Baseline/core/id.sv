@@ -23,6 +23,7 @@ module id(
 
     // to EX
     output EX_data_t                    data_pkg_o          ,
+    output EX_FWD_data_t                fwd_data_pkg_o      ,
     output decode_t                     inst_pkg_o          ,
     output logic                        regs_wen_o          ,
     output logic                        valid_o             ,
@@ -423,10 +424,10 @@ module id(
     assign data_pkg_o.gshare_ghr_snapshot   = data_pkg_i.gshare_ghr_snapshot;
 
     // 前推
-    assign data_pkg_o.fwd_rs1_data = forwarding_rs1_data_hit;
-    assign data_pkg_o.fwd_rs2_data = (ipkg.is_alu_i) ? {{20{inst_i[31]}}, inst_i[31:20]} : forwarding_rs2_data_hit;    // 立即数时返回 imm
-    assign data_pkg_o.fwd_rs1_hit_ex = forwarding_rs1_ex;
-    assign data_pkg_o.fwd_rs2_hit_ex = forwarding_rs2_ex & !ipkg.is_alu_i;  // 当为立即数时，不启用前推
+    assign fwd_data_pkg_o.fwd_rs1_data = forwarding_rs1_data_hit;
+    assign fwd_data_pkg_o.fwd_rs2_data = (ipkg.is_alu_i) ? {{20{inst_i[31]}}, inst_i[31:20]} : forwarding_rs2_data_hit;    // 立即数时返回 imm
+    assign fwd_data_pkg_o.fwd_rs1_hit_ex = forwarding_rs1_ex;
+    assign fwd_data_pkg_o.fwd_rs2_hit_ex = forwarding_rs2_ex & !ipkg.is_alu_i;  // 当为立即数时，不启用前推
     
     // CSR
     always_comb begin

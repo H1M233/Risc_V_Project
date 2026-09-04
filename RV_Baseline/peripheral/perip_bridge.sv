@@ -32,8 +32,9 @@ module perip_bridge(
     localparam SEG_ADDR         = `PERIP_SEG_ADDR;          // SEG
     localparam LED_ADDR         = `PERIP_LED_ADDR;          // LED[3:0]
     localparam CNT_ADDR         = `PERIP_CNT_ADDR;          // CNT
-    localparam UART_ADDR        = `PERIP_UART_ADDR;         // UART[7:0]
-    localparam UART_STATUS_ADDR = `PERIP_UART_ADDR + 4;     // UART_STATUS
+    localparam UART_TX_ADDR     = `PERIP_UART_ADDR;         // UART_TX[7:0]
+    localparam UART_RX_ADDR     = `PERIP_UART_ADDR + 4;     // UART_RX[7:0]
+    localparam UART_STATUS_ADDR = `PERIP_UART_ADDR + 8;     // UART_STATUS
     
     localparam CNT_RESET_CMD = 32'h4000_0000;
     localparam CNT_START_CMD = 32'h8000_0000;
@@ -94,7 +95,7 @@ module perip_bridge(
                         default;
                     endcase
                 end
-                UART_ADDR : uart_wdata <= DCACHE_perip_wdata;
+                UART_TX_ADDR : uart_wdata <= DCACHE_perip_wdata;
                 default;
             endcase
         end
@@ -147,7 +148,7 @@ module perip_bridge(
     // uart driver
     logic [31:0] uart_status;
     logic        uart_wen;
-    assign uart_wen = DCACHE_perip_wen && (DCACHE_perip_addr == UART_ADDR);
+    assign uart_wen = DCACHE_perip_wen && (DCACHE_perip_addr == UART_TX_ADDR);
     uart_driver uart_driver_inst (
         .cpu_clk            (clk),
         .cnt_clk            (cnt_clk),

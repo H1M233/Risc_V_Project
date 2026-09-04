@@ -54,7 +54,6 @@ module Frontend(
     `ifdef ENABLE_C
     logic                               BPU_is_compressed_r;
     `endif
-    logic [31:0]                        BPU_pc_next;
     logic [31:0]                        BPU_pc_next_r;
     logic                               BPU_valid_r;
     flush_t                             BPU_pred_flush;
@@ -112,19 +111,14 @@ module Frontend(
     
     // RVCExpander 例化
     `ifdef ENABLE_C
-    assign RVCE_is_compressed = ICACHE_res_inst[1:0] != 2'b11;
+    assign RVCE_is_compressed = ICACHE_resp_inst[1:0] != 2'b11;
     RVCExpander RVCExpander(
-        .inst_i     (ICACHE_res_inst),
+        .inst_i     (ICACHE_resp_inst),
         .inst_o     (RVCE_expanded_inst)
     );
     `endif
 
     // BPU 例化
-    `ifdef ENABLE_C
-    assign BPU_pc_next = (RVCE_is_compressed) ? ICACHE_res_pc + 32'h2 : ICACHE_res_pc + 32'h4;
-    `else
-    assign BPU_pc_next = ICACHE_resp_pc + 32'h4;
-    `endif
     always_ff @(posedge clk) begin
         if (rst) begin
             BPU_pc_r                    <= 0;
@@ -153,8 +147,8 @@ module Frontend(
             BPU_is_compressed_r         <= RVCE_is_compressed;
             `else
             BPU_inst_r                  <= ICACHE_resp_inst;
-            BPU_pc_next_r               <= BPU_pc_next;
             `endif
+            BPU_pc_next_r               <= ICACHE_req_pc;
             BPU_valid_r                 <= ICACHE_resp_valid;
             BPU_gsahre_ghr_snapshot_r   <= BPU_gsahre_ghr_snapshot;
         end
@@ -178,7 +172,6 @@ module Frontend(
         `else
         .inst_i             (ICACHE_resp_inst),
         `endif
-        .pc_next_i          (BPU_pc_next),
         .valid_i            (ICACHE_resp_valid),
 
         .data_pkg_i         (BPU_data_pkg_i),
@@ -196,7 +189,7 @@ module Frontend(
     assign Frontend_fifo_din.ras_ptr_snapshot       = BPU_ras_ptr_snapshot;
     assign Frontend_fifo_din.gshare_ghr_snapshot    = BPU_gsahre_ghr_snapshot_r;
     fifo #(
-        .DEPTH  (16),
+        .DEPTH  (8),
         .WIDTH  ($bits(prefetch_t))
     ) frontend_ifetch_FIFO (
         .clk        (clk),

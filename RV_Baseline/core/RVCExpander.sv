@@ -105,7 +105,7 @@ module RVCExpander(
                     end
 
                     3'b001 : translated_inst = { // C.JAL
-                        1'b0,                           // imm[20]
+                        compressed_inst[12],            // imm[20]
                         compressed_inst[8],             // imm[10]
                         compressed_inst[10:9],          // imm[9:8]
                         compressed_inst[6],             // imm[7]
@@ -114,7 +114,7 @@ module RVCExpander(
                         compressed_inst[11],            // imm[4]
                         compressed_inst[5:3],           // imm[3:1]
                         compressed_inst[12],            // imm[11]
-                        8'b0,                           // imm[19:12]
+                        {8{compressed_inst[12]}},       // imm[19:12]
                         5'd1,                           // rd
                         `JAL                            // opcode
                     };
@@ -238,7 +238,7 @@ module RVCExpander(
                     end
 
                     3'b101 : translated_inst = { // C.J
-                        1'b0,                           // imm[20]
+                        compressed_inst[12],            // imm[20]
                         compressed_inst[8],             // imm[10]
                         compressed_inst[10:9],          // imm[9:8]
                         compressed_inst[6],             // imm[7]
@@ -247,14 +247,14 @@ module RVCExpander(
                         compressed_inst[11],            // imm[4]
                         compressed_inst[5:3],           // imm[3:1]
                         compressed_inst[12],            // imm[11]
-                        8'b0,                           // imm[19:12]
+                        {8{compressed_inst[12]}},       // imm[19:12]
                         5'd0,                           // rd
                         `JAL                            // opcode
                     };
 
                     3'b110 : translated_inst = { // C.BEQZ
-                        1'b0,                           // imm[12]
-                        2'b0,                           // imm[10:9]
+                        compressed_inst[12],            // imm[12]
+                        {2{compressed_inst[12]}},       // imm[10:9]
                         compressed_inst[12],            // imm[8]
                         compressed_inst[6:5],           // imm[7:6]
                         compressed_inst[2],             // imm[5]
@@ -263,13 +263,13 @@ module RVCExpander(
                         3'b000,                         // funct3
                         compressed_inst[11:10],         // imm[4:3]
                         compressed_inst[4:3],           // imm[2:1]
-                        1'b0,                           // imm[11]
+                        compressed_inst[12],            // imm[11]
                         `TYPE_B                         // opcode
                     };
 
                     3'b111 : translated_inst = { // C.BNEZ
-                        1'b0,                           // imm[12]
-                        2'b0,                           // imm[10:9]
+                        compressed_inst[12],            // imm[12]
+                        {2{compressed_inst[12]}},       // imm[10:9]
                         compressed_inst[12],            // imm[8]
                         compressed_inst[6:5],           // imm[7:6]
                         compressed_inst[2],             // imm[5]
@@ -278,7 +278,7 @@ module RVCExpander(
                         3'b001,                         // funct3
                         compressed_inst[11:10],         // imm[4:3]
                         compressed_inst[4:3],           // imm[2:1]
-                        1'b0,                           // imm[11]
+                        compressed_inst[12],            // imm[11]
                         `TYPE_B                         // opcode
                     };
 

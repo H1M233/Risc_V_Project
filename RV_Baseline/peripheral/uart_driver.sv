@@ -11,7 +11,7 @@ module uart_driver (
     input  logic        rx_i            ,
     output logic        tx_o            
 );
-    localparam UART_TX_BUSY  = 32'h0000_FFFF;
+    localparam UART_TX_BUSY  = 32'h0000_0001;
 
     // uart wire
     logic [7:0] rx_data;

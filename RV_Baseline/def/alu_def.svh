@@ -42,14 +42,17 @@ typedef struct packed {
     logic [`GSHARE_BHR_WIDTH - 1:0] gshare_ghr_snapshot;
     logic [11:0]                    csr_waddr;
     logic [31:0]                    csr_rdata;
-    logic [31:0]                    fwd_rs1_data;
-    logic [31:0]                    fwd_rs2_data;
-    logic                           fwd_rs1_hit_ex;
-    logic                           fwd_rs2_hit_ex;
     `ifdef ENABLE_F
     logic [31:0]                    rs3_rdata;
     `endif
 } EX_data_t;
+
+typedef struct packed {
+    logic [31:0]                    fwd_rs1_data;
+    logic [31:0]                    fwd_rs2_data;
+    logic                           fwd_rs1_hit_ex;
+    logic                           fwd_rs2_hit_ex;
+} EX_FWD_data_t;
 
 typedef struct packed {
     // opcode OneShot

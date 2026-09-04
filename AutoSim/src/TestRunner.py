@@ -172,13 +172,12 @@ def system_test(
         AutoSim_dir: Path,
         json_settings: dict[str, any],
         prj_dict : dict[str, any],
-        cmake: Optional[bool] = None,
         debugging: Optional[bool] = None, 
         enableTrace: Optional[bool] = None, 
         traceRange: Optional[tuple[int, int]] = None
     ):
     # 参数默认值
-    cmake = False or cmake
+    cmake = json_settings['MySystem']['cmake'] == 'True'
     debugging = False or debugging
     enableTrace = False or enableTrace
     traceRange = (-1, -1) if traceRange is None else traceRange

@@ -63,18 +63,6 @@ module icache (
         end
     end
 
-    // IROM 旁路输出
-    logic IROM_bypass;
-    `ifdef VERILATOR_INST_TEST
-        assign IROM_bypass = 1'b1;
-    `elsif VERILATOR_SOFTWARE_TEST
-        assign IROM_bypass = 1'b1;
-    `elsif VIVADO_SIM
-        assign IROM_bypass = 1'b1;
-    `else
-        assign IROM_bypass = cpu_addr[31:28] == 4'h4;
-    `endif
-
     // 地址解码
     `ifdef ENABLE_C
     logic [31:0] cpu_pc_add2_r;
@@ -99,7 +87,7 @@ module icache (
     wire hit_way0    = tagv_w0[query_index] == {1'b1, query_tag};
     wire hit_way1    = tagv_w1[query_index] == {1'b1, query_tag};
     wire ICACHE_hit  = hit_way0 | hit_way1;
-    wire ICACHE_miss = ~ICACHE_hit & ~IROM_bypass;
+    wire ICACHE_miss = ~ICACHE_hit;
 
     // 读数据
     wire         replace_way_rdata  = replace_way[query_index];
@@ -116,8 +104,7 @@ module icache (
 
     // IROM 请求
     wire [31:0] request_addr = {miss_tag, miss_index, miss_word_sel, 2'b0};
-    assign perip_addr = (IROM_bypass)     ? cpu_addr :
-                        (requset_arvalid) ? request_addr : 32'b0;
+    assign perip_addr = (requset_arvalid) ? request_addr : 32'b0;
 
     // 写入行缓存
     logic [127:0] line_buffer;
@@ -145,8 +132,8 @@ module icache (
     end
 
     // 状态机
-    assign perip_arvalid = requset_arvalid | IROM_bypass;
-    assign perip_ren     = state == REQUEST_n_FILL | IROM_bypass;
+    assign perip_arvalid = requset_arvalid;
+    assign perip_ren     = state == REQUEST_n_FILL;
     always_ff @(posedge clk) begin
         if (rst | pipe_flush) begin
             state               <= IDLE;
@@ -241,10 +228,6 @@ module icache (
             cpu_rvalid  <= 1'b0;
         end else if (pipe_hold) begin
             // ...
-        end else if (IROM_bypass) begin
-            cpu_addr_r  <= cpu_addr;
-            cpu_rdata   <= perip_rdata;
-            cpu_rvalid  <= 1'b1;
         `ifdef ENABLE_C
         end else if (state == IDLE & ICACHE_hit & ~align2x_line) begin
             cpu_addr_r  <= cpu_addr;
@@ -261,8 +244,8 @@ module icache (
             cpu_rvalid  <= 1'b1;
         `endif
         end else begin
-            cpu_addr_r  <= 32'b0;
-            cpu_rdata   <= `NOP;
+            // cpu_addr_r  <= 32'b0;
+            // cpu_rdata   <= `NOP;
             cpu_rvalid  <= 1'b0;
         end
     end
