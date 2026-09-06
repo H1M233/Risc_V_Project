@@ -174,7 +174,7 @@ module bpu_top #(
             pred_flush_o.pc     <= 0;
         end else if (pipe_hold) begin
             // ...
-        end else if (pipe_flush) begin
+        end else if (pipe_flush | ~valid_i) begin
             pred_flush_o.en     <= 0;
             pred_flush_o.pc     <= 0;
         end else begin

@@ -3,24 +3,27 @@
 `include "csr_def.svh"
 
 module CSR(
-    input  logic            clk                 ,
-    input  logic            rst                 ,
+    input  logic                    clk                     ,
+    input  logic                    rst                     ,
 
     // from id
-    input  logic [11:0]     csr_addr            ,
-    output logic [31:0]     csr_rdata           ,
+    input  logic [11:0]             csr_addr                ,
+    output logic [31:0]             csr_rdata               ,
 
     // from wb
-    input  logic [31:0]     wb_pc_i             ,
-    input  CSR_data_t       data_pkg_i          ,
+    input  logic [31:0]             wb_pc_i                 ,
+    input  CSR_data_t               data_pkg_i              ,
 
     // from ex
-    input  logic            ex_ecall            ,
-    input  logic            ex_mret             ,
-    input  logic            ex_sret             ,
-    
+    input  logic                    ex_ecall                ,
+    input  logic                    ex_mret                 ,
+    input  logic                    ex_sret                 ,
+
+    // from PerfCounter
+    input  PerfCounter_t            PerfCounter_pkg_i       ,
+
     // trap
-    output flush_t          trap_flush_o        
+    output flush_t                  trap_flush_o            
 
     // // 外部中断
     // input  logic         PLIC,
@@ -52,12 +55,18 @@ module CSR(
     logic [31:0] marchid;       // 设备架构 ID
     logic [31:0] mimpid;        // 设备版本号
     logic [31:0] mhartid;       // 核心编号
-    logic [63:0] mcycle;        // 机器计数器
-    logic [63:0] minstret;      // 退休指令计数器
     logic [31:0] dcsr;          // Debug 状态寄存器
     logic [31:0] dpc;           // Debug PC
     logic [31:0] dscratch0;     // Debug 临时寄存器 x0
     logic [31:0] dscratch1;     // Debug 临时寄存器 x1
+
+    logic [31:0] mcountinhibit; // 性能计数器开关
+    logic [63:0] mcycle;
+    logic [63:0] time_;
+    logic [63:0] minstret;
+    logic [63:0] mhpmcounter3;
+    logic [63:0] mhpmcounter4;
+    logic [63:0] mhpmcounter5;
 
     // 机器信息连线
     assign misa = {
@@ -88,28 +97,6 @@ module CSR(
     assign mimpid    = 32'b0;
     assign mhartid   = 32'b0;
 
-    // CSR地址映射
-    localparam MSTATUS_ADDR   = 12'h300;
-    localparam MEPC_ADDR      = 12'h341;
-    localparam MCAUSE_ADDR    = 12'h342;
-    localparam MTVEC_ADDR     = 12'h305;
-    localparam MSCRATCH_ADDR  = 12'h340;
-    localparam FCSR_ADDR      = 12'h003;
-    localparam FFLAGS_ADDR    = 12'h001;
-    localparam FRM_ADDR       = 12'h002;
-    localparam MIE_ADDR       = 12'h304;
-    localparam MIP_ADDR       = 12'h344;
-    localparam MTVAL_ADDR     = 12'h343;
-    localparam MISA_ADDR      = 12'h301;
-    localparam MVENDORID_ADDR = 12'hf11;
-    localparam MARCHID_ADDR   = 12'hf12;
-    localparam MIMPID_ADDR    = 12'hf13;
-    localparam MHARTID_ADDR   = 12'hf14;
-    localparam DCSR_ADDR      = 12'h7b0;
-    localparam DPC_ADDR       = 12'h7b1;
-    localparam DSCRATCH0_ADDR = 12'h7b2;
-    localparam DSCRATCH1_ADDR = 12'h7b3;
-
     // CSR 写
     always_ff @(posedge clk) begin
         if (rst) begin
@@ -136,16 +123,20 @@ module CSR(
         end
         else if (csr_wen) begin
             case (csr_waddr)
-                MSTATUS_ADDR  : mstatus     <= csr_wdata;
-                MEPC_ADDR     : mepc        <= csr_wdata;
-                MCAUSE_ADDR   : mcause      <= csr_wdata;
-                MTVEC_ADDR    : mtvec       <= csr_wdata;
-                MSCRATCH_ADDR : mscratch    <= csr_wdata;
+                MSTATUS_ADDR       : mstatus        <= csr_wdata;
+                MEPC_ADDR          : mepc           <= csr_wdata;
+                MCAUSE_ADDR        : mcause         <= csr_wdata;
+                MTVEC_ADDR         : mtvec          <= csr_wdata;
+                MSCRATCH_ADDR      : mscratch       <= csr_wdata;
 
-                FCSR_ADDR     : fcsr        <= csr_wdata[7:0];
-                FFLAGS_ADDR   : fcsr.flags  <= csr_wdata[4:0];
-                FRM_ADDR      : fcsr.frm    <= rm_t'(csr_wdata[2:0]);
-                default       : ; // 无效地址，保持不变
+                // FCSR
+                FCSR_ADDR          : fcsr           <= csr_wdata[7:0];
+                FFLAGS_ADDR        : fcsr.flags     <= csr_wdata[4:0];
+                FRM_ADDR           : fcsr.frm       <= rm_t'(csr_wdata[2:0]);
+
+                // PerfCounter
+                MCOUNTINHIBIT_ADDR : mcountinhibit  <= csr_wdata;
+                default            : ; // 无效地址，保持不变
             endcase
         end 
     end
@@ -153,16 +144,32 @@ module CSR(
     // CSR 读
     always_comb begin
         case (csr_addr)
-            MSTATUS_ADDR  : csr_rdata = mstatus;
-            MEPC_ADDR     : csr_rdata = mepc;
-            MCAUSE_ADDR   : csr_rdata = mcause;
-            MTVEC_ADDR    : csr_rdata = mtvec;
-            MSCRATCH_ADDR : csr_rdata = mscratch;
+            MSTATUS_ADDR       : csr_rdata = mstatus;
+            MEPC_ADDR          : csr_rdata = mepc;
+            MCAUSE_ADDR        : csr_rdata = mcause;
+            MTVEC_ADDR         : csr_rdata = mtvec;
+            MSCRATCH_ADDR      : csr_rdata = mscratch;
 
-            FCSR_ADDR     : csr_rdata = fcsr;
-            FFLAGS_ADDR   : csr_rdata = {26'b0, fcsr.flags};
-            FRM_ADDR      : csr_rdata = {29'b0, fcsr.frm};
-            default       : csr_rdata = 32'b0; // 无效地址，返回0
+            // FCSR
+            FCSR_ADDR          : csr_rdata = fcsr;
+            FFLAGS_ADDR        : csr_rdata = {26'b0, fcsr.flags};
+            FRM_ADDR           : csr_rdata = {29'b0, fcsr.frm};
+
+            // PerfCounter
+            MCOUNTINHIBIT_ADDR : csr_rdata = mcountinhibit;
+            MCYCLE_ADDR        : csr_rdata = mcycle[31:0];
+            MCYCLEH_ADDR       : csr_rdata = mcycle[63:32];
+            TIME_ADDR          : csr_rdata = time_[31:0];
+            TIMEH_ADDR         : csr_rdata = time_[63:32];
+            MINSTRET_ADDR      : csr_rdata = minstret[31:0];
+            MINSTRETH_ADDR     : csr_rdata = minstret[63:32];
+            ICACHE_MISS_ADDR   : csr_rdata = mhpmcounter3[31:0];
+            ICACHE_MISSH_ADDR  : csr_rdata = mhpmcounter3[63:32];
+            MISPREDICT_ADDR    : csr_rdata = mhpmcounter4[31:0];
+            MISPREDICTH_ADDR   : csr_rdata = mhpmcounter4[63:32];
+            DCACHE_MISS_ADDR   : csr_rdata = mhpmcounter5[31:0];
+            DCACHE_MISSH_ADDR  : csr_rdata = mhpmcounter5[63:32];
+            default            : csr_rdata = 32'b0; // 无效地址，返回0
         endcase
     end
     
@@ -175,4 +182,24 @@ module CSR(
             default    : trap_flush_o.pc = 32'b0;
         endcase
     end
+
+    // PerfCounter_if 例化
+    `define DECLARE_PERFCOUNTER(NAME, _reg,_event_pulse) \
+        PerfCounter PerfCounter_``NAME``_inst( \
+            .clk            (clk), \
+            .rst            (rst), \
+            .enable         (mcountinhibit[MCOUNTINHIBIT_``NAME]), \
+            .event_pulse    (_event_pulse), \
+            .wenl           (csr_wen && csr_waddr == NAME``_ADDR), \
+            .wenh           (csr_wen && csr_waddr == NAME``H_ADDR), \
+            .wdata          (csr_wdata), \
+            .value          (_reg) \
+        );
+
+    `DECLARE_PERFCOUNTER(MCYCLE,        mcycle,         1'b1)
+    `DECLARE_PERFCOUNTER(TIME,          time_,          1'b1)
+    `DECLARE_PERFCOUNTER(MINSTRET,      minstret,       PerfCounter_pkg_i.minstret)
+    `DECLARE_PERFCOUNTER(ICACHE_MISS,   mhpmcounter3,   PerfCounter_pkg_i.icache_miss)
+    `DECLARE_PERFCOUNTER(MISPREDICT,    mhpmcounter4,   PerfCounter_pkg_i.mispredict)
+    `DECLARE_PERFCOUNTER(DCACHE_MISS,   mhpmcounter5,   PerfCounter_pkg_i.dcache_miss)
 endmodule

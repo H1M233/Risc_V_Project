@@ -1,53 +1,55 @@
 `include "alu_def.svh"
 `include "switch.svh"
 module Backend(
-    input  logic                        clk                     ,
-    input  logic                        rst                     ,
+    input  logic                        clk                         ,
+    input  logic                        rst                         ,
 
     // from Frontend
-    input  prefetch_t                   data_pkg_i              ,
-    input  logic                        valid_i                 ,
+    input  prefetch_t                   data_pkg_i                  ,
+    input  logic                        valid_i                     ,
 
     // to Frontend
-    output flush_t                      EX_mispred_flush        ,
-    output BPU_data_t                   BPU_data_pkg_o          ,
-    output logic                        ready_o                 ,
+    output flush_t                      EX_mispred_flush            ,
+    output BPU_data_t                   BPU_data_pkg_o              ,
+    output logic                        ready_o                     ,
 
     // to RF
-    output logic [`RF_IDX_WIDTH - 1:0]  RF_rs1_addr_o           ,
-    output logic [`RF_IDX_WIDTH - 1:0]  RF_rs2_addr_o           ,
-    output RF_data_t                    RF_data_pkg_o           ,
+    output logic [`RF_IDX_WIDTH - 1:0]  RF_rs1_addr_o               ,
+    output logic [`RF_IDX_WIDTH - 1:0]  RF_rs2_addr_o               ,
+    output RF_data_t                    RF_data_pkg_o               ,
     `ifdef ENABLE_F
-    output logic [`RF_IDX_WIDTH - 1:0]  RF_rs3_addr_o           ,
+    output logic [`RF_IDX_WIDTH - 1:0]  RF_rs3_addr_o               ,
     `endif
 
     // to CSR
-    output logic [11:0]                 CSR_addr_o              ,
-    output logic [31:0]                 CSR_WB_pc_o             ,
-    output CSR_data_t                   CSR_data_pkg_o          ,
-    output logic                        EX_ecall_o              ,
-    output logic                        EX_mret_o               ,
-    output logic                        EX_sret_o               ,
+    output logic [11:0]                 CSR_addr_o                  ,
+    output logic [31:0]                 CSR_WB_pc_o                 ,
+    output CSR_data_t                   CSR_data_pkg_o              ,
+    output logic                        EX_ecall_o                  ,
+    output logic                        EX_mret_o                   ,
+    output logic                        EX_sret_o                   ,
 
     // from RF
-    input  logic [31:0]                 RF_rs1_rdata_i          ,
-    input  logic [31:0]                 RF_rs2_rdata_i          ,
+    input  logic [31:0]                 RF_rs1_rdata_i              ,
+    input  logic [31:0]                 RF_rs2_rdata_i              ,
     `ifdef ENABLE_F
-    input  logic [31:0]                 RF_rs3_rdata_i          ,
+    input  logic [31:0]                 RF_rs3_rdata_i              ,
     `endif
 
     // from CSR
-    input  logic [31:0]                 CSR_rdata_i             ,
-    input  flush_t                      CSR_trap_flush_i        ,
+    input  logic [31:0]                 CSR_rdata_i                 ,
+    input  flush_t                      CSR_trap_flush_i            ,
+
+    // to PerfCounter
+    output PerfCounter_t                PerfCounter_pkg_o           ,
 
     // Perip Bridge side
-    output logic [31:0]                 DCACHE_perip_addr       ,
-    output logic [3:0]                  DCACHE_perip_we         ,
-    output logic                        DCACHE_perip_wen        ,
-    output logic [31:0]                 DCACHE_perip_wdata      ,
-    input  logic [31:0]                 DCACHE_perip_rdata      
+    output logic [31:0]                 DCACHE_perip_addr           ,
+    output logic [3:0]                  DCACHE_perip_we             ,
+    output logic                        DCACHE_perip_wen            ,
+    output logic [31:0]                 DCACHE_perip_wdata          ,
+    input  logic [31:0]                 DCACHE_perip_rdata          
 );
-
     // ID - out
     EX_data_t       ID_data_pkg_o;
     EX_FWD_data_t   ID_fwd_data_pkg_o;
@@ -330,4 +332,10 @@ module Backend(
         .data_pkg_o             (WB_RF_data_pkg_o),
         .CSR_data_pkg_o         (WB_CSR_data_pkg_o)
     );
+
+    // PerfCounter
+    assign PerfCounter_pkg_o.minstret    = WB_valid_i;
+    assign PerfCounter_pkg_o.mispredict  = EX_mispred_flush.en;
+    assign PerfCounter_pkg_o.dcache_miss = DCACHE_stall;
+
 endmodule

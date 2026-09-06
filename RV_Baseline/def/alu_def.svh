@@ -341,4 +341,20 @@ typedef struct packed {
     logic NX;   // 不精确
 } fflags_t;
 
+typedef struct packed {
+    logic minstret;
+    logic icache_miss;
+    logic mispredict;
+    logic dcache_miss;
+} PerfCounter_t;
+
+typedef struct packed {
+    logic [63:0] mcycle;
+    logic [63:0] time_;
+    logic [63:0] minstret;
+    logic [63:0] mispredict;
+    logic [63:0] icache_miss;
+    logic [63:0] dcache_miss;
+} PerfCounter_CSR_t;
+
 `endif

@@ -2,28 +2,31 @@
 `include "switch.svh"
 
 module Frontend(
-    input  logic            clk                     ,
-    input  logic            rst                     ,
+    input  logic                    clk                     ,
+    input  logic                    rst                     ,
 
     // PC flush
-    input  flush_t          EX_mispred_flush_i      ,
-    input  flush_t          CSR_trap_flush_i        ,
+    input  flush_t                  EX_mispred_flush_i      ,
+    input  flush_t                  CSR_trap_flush_i        ,
 
     // to Backend
-    output prefetch_t       data_pkg_o              ,
-    output logic            valid_o                 ,
+    output prefetch_t               data_pkg_o              ,
+    output logic                    valid_o                 ,
 
     // from Backend
-    input  BPU_data_t       BPU_data_pkg_i          ,
-    input  logic            Backend_ready_i         ,
+    input  BPU_data_t               BPU_data_pkg_i          ,
+    input  logic                    Backend_ready_i         ,
+
+    // to PerfCounter
+    output PerfCounter_t            PerfCounter_pkg_o       ,
 
     // Perip Bridge side
-    output logic [31:0]     ICACHE_perip_addr       ,
-    output logic            ICACHE_perip_arvalid    ,
-    output logic            ICACHE_perip_ren        ,
-    input  logic            ICACHE_perip_ready      ,
-    input  logic [31:0]     ICACHE_perip_rdata      ,
-    input  logic            ICACHE_perip_rvalid     
+    output logic [31:0]             ICACHE_perip_addr       ,
+    output logic                    ICACHE_perip_arvalid    ,
+    output logic                    ICACHE_perip_ren        ,
+    input  logic                    ICACHE_perip_ready      ,
+    input  logic [31:0]             ICACHE_perip_rdata      ,
+    input  logic                    ICACHE_perip_rvalid     
 );
     // flush
     wire Frontend_flush           = EX_mispred_flush_i.en | CSR_trap_flush_i.en;
@@ -31,29 +34,25 @@ module Frontend(
 
     // PC
     (* max_fanout = 64 *)
-    logic [31:0]    PC_pc_o;
+    logic [31:0]    PC_pc;
+    logic [31:0]    PC_ICACHE_req_pc;
     logic           PC_stall;
 
     // I-Cache
-    logic [31:0]    ICACHE_req_pc;
-    logic           ICACHE_req_valid;
-    logic [31:0]    ICACHE_resp_pc;
-    logic [31:0]    ICACHE_resp_inst;
+    logic [255:0]   ICACHE_resp_line;
     logic           ICACHE_resp_valid;
-    logic           ICACHE_stall;
 
-    // RVCExpander
-    `ifdef ENABLE_C
-    logic           RVCE_is_compressed;
-    logic [31:0]    RVCE_expanded_inst;
-    `endif
+    // IAB
+    logic           IAB_prefetch;
+    logic           IAB_update_line;
+    logic [31:0]    IAB_pc;
+    logic [31:0]    IAB_inst;
+    logic           IAB_valid;
+    logic [1:0]     IAB_update_offest;
 
     // BPU
     logic [31:0]                        BPU_pc_r;
     logic [31:0]                        BPU_inst_r;
-    `ifdef ENABLE_C
-    logic                               BPU_is_compressed_r;
-    `endif
     logic [31:0]                        BPU_pc_next_r;
     logic                               BPU_valid_r;
     flush_t                             BPU_pred_flush;
@@ -68,38 +67,35 @@ module Frontend(
     logic           Frontend_fifo_isempty;
 
     // PC 例化
-    assign PC_stall = ICACHE_stall | Frontend_fifo_isfull;
+    assign PC_stall = ~ICACHE_resp_valid | Frontend_fifo_isfull;
     pc PC(
         .clk                    (clk),
         .rst                    (rst),
         .pipe_hold              (PC_stall),
 
-        `ifdef ENABLE_C
-        .frontend_isCompressed  (RVCE_is_compressed),
-        `endif
+        .IAB_update_offest      (IAB_update_offest),
+        .IAB_prefetch           (IAB_prefetch),
 
         .BPU_pred_flush         (BPU_pred_flush),
         .EX_mispred_flush       (EX_mispred_flush_i),
         .CSR_trap_flush         (CSR_trap_flush_i),
 
-        .pc_o                   (PC_pc_o)
+        .pc_o                   (PC_pc),
+        .ICACHE_req_pc_o        (PC_ICACHE_req_pc)
     );
 
     // I-Cache 例化
-    assign ICACHE_req_pc    = PC_pc_o;
-    assign ICACHE_req_valid = 1'b1;
     icache ICACHE(
         .clk                    (clk),
         .rst                    (rst),
         .pipe_hold              (Frontend_fifo_isfull),
         .pipe_flush             (Frontend_flush_with_pred),
 
-        .cpu_addr               (ICACHE_req_pc),
-        .cpu_arvalid            (ICACHE_req_valid),
-        .cpu_addr_r             (ICACHE_resp_pc),
-        .cpu_rdata              (ICACHE_resp_inst),
-        .cpu_rvalid             (ICACHE_resp_valid),
-        .cpu_stall              (ICACHE_stall),
+        .cpu_req_addr           (PC_ICACHE_req_pc),
+        .cpu_req_prefetch       (IAB_prefetch),
+        .cpu_req_update         (IAB_update_line),
+        .cpu_resp_line          (ICACHE_resp_line),
+        .cpu_resp_valid         (ICACHE_resp_valid),
 
         .perip_addr             (ICACHE_perip_addr),
         .perip_arvalid          (ICACHE_perip_arvalid),
@@ -108,24 +104,31 @@ module Frontend(
         .perip_rdata            (ICACHE_perip_rdata),
         .perip_rvalid           (ICACHE_perip_rvalid)
     );
-    
-    // RVCExpander 例化
-    `ifdef ENABLE_C
-    assign RVCE_is_compressed = ICACHE_resp_inst[1:0] != 2'b11;
-    RVCExpander RVCExpander(
-        .inst_i     (ICACHE_resp_inst),
-        .inst_o     (RVCE_expanded_inst)
+
+    // IAB 例化
+    IAB IAB(
+        .clk                    (clk),
+        .rst                    (rst),
+        .pipe_hold              (Frontend_fifo_isfull),
+        .pipe_flush             (Frontend_flush_with_pred),
+
+        .pc_i                   (PC_pc),
+        .PC_update_offest_o     (IAB_update_offest),
+        .ICACHE_prefetch_o      (IAB_prefetch),
+        .ICACHE_update_line_o   (IAB_update_line),
+        
+        .line_i                 (ICACHE_resp_line),
+        .line_valid_i           (ICACHE_resp_valid),
+        .pc_o                   (IAB_pc),
+        .inst_o                 (IAB_inst),
+        .valid_o                (IAB_valid)
     );
-    `endif
 
     // BPU 例化
     always_ff @(posedge clk) begin
         if (rst) begin
             BPU_pc_r                    <= 0;
             BPU_inst_r                  <= 0;
-            `ifdef ENABLE_C
-            BPU_is_compressed_r         <= 0;
-            `endif
             BPU_pc_next_r               <= 0;
             BPU_valid_r                 <= 0;
             BPU_gsahre_ghr_snapshot_r   <= 0;
@@ -134,22 +137,14 @@ module Frontend(
         end else if (Frontend_flush_with_pred) begin
             BPU_pc_r                    <= 0;
             BPU_inst_r                  <= 0;
-            `ifdef ENABLE_C
-            BPU_is_compressed_r         <= 0;
-            `endif
             BPU_pc_next_r               <= 0;
             BPU_valid_r                 <= 0;
             BPU_gsahre_ghr_snapshot_r   <= 0;
         end else begin
-            BPU_pc_r                    <= ICACHE_resp_pc;
-            `ifdef ENABLE_C
-            BPU_inst_r                  <= RVCE_expanded_inst;
-            BPU_is_compressed_r         <= RVCE_is_compressed;
-            `else
-            BPU_inst_r                  <= ICACHE_resp_inst;
-            `endif
-            BPU_pc_next_r               <= ICACHE_req_pc;
-            BPU_valid_r                 <= ICACHE_resp_valid;
+            BPU_pc_r                    <= IAB_pc;
+            BPU_inst_r                  <= IAB_inst;
+            BPU_pc_next_r               <= PC_pc;
+            BPU_valid_r                 <= IAB_valid;
             BPU_gsahre_ghr_snapshot_r   <= BPU_gsahre_ghr_snapshot;
         end
     end
@@ -165,14 +160,10 @@ module Frontend(
         .pipe_flush         (Frontend_flush_with_pred),
         .outer_flush        (Frontend_flush),
 
-        .pc_early_i         (ICACHE_req_pc),
-        .pc_i               (ICACHE_resp_pc),
-        `ifdef ENMABLE_C
-        .inst_i             (RVCE_expanded_inst),
-        `else
-        .inst_i             (ICACHE_resp_inst),
-        `endif
-        .valid_i            (ICACHE_resp_valid),
+        .pc_early_i         (PC_pc),
+        .pc_i               (IAB_pc),
+        .inst_i             (IAB_inst),
+        .valid_i            (IAB_valid),
 
         .data_pkg_i         (BPU_data_pkg_i),
 
@@ -203,6 +194,21 @@ module Frontend(
     );
 
     assign data_pkg_o = Frontend_fifo_dout;
-    assign valid_o = Backend_ready_i;
+
+    logic Frontend_fifo_valid;
+    always_ff @(posedge clk) begin
+        if (rst | Frontend_flush) begin
+            Frontend_fifo_valid <= 1'b1;
+        end else if (~Backend_ready_i) begin
+            // ...
+        end else begin
+            Frontend_fifo_valid <= ~Frontend_fifo_isempty;
+        end
+    end
+
+    assign valid_o = Backend_ready_i & Frontend_fifo_valid;
+
+    // PerfCounter
+    assign PerfCounter_pkg_o.icache_miss = ~ICACHE_resp_valid;
 
 endmodule

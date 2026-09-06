@@ -24,7 +24,7 @@ Disassembly of section .text.init:
 
 00000030 <test_4>:
   30:	00300093          	li	ra,3
-  34:	00708f13          	addi	t5,ra,7
+  34:	00708f13          	addi	t5,ra,7 
   38:	00a00e93          	li	t4,10
   3c:	00400193          	li	gp,4
   40:	25df1863          	bne	t5,t4,290 <fail>

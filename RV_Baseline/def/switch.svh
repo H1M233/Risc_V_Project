@@ -55,7 +55,7 @@
 `endif
 
 // Cache 配置
-`define ICACHE_INDEX_WIDTH 7 // I-Cache : 4 KB
+`define ICACHE_INDEX_WIDTH 8 // I-Cache : 4 KB
 `define DCACHE_INDEX_WIDTH 9 // D-Cache : 4 KB
 
 // 扩展

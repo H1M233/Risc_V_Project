@@ -52,6 +52,9 @@ module top_riscv(
     logic [31:0]                Backend_WB_pc_o;
     CSR_data_t                  Backend_CSR_data_pkg_o;
 
+    // PerfCounter
+    PerfCounter_t               PerfCounter_pkg_i;
+
     // RF 例化
     RF RF(
         .clk                    (cpu_clk),
@@ -76,16 +79,23 @@ module top_riscv(
         .clk                    (cpu_clk),
         .rst                    (cpu_rst),
 
+        // from id
         .csr_addr               (CSR_addr_i),
         .csr_rdata              (CSR_rdata),
         
+        // from wb
         .wb_pc_i                (Backend_WB_pc_o),
         .data_pkg_i             (Backend_CSR_data_pkg_o),
         
+        // from ex
         .ex_ecall               (Backend_EX_ecall_o),
         .ex_mret                (Backend_EX_mret_o),
         .ex_sret                (Backend_EX_sret_o),
+
+        // from PerfCounter
+        .PerfCounter_pkg_i      (PerfCounter_pkg_i),
         
+        // trap
         .trap_flush_o           (CSR_trap_flush)
     );
 
@@ -105,6 +115,9 @@ module top_riscv(
         // from Backend
         .BPU_data_pkg_i         (Backend_BPU_data_pkg_o),
         .Backend_ready_i        (Backend_ready),
+
+        // to PerfCounter
+        .PerfCounter_pkg_o      (PerfCounter_pkg_i),
 
         // Perip Bridge side
         .ICACHE_perip_addr      (ICACHE_perip_addr),
@@ -155,6 +168,9 @@ module top_riscv(
         // from CSR
         .CSR_rdata_i            (CSR_rdata),
         .CSR_trap_flush_i       (CSR_trap_flush),
+
+        // to PerfCounter
+        .PerfCounter_pkg_o      (PerfCounter_pkg_i),
 
         // Perip Bridge side
         .DCACHE_perip_addr      (DCACHE_perip_addr),

@@ -26,9 +26,12 @@ def removeScreenFlag(flag):
 
 def waitForScreen(flag):
     while True:
-        time.sleep(0.1)
+        time.sleep(0.2)
         if os.path.exists(flag):
-            os.remove(flag)
+            try:
+                os.remove(flag)
+            except FileNotFoundError:
+                continue
             break
     
     subprocess.run('wt.exe -w -1 --colorScheme "One Half Dark" wsl.exe -- bash -lc "screen /tmp/RV_UART"', shell=True)

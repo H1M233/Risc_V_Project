@@ -60,8 +60,8 @@ module uart_driver (
     assign uart_status = (uart_tx_fifo_full) ? UART_TX_BUSY : 32'h0;
     assign tx_valid = tx_ready && ~uart_tx_fifo_empty;
     uart #(
-        .CLK_FREQ(50000000),
-        .BAUD_RATE(1000000)
+        .CLK_FREQ   (50000000),
+        .BAUD_RATE  (1000000)
     ) uart_inst(
         .clk        (cnt_clk),
         .rst        (rst),

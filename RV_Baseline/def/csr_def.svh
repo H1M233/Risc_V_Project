@@ -2,6 +2,53 @@
 
 `ifndef CSR_DEF
 `define CSR_DEF
+
+// CSR地址映射
+localparam MSTATUS_ADDR         = 12'h300;
+localparam MEPC_ADDR            = 12'h341;
+localparam MCAUSE_ADDR          = 12'h342;
+localparam MTVEC_ADDR           = 12'h305;
+localparam MSCRATCH_ADDR        = 12'h340;
+localparam FCSR_ADDR            = 12'h003;
+localparam FFLAGS_ADDR          = 12'h001;
+localparam FRM_ADDR             = 12'h002;
+localparam MIE_ADDR             = 12'h304;
+localparam MIP_ADDR             = 12'h344;
+localparam MTVAL_ADDR           = 12'h343;
+localparam MISA_ADDR            = 12'h301;
+localparam MVENDORID_ADDR       = 12'hf11;
+localparam MARCHID_ADDR         = 12'hf12;
+localparam MIMPID_ADDR          = 12'hf13;
+localparam MHARTID_ADDR         = 12'hf14;
+localparam DCSR_ADDR            = 12'h7b0;
+localparam DPC_ADDR             = 12'h7b1;
+localparam DSCRATCH0_ADDR       = 12'h7b2;
+localparam DSCRATCH1_ADDR       = 12'h7b3;
+
+// 性能计数器地址映射
+localparam MCOUNTINHIBIT_ADDR   = 12'h320;
+localparam MCYCLE_ADDR          = 12'hC00;
+localparam MCYCLEH_ADDR         = 12'hC80;
+localparam TIME_ADDR            = 12'hC01;
+localparam TIMEH_ADDR           = 12'hC81;
+localparam MINSTRET_ADDR        = 12'hC02;
+localparam MINSTRETH_ADDR       = 12'hC82;
+localparam ICACHE_MISS_ADDR     = 12'hC03;
+localparam ICACHE_MISSH_ADDR    = 12'hC83;
+localparam MISPREDICT_ADDR      = 12'hC04;
+localparam MISPREDICTH_ADDR     = 12'hC84;
+localparam DCACHE_MISS_ADDR     = 12'hC05;
+localparam DCACHE_MISSH_ADDR    = 12'hC85;
+
+// 性能计数器开关位
+localparam MCOUNTINHIBIT_MCYCLE       = 0;
+localparam MCOUNTINHIBIT_TIME         = 1;
+localparam MCOUNTINHIBIT_MINSTRET     = 2;
+localparam MCOUNTINHIBIT_ICACHE_MISS  = 3;
+localparam MCOUNTINHIBIT_MISPREDICT   = 4;
+localparam MCOUNTINHIBIT_DCACHE_MISS  = 5;
+
+
 // CSR 解码
 typedef struct packed { // MSTATUS
     logic       SD;     // is XS | FS | VS Dirty
